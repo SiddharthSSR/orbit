@@ -7,6 +7,13 @@ protocol TodoAPIClientProtocol: Sendable {
     func deleteTodo(id: UUID) async throws
 }
 
+protocol BillAPIClientProtocol: Sendable {
+    func listBills() async throws -> [BillDTO]
+    func createBill(_ payload: BillCreateRequest) async throws -> BillDTO
+    func updateBill(id: UUID, payload: BillUpdateRequest) async throws -> BillDTO
+    func deleteBill(id: UUID) async throws
+}
+
 enum OrbitAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -24,7 +31,7 @@ enum OrbitAPIError: LocalizedError {
     }
 }
 
-struct OrbitAPIClient: TodoAPIClientProtocol, @unchecked Sendable {
+struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, @unchecked Sendable {
     var baseURL: URL
     var session: URLSession
 
@@ -50,6 +57,22 @@ struct OrbitAPIClient: TodoAPIClientProtocol, @unchecked Sendable {
 
     func deleteTodo(id: UUID) async throws {
         let _: EmptyResponse = try await request(path: "/todos/\(id.uuidString)", method: "DELETE")
+    }
+
+    func listBills() async throws -> [BillDTO] {
+        try await request(path: "/bills")
+    }
+
+    func createBill(_ payload: BillCreateRequest) async throws -> BillDTO {
+        try await request(path: "/bills", method: "POST", body: payload)
+    }
+
+    func updateBill(id: UUID, payload: BillUpdateRequest) async throws -> BillDTO {
+        try await request(path: "/bills/\(id.uuidString)", method: "PATCH", body: payload)
+    }
+
+    func deleteBill(id: UUID) async throws {
+        let _: EmptyResponse = try await request(path: "/bills/\(id.uuidString)", method: "DELETE")
     }
 
     private func request<Response: Decodable>(
