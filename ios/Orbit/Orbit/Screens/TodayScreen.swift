@@ -2,17 +2,24 @@ import SwiftUI
 
 struct TodayScreen: View {
     @StateObject private var dashboardViewModel: TodayDashboardViewModel
+    @State private var selectedMood = "focused"
+    @State private var selectedEnergy = 3
+    @State private var moodNotes = ""
+
+    private let moodOptions = ["focused", "calm", "happy", "stressed", "tired", "anxious", "excited", "neutral"]
 
     init(
         todoAPIClient: any TodoAPIClientProtocol = OrbitAPIClient(),
         billAPIClient: any BillAPIClientProtocol = OrbitAPIClient(),
-        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient()
+        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
+        moodAPIClient: any MoodAPIClientProtocol = OrbitAPIClient()
     ) {
         _dashboardViewModel = StateObject(
             wrappedValue: TodayDashboardViewModel(
                 todoAPIClient: todoAPIClient,
                 billAPIClient: billAPIClient,
-                memoryAPIClient: memoryAPIClient
+                memoryAPIClient: memoryAPIClient,
+                moodAPIClient: moodAPIClient
             )
         )
     }
@@ -27,6 +34,7 @@ struct TodayScreen: View {
                 } else if let errorMessage = dashboardViewModel.errorMessage {
                     errorCard(errorMessage)
                 } else {
+                    moodCheckInSection
                     openTodosSection
                     unpaidBillsSection
                     recentMemorySection
@@ -98,6 +106,49 @@ struct TodayScreen: View {
         }
     }
 
+    private var moodCheckInSection: some View {
+        DashboardSection(title: "Mood Check-in", systemImage: "heart") {
+            OrbitCard {
+                if let latestMood = dashboardViewModel.latestMood {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("\(latestMood.mood.capitalized) · Energy \(latestMood.energy)/5")
+                            .font(.subheadline.weight(.semibold))
+                        Text("Checked in \(latestMood.checkInDate.formatted(date: .abbreviated, time: .omitted))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let notes = latestMood.notes, !notes.isEmpty {
+                            Text(notes)
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    Text("No mood check-in yet today.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Picker("Mood", selection: $selectedMood) {
+                    ForEach(moodOptions, id: \.self) { mood in
+                        Text(mood.capitalized).tag(mood)
+                    }
+                }
+
+                Stepper("Energy \(selectedEnergy)/5", value: $selectedEnergy, in: 1...5)
+
+                TextField("Notes (optional)", text: $moodNotes, axis: .vertical)
+                    .lineLimit(1...3)
+
+                Button {
+                    Task { await createMoodCheckIn() }
+                } label: {
+                    Label("Save check-in", systemImage: "heart.fill")
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
     private var unpaidBillsSection: some View {
         DashboardSection(title: "Upcoming Bills", systemImage: "creditcard") {
             if dashboardViewModel.unpaidBills.isEmpty {
@@ -137,6 +188,18 @@ struct TodayScreen: View {
                     }
                 }
             }
+        }
+    }
+
+    private func createMoodCheckIn() async {
+        await dashboardViewModel.createMood(
+            mood: selectedMood,
+            energy: selectedEnergy,
+            notes: moodNotes
+        )
+
+        if dashboardViewModel.errorMessage == nil {
+            moodNotes = ""
         }
     }
 }
@@ -267,7 +330,8 @@ struct TodayScreen_Previews: PreviewProvider {
             TodayScreen(
                 todoAPIClient: MockTodoAPIClient(),
                 billAPIClient: MockBillAPIClient(),
-                memoryAPIClient: MockMemoryAPIClient()
+                memoryAPIClient: MockMemoryAPIClient(),
+                moodAPIClient: MockMoodAPIClient()
             )
             .navigationTitle("Today")
         }

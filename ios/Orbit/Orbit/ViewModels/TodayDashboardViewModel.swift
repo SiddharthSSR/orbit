@@ -5,12 +5,14 @@ final class TodayDashboardViewModel: ObservableObject {
     @Published private(set) var todos: [TodoDTO] = []
     @Published private(set) var bills: [BillDTO] = []
     @Published private(set) var memoryItems: [MemoryDTO] = []
+    @Published private(set) var latestMood: MoodDTO?
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
     private let todoAPIClient: any TodoAPIClientProtocol
     private let billAPIClient: any BillAPIClientProtocol
     private let memoryAPIClient: any MemoryAPIClientProtocol
+    private let moodAPIClient: any MoodAPIClientProtocol
 
     var openTodos: [TodoDTO] {
         Array(todos.filter { !$0.isComplete }.prefix(5))
@@ -39,11 +41,13 @@ final class TodayDashboardViewModel: ObservableObject {
     init(
         todoAPIClient: any TodoAPIClientProtocol = OrbitAPIClient(),
         billAPIClient: any BillAPIClientProtocol = OrbitAPIClient(),
-        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient()
+        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
+        moodAPIClient: any MoodAPIClientProtocol = OrbitAPIClient()
     ) {
         self.todoAPIClient = todoAPIClient
         self.billAPIClient = billAPIClient
         self.memoryAPIClient = memoryAPIClient
+        self.moodAPIClient = moodAPIClient
     }
 
     func loadDashboard() async {
@@ -59,10 +63,32 @@ final class TodayDashboardViewModel: ObservableObject {
                 kind: nil,
                 tag: nil
             )
+            let loadedMoods = try await moodAPIClient.listMoods(limit: 1, fromDate: nil, toDate: nil)
 
             todos = loadedTodos
             bills = loadedBills
             memoryItems = loadedMemory
+            latestMood = loadedMoods.first
+        } catch {
+            errorMessage = readableMessage(for: error)
+        }
+    }
+
+    func createMood(mood: String, energy: Int, notes: String? = nil) async {
+        let trimmedMood = mood.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedMood.isEmpty, 1...5 ~= energy else { return }
+
+        let trimmedNotes = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        errorMessage = nil
+        do {
+            latestMood = try await moodAPIClient.createMood(
+                MoodCreateRequest(
+                    mood: trimmedMood,
+                    energy: energy,
+                    notes: trimmedNotes?.isEmpty == true ? nil : trimmedNotes,
+                    checkInDate: nil
+                )
+            )
         } catch {
             errorMessage = readableMessage(for: error)
         }

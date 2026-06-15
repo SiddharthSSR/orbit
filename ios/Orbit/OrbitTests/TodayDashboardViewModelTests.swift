@@ -7,7 +7,8 @@ final class TodayDashboardViewModelTests: XCTestCase {
         let viewModel = makeViewModel(
             todos: [makeTodo(title: "Open todo")],
             bills: [makeBill(name: "Rent")],
-            memoryItems: [makeMemory(title: "Idea")]
+            memoryItems: [makeMemory(title: "Idea")],
+            moods: [makeMood(mood: "focused")]
         )
 
         await viewModel.loadDashboard()
@@ -15,6 +16,7 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.todos.map(\.title), ["Open todo"])
         XCTAssertEqual(viewModel.bills.map(\.name), ["Rent"])
         XCTAssertEqual(viewModel.memoryItems.map(\.title), ["Idea"])
+        XCTAssertEqual(viewModel.latestMood?.mood, "focused")
         XCTAssertFalse(viewModel.isLoading)
         XCTAssertNil(viewModel.errorMessage)
     }
@@ -93,11 +95,24 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.recentMemoryItems.count, 5)
     }
 
+    func testLoadDashboardLoadsLatestMood() async {
+        let viewModel = makeViewModel(moods: [
+            makeMood(mood: "focused", energy: 4),
+            makeMood(mood: "tired", energy: 2)
+        ])
+
+        await viewModel.loadDashboard()
+
+        XCTAssertEqual(viewModel.latestMood?.mood, "focused")
+        XCTAssertEqual(viewModel.latestMood?.energy, 4)
+    }
+
     func testErrorStateIsSetWhenOneAPIFails() async {
         let viewModel = TodayDashboardViewModel(
             todoAPIClient: MockTodoAPIClient(todos: []),
             billAPIClient: FailingDashboardBillAPIClient(),
-            memoryAPIClient: MockMemoryAPIClient(memoryItems: [])
+            memoryAPIClient: MockMemoryAPIClient(memoryItems: []),
+            moodAPIClient: MockMoodAPIClient(moods: [])
         )
 
         await viewModel.loadDashboard()
@@ -109,12 +124,14 @@ final class TodayDashboardViewModelTests: XCTestCase {
     private func makeViewModel(
         todos: [TodoDTO] = [],
         bills: [BillDTO] = [],
-        memoryItems: [MemoryDTO] = []
+        memoryItems: [MemoryDTO] = [],
+        moods: [MoodDTO] = []
     ) -> TodayDashboardViewModel {
         TodayDashboardViewModel(
             todoAPIClient: MockTodoAPIClient(todos: todos),
             billAPIClient: MockBillAPIClient(bills: bills),
-            memoryAPIClient: MockMemoryAPIClient(memoryItems: memoryItems)
+            memoryAPIClient: MockMemoryAPIClient(memoryItems: memoryItems),
+            moodAPIClient: MockMoodAPIClient(moods: moods)
         )
     }
 
@@ -159,6 +176,19 @@ final class TodayDashboardViewModelTests: XCTestCase {
             sourceUrl: nil,
             tags: ["today"],
             isArchived: isArchived,
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+
+    private func makeMood(mood: String, energy: Int = 3) -> MoodDTO {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        return MoodDTO(
+            id: UUID(),
+            mood: mood,
+            energy: energy,
+            notes: nil,
+            checkInDate: now,
             createdAt: now,
             updatedAt: now
         )

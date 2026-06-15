@@ -33,6 +33,10 @@
 		0B0000532C18B5D600000001 /* MemoryListViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */; };
 		0B0000602C18B5D600000001 /* TodayDashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000602C18B5D600000101 /* TodayDashboardViewModel.swift */; };
 		0B0000612C18B5D600000001 /* TodayDashboardViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000612C18B5D600000101 /* TodayDashboardViewModelTests.swift */; };
+		0B0000702C18B5D600000001 /* MoodAPIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000702C18B5D600000101 /* MoodAPIModels.swift */; };
+		0B0000712C18B5D600000001 /* MockMoodAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000712C18B5D600000101 /* MockMoodAPIClient.swift */; };
+		0B0000722C18B5D600000001 /* MoodCheckInViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000722C18B5D600000101 /* MoodCheckInViewModel.swift */; };
+		0B0000732C18B5D600000001 /* MoodCheckInViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000732C18B5D600000101 /* MoodCheckInViewModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -74,6 +78,10 @@
 		0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryListViewModelTests.swift; sourceTree = "<group>"; };
 		0B0000602C18B5D600000101 /* TodayDashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayDashboardViewModel.swift; sourceTree = "<group>"; };
 		0B0000612C18B5D600000101 /* TodayDashboardViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayDashboardViewModelTests.swift; sourceTree = "<group>"; };
+		0B0000702C18B5D600000101 /* MoodAPIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodAPIModels.swift; sourceTree = "<group>"; };
+		0B0000712C18B5D600000101 /* MockMoodAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMoodAPIClient.swift; sourceTree = "<group>"; };
+		0B0000722C18B5D600000101 /* MoodCheckInViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodCheckInViewModel.swift; sourceTree = "<group>"; };
+		0B0000732C18B5D600000101 /* MoodCheckInViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoodCheckInViewModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -142,6 +150,7 @@
 				0B0000202C18B5D600000101 /* TodoAPIModels.swift */,
 				0B0000402C18B5D600000101 /* BillAPIModels.swift */,
 				0B0000502C18B5D600000101 /* MemoryAPIModels.swift */,
+				0B0000702C18B5D600000101 /* MoodAPIModels.swift */,
 				0B0000042C18B5D600000101 /* SampleData.swift */,
 			);
 			path = Models;
@@ -154,6 +163,7 @@
 				0B0000252C18B5D600000101 /* MockTodoAPIClient.swift */,
 				0B0000412C18B5D600000101 /* MockBillAPIClient.swift */,
 				0B0000512C18B5D600000101 /* MockMemoryAPIClient.swift */,
+				0B0000712C18B5D600000101 /* MockMoodAPIClient.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -164,6 +174,7 @@
 				0B0000222C18B5D600000101 /* TodoListViewModel.swift */,
 				0B0000422C18B5D600000101 /* BillListViewModel.swift */,
 				0B0000522C18B5D600000101 /* MemoryListViewModel.swift */,
+				0B0000722C18B5D600000101 /* MoodCheckInViewModel.swift */,
 				0B0000602C18B5D600000101 /* TodayDashboardViewModel.swift */,
 			);
 			path = ViewModels;
@@ -204,6 +215,7 @@
 				0B0000432C18B5D600000101 /* BillListViewModelTests.swift */,
 				0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */,
 				0B0000612C18B5D600000101 /* TodayDashboardViewModelTests.swift */,
+				0B0000732C18B5D600000101 /* MoodCheckInViewModelTests.swift */,
 			);
 			path = OrbitTests;
 			sourceTree = "<group>";
@@ -313,14 +325,17 @@
 				0B0000202C18B5D600000001 /* TodoAPIModels.swift in Sources */,
 				0B0000402C18B5D600000001 /* BillAPIModels.swift in Sources */,
 				0B0000502C18B5D600000001 /* MemoryAPIModels.swift in Sources */,
+				0B0000702C18B5D600000001 /* MoodAPIModels.swift in Sources */,
 				0B0000212C18B5D600000001 /* OrbitAPIClient.swift in Sources */,
 				0B0000222C18B5D600000001 /* TodoListViewModel.swift in Sources */,
 				0B0000422C18B5D600000001 /* BillListViewModel.swift in Sources */,
 				0B0000522C18B5D600000001 /* MemoryListViewModel.swift in Sources */,
+				0B0000722C18B5D600000001 /* MoodCheckInViewModel.swift in Sources */,
 				0B0000602C18B5D600000001 /* TodayDashboardViewModel.swift in Sources */,
 				0B0000252C18B5D600000001 /* MockTodoAPIClient.swift in Sources */,
 				0B0000412C18B5D600000001 /* MockBillAPIClient.swift in Sources */,
 				0B0000512C18B5D600000001 /* MockMemoryAPIClient.swift in Sources */,
+				0B0000712C18B5D600000001 /* MockMoodAPIClient.swift in Sources */,
 				0B0000042C18B5D600000001 /* SampleData.swift in Sources */,
 				0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */,
 				0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */,
@@ -340,6 +355,7 @@
 				0B0000432C18B5D600000001 /* BillListViewModelTests.swift in Sources */,
 				0B0000532C18B5D600000001 /* MemoryListViewModelTests.swift in Sources */,
 				0B0000612C18B5D600000001 /* TodayDashboardViewModelTests.swift in Sources */,
+				0B0000732C18B5D600000001 /* MoodCheckInViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -21,6 +21,13 @@ protocol MemoryAPIClientProtocol: Sendable {
     func deleteMemory(id: UUID) async throws
 }
 
+protocol MoodAPIClientProtocol: Sendable {
+    func listMoods(limit: Int?, fromDate: Date?, toDate: Date?) async throws -> [MoodDTO]
+    func createMood(_ payload: MoodCreateRequest) async throws -> MoodDTO
+    func updateMood(id: UUID, payload: MoodUpdateRequest) async throws -> MoodDTO
+    func deleteMood(id: UUID) async throws
+}
+
 enum OrbitAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -38,7 +45,7 @@ enum OrbitAPIError: LocalizedError {
     }
 }
 
-struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPIClientProtocol, @unchecked Sendable {
+struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPIClientProtocol, MoodAPIClientProtocol, @unchecked Sendable {
     var baseURL: URL
     var session: URLSession
 
@@ -104,6 +111,34 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
 
     func deleteMemory(id: UUID) async throws {
         let _: EmptyResponse = try await request(path: "/memory/\(id.uuidString)", method: "DELETE")
+    }
+
+    func listMoods(limit: Int? = nil, fromDate: Date? = nil, toDate: Date? = nil) async throws -> [MoodDTO] {
+        var queryItems: [URLQueryItem] = []
+        if let limit {
+            queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        }
+        if let fromDate {
+            queryItems.append(URLQueryItem(name: "from_date", value: Self.makeDateOnlyFormatter().string(from: fromDate)))
+        }
+        if let toDate {
+            queryItems.append(URLQueryItem(name: "to_date", value: Self.makeDateOnlyFormatter().string(from: toDate)))
+        }
+
+        let moods: [MoodDTO] = try await request(path: "/moods", queryItems: queryItems)
+        return moods
+    }
+
+    func createMood(_ payload: MoodCreateRequest) async throws -> MoodDTO {
+        try await request(path: "/moods", method: "POST", body: payload)
+    }
+
+    func updateMood(id: UUID, payload: MoodUpdateRequest) async throws -> MoodDTO {
+        try await request(path: "/moods/\(id.uuidString)", method: "PATCH", body: payload)
+    }
+
+    func deleteMood(id: UUID) async throws {
+        let _: EmptyResponse = try await request(path: "/moods/\(id.uuidString)", method: "DELETE")
     }
 
     private func request<Response: Decodable>(
