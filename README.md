@@ -54,6 +54,24 @@ open ios/Orbit/Orbit.xcodeproj
 
 The iOS app currently contains a tabbed SwiftUI shell with Today, Inbox, Ask, Projects, and Bills screens.
 
+## Run Backend And iOS Together
+
+Start the backend first:
+
+```bash
+cd backend
+source .venv/bin/activate
+uvicorn app.main:app --reload
+```
+
+Then run the iOS app from Xcode using an iPhone simulator. The iOS app's Todo API client defaults to:
+
+```text
+http://127.0.0.1:8000
+```
+
+That address lets the simulator reach the FastAPI server running on your Mac. The Today tab uses the live Todo API to load, create, toggle, and delete todos.
+
 ## Backend API Notes
 
 Todos are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.

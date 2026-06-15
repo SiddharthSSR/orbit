@@ -18,6 +18,9 @@
 		0B0000092C18B5D600000001 /* AskScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000092C18B5D600000101 /* AskScreen.swift */; };
 		0B00000A2C18B5D600000001 /* ProjectsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B00000A2C18B5D600000101 /* ProjectsScreen.swift */; };
 		0B00000B2C18B5D600000001 /* BillsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B00000B2C18B5D600000101 /* BillsScreen.swift */; };
+		0B0000202C18B5D600000001 /* TodoAPIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000202C18B5D600000101 /* TodoAPIModels.swift */; };
+		0B0000212C18B5D600000001 /* OrbitAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000212C18B5D600000101 /* OrbitAPIClient.swift */; };
+		0B0000222C18B5D600000001 /* TodoListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000222C18B5D600000101 /* TodoListViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -33,6 +36,9 @@
 		0B00000A2C18B5D600000101 /* ProjectsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsScreen.swift; sourceTree = "<group>"; };
 		0B00000B2C18B5D600000101 /* BillsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillsScreen.swift; sourceTree = "<group>"; };
 		0B00000C2C18B5D600000101 /* Orbit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orbit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		0B0000202C18B5D600000101 /* TodoAPIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoAPIModels.swift; sourceTree = "<group>"; };
+		0B0000212C18B5D600000101 /* OrbitAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitAPIClient.swift; sourceTree = "<group>"; };
+		0B0000222C18B5D600000101 /* TodoListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoListViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -59,6 +65,8 @@
 			children = (
 				0B0000112C18B5D600000101 /* App */,
 				0B0000122C18B5D600000101 /* Models */,
+				0B0000232C18B5D600000101 /* Networking */,
+				0B0000242C18B5D600000101 /* ViewModels */,
 				0B0000132C18B5D600000101 /* Components */,
 				0B0000142C18B5D600000101 /* Screens */,
 				0B0000152C18B5D600000101 /* Resources */,
@@ -87,9 +95,26 @@
 			isa = PBXGroup;
 			children = (
 				0B0000032C18B5D600000101 /* OrbitModels.swift */,
+				0B0000202C18B5D600000101 /* TodoAPIModels.swift */,
 				0B0000042C18B5D600000101 /* SampleData.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		0B0000232C18B5D600000101 /* Networking */ = {
+			isa = PBXGroup;
+			children = (
+				0B0000212C18B5D600000101 /* OrbitAPIClient.swift */,
+			);
+			path = Networking;
+			sourceTree = "<group>";
+		};
+		0B0000242C18B5D600000101 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				0B0000222C18B5D600000101 /* TodoListViewModel.swift */,
+			);
+			path = ViewModels;
 			sourceTree = "<group>";
 		};
 		0B0000132C18B5D600000101 /* Components */ = {
@@ -192,6 +217,9 @@
 				0B0000012C18B5D600000001 /* OrbitApp.swift in Sources */,
 				0B0000022C18B5D600000001 /* RootTabView.swift in Sources */,
 				0B0000032C18B5D600000001 /* OrbitModels.swift in Sources */,
+				0B0000202C18B5D600000001 /* TodoAPIModels.swift in Sources */,
+				0B0000212C18B5D600000001 /* OrbitAPIClient.swift in Sources */,
+				0B0000222C18B5D600000001 /* TodoListViewModel.swift in Sources */,
 				0B0000042C18B5D600000001 /* SampleData.swift in Sources */,
 				0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */,
 				0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */,
