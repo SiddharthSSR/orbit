@@ -1,5 +1,12 @@
 import Foundation
 
+protocol TodoAPIClientProtocol: Sendable {
+    func listTodos() async throws -> [TodoDTO]
+    func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO
+    func updateTodo(id: UUID, payload: TodoUpdateRequest) async throws -> TodoDTO
+    func deleteTodo(id: UUID) async throws
+}
+
 enum OrbitAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -17,7 +24,7 @@ enum OrbitAPIError: LocalizedError {
     }
 }
 
-struct OrbitAPIClient {
+struct OrbitAPIClient: TodoAPIClientProtocol, @unchecked Sendable {
     var baseURL: URL
     var session: URLSession
 

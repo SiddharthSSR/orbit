@@ -1,10 +1,14 @@
 import SwiftUI
 
 struct TodayScreen: View {
-    @StateObject private var todoViewModel = TodoListViewModel()
+    @StateObject private var todoViewModel: TodoListViewModel
     @State private var newTodoTitle = ""
 
     private let moodLog = SampleData.moodLogs.first
+
+    init(apiClient: any TodoAPIClientProtocol = OrbitAPIClient()) {
+        _todoViewModel = StateObject(wrappedValue: TodoListViewModel(apiClient: apiClient))
+    }
 
     var body: some View {
         ScrollView {
@@ -155,7 +159,7 @@ private struct TodoRow: View {
 struct TodayScreen_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            TodayScreen()
+            TodayScreen(apiClient: MockTodoAPIClient())
                 .navigationTitle("Today")
         }
     }

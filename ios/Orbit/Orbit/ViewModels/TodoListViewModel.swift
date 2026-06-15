@@ -6,9 +6,9 @@ final class TodoListViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
 
-    private let apiClient: OrbitAPIClient
+    private let apiClient: any TodoAPIClientProtocol
 
-    init(apiClient: OrbitAPIClient = OrbitAPIClient()) {
+    init(apiClient: any TodoAPIClientProtocol = OrbitAPIClient()) {
         self.apiClient = apiClient
     }
 
@@ -76,4 +76,3 @@ final class TodoListViewModel: ObservableObject {
         return error.localizedDescription
     }
 }
-

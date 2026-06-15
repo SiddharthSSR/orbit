@@ -1,6 +1,6 @@
 import Foundation
 
-struct TodoDTO: Decodable, Identifiable, Hashable {
+struct TodoDTO: Decodable, Identifiable, Hashable, Sendable {
     let id: UUID
     var title: String
     var notes: String?
@@ -11,7 +11,7 @@ struct TodoDTO: Decodable, Identifiable, Hashable {
     var updatedAt: Date
 }
 
-struct TodoCreateRequest: Encodable {
+struct TodoCreateRequest: Encodable, Sendable {
     var title: String
     var notes: String?
     var dueDate: Date?
@@ -19,7 +19,7 @@ struct TodoCreateRequest: Encodable {
     var isComplete: Bool = false
 }
 
-struct TodoUpdateRequest: Encodable {
+struct TodoUpdateRequest: Encodable, Sendable {
     var title: String?
     var notes: String?
     var dueDate: Date?
@@ -43,4 +43,3 @@ struct TodoUpdateRequest: Encodable {
         try container.encodeIfPresent(isComplete, forKey: .isComplete)
     }
 }
-

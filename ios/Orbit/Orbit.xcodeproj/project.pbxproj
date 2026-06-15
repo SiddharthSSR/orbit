@@ -21,6 +21,7 @@
 		0B0000202C18B5D600000001 /* TodoAPIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000202C18B5D600000101 /* TodoAPIModels.swift */; };
 		0B0000212C18B5D600000001 /* OrbitAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000212C18B5D600000101 /* OrbitAPIClient.swift */; };
 		0B0000222C18B5D600000001 /* TodoListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000222C18B5D600000101 /* TodoListViewModel.swift */; };
+		0B0000252C18B5D600000001 /* MockTodoAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000252C18B5D600000101 /* MockTodoAPIClient.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -39,6 +40,7 @@
 		0B0000202C18B5D600000101 /* TodoAPIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoAPIModels.swift; sourceTree = "<group>"; };
 		0B0000212C18B5D600000101 /* OrbitAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitAPIClient.swift; sourceTree = "<group>"; };
 		0B0000222C18B5D600000101 /* TodoListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodoListViewModel.swift; sourceTree = "<group>"; };
+		0B0000252C18B5D600000101 /* MockTodoAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockTodoAPIClient.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -105,6 +107,7 @@
 			isa = PBXGroup;
 			children = (
 				0B0000212C18B5D600000101 /* OrbitAPIClient.swift */,
+				0B0000252C18B5D600000101 /* MockTodoAPIClient.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -220,6 +223,7 @@
 				0B0000202C18B5D600000001 /* TodoAPIModels.swift in Sources */,
 				0B0000212C18B5D600000001 /* OrbitAPIClient.swift in Sources */,
 				0B0000222C18B5D600000001 /* TodoListViewModel.swift in Sources */,
+				0B0000252C18B5D600000001 /* MockTodoAPIClient.swift in Sources */,
 				0B0000042C18B5D600000001 /* SampleData.swift in Sources */,
 				0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */,
 				0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */,
