@@ -1,0 +1,392 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0B0000012C18B5D600000001 /* OrbitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000012C18B5D600000101 /* OrbitApp.swift */; };
+		0B0000022C18B5D600000001 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000022C18B5D600000101 /* RootTabView.swift */; };
+		0B0000032C18B5D600000001 /* OrbitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000032C18B5D600000101 /* OrbitModels.swift */; };
+		0B0000042C18B5D600000001 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000042C18B5D600000101 /* SampleData.swift */; };
+		0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000052C18B5D600000101 /* EmptyStateView.swift */; };
+		0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000062C18B5D600000101 /* OrbitCard.swift */; };
+		0B0000072C18B5D600000001 /* TodayScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000072C18B5D600000101 /* TodayScreen.swift */; };
+		0B0000082C18B5D600000001 /* InboxScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000082C18B5D600000101 /* InboxScreen.swift */; };
+		0B0000092C18B5D600000001 /* AskScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000092C18B5D600000101 /* AskScreen.swift */; };
+		0B00000A2C18B5D600000001 /* ProjectsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B00000A2C18B5D600000101 /* ProjectsScreen.swift */; };
+		0B00000B2C18B5D600000001 /* BillsScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B00000B2C18B5D600000101 /* BillsScreen.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0B0000012C18B5D600000101 /* OrbitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitApp.swift; sourceTree = "<group>"; };
+		0B0000022C18B5D600000101 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
+		0B0000032C18B5D600000101 /* OrbitModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitModels.swift; sourceTree = "<group>"; };
+		0B0000042C18B5D600000101 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
+		0B0000052C18B5D600000101 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		0B0000062C18B5D600000101 /* OrbitCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitCard.swift; sourceTree = "<group>"; };
+		0B0000072C18B5D600000101 /* TodayScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayScreen.swift; sourceTree = "<group>"; };
+		0B0000082C18B5D600000101 /* InboxScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxScreen.swift; sourceTree = "<group>"; };
+		0B0000092C18B5D600000101 /* AskScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskScreen.swift; sourceTree = "<group>"; };
+		0B00000A2C18B5D600000101 /* ProjectsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsScreen.swift; sourceTree = "<group>"; };
+		0B00000B2C18B5D600000101 /* BillsScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillsScreen.swift; sourceTree = "<group>"; };
+		0B00000C2C18B5D600000101 /* Orbit.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Orbit.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		0B00000D2C18B5D600000101 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0B00000E2C18B5D600000101 = {
+			isa = PBXGroup;
+			children = (
+				0B00000F2C18B5D600000101 /* Orbit */,
+				0B0000102C18B5D600000101 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		0B00000F2C18B5D600000101 /* Orbit */ = {
+			isa = PBXGroup;
+			children = (
+				0B0000112C18B5D600000101 /* App */,
+				0B0000122C18B5D600000101 /* Models */,
+				0B0000132C18B5D600000101 /* Components */,
+				0B0000142C18B5D600000101 /* Screens */,
+				0B0000152C18B5D600000101 /* Resources */,
+			);
+			path = Orbit;
+			sourceTree = "<group>";
+		};
+		0B0000102C18B5D600000101 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				0B00000C2C18B5D600000101 /* Orbit.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		0B0000112C18B5D600000101 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				0B0000012C18B5D600000101 /* OrbitApp.swift */,
+				0B0000022C18B5D600000101 /* RootTabView.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		0B0000122C18B5D600000101 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				0B0000032C18B5D600000101 /* OrbitModels.swift */,
+				0B0000042C18B5D600000101 /* SampleData.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		0B0000132C18B5D600000101 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				0B0000052C18B5D600000101 /* EmptyStateView.swift */,
+				0B0000062C18B5D600000101 /* OrbitCard.swift */,
+			);
+			path = Components;
+			sourceTree = "<group>";
+		};
+		0B0000142C18B5D600000101 /* Screens */ = {
+			isa = PBXGroup;
+			children = (
+				0B0000072C18B5D600000101 /* TodayScreen.swift */,
+				0B0000082C18B5D600000101 /* InboxScreen.swift */,
+				0B0000092C18B5D600000101 /* AskScreen.swift */,
+				0B00000A2C18B5D600000101 /* ProjectsScreen.swift */,
+				0B00000B2C18B5D600000101 /* BillsScreen.swift */,
+			);
+			path = Screens;
+			sourceTree = "<group>";
+		};
+		0B0000152C18B5D600000101 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		0B0000162C18B5D600000101 /* Orbit */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0B0000172C18B5D600000101 /* Build configuration list for PBXNativeTarget "Orbit" */;
+			buildPhases = (
+				0B0000182C18B5D600000101 /* Sources */,
+				0B00000D2C18B5D600000101 /* Frameworks */,
+				0B0000192C18B5D600000101 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Orbit;
+			productName = Orbit;
+			productReference = 0B00000C2C18B5D600000101 /* Orbit.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0B00001A2C18B5D600000101 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+					0B0000162C18B5D600000101 = {
+						CreatedOnToolsVersion = 16.0;
+					};
+				};
+			};
+			buildConfigurationList = 0B00001B2C18B5D600000101 /* Build configuration list for PBXProject "Orbit" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 0B00000E2C18B5D600000101;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 0B0000102C18B5D600000101 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				0B0000162C18B5D600000101 /* Orbit */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		0B0000192C18B5D600000101 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		0B0000182C18B5D600000101 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B0000012C18B5D600000001 /* OrbitApp.swift in Sources */,
+				0B0000022C18B5D600000001 /* RootTabView.swift in Sources */,
+				0B0000032C18B5D600000001 /* OrbitModels.swift in Sources */,
+				0B0000042C18B5D600000001 /* SampleData.swift in Sources */,
+				0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */,
+				0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */,
+				0B0000072C18B5D600000001 /* TodayScreen.swift in Sources */,
+				0B0000082C18B5D600000001 /* InboxScreen.swift in Sources */,
+				0B0000092C18B5D600000001 /* AskScreen.swift in Sources */,
+				0B00000A2C18B5D600000001 /* ProjectsScreen.swift in Sources */,
+				0B00000B2C18B5D600000001 /* BillsScreen.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		0B00001C2C18B5D600000101 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		0B00001D2C18B5D600000101 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		0B00001E2C18B5D600000101 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Orbit;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.orbit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		0B00001F2C18B5D600000101 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = Orbit;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.orbit;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0B0000172C18B5D600000101 /* Build configuration list for PBXNativeTarget "Orbit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0B00001E2C18B5D600000101 /* Debug */,
+				0B00001F2C18B5D600000101 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0B00001B2C18B5D600000101 /* Build configuration list for PBXProject "Orbit" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0B00001C2C18B5D600000101 /* Debug */,
+				0B00001D2C18B5D600000101 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 0B00001A2C18B5D600000101 /* Project object */;
+}
