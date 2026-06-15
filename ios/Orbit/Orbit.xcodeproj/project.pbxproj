@@ -31,6 +31,8 @@
 		0B0000512C18B5D600000001 /* MockMemoryAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000512C18B5D600000101 /* MockMemoryAPIClient.swift */; };
 		0B0000522C18B5D600000001 /* MemoryListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000522C18B5D600000101 /* MemoryListViewModel.swift */; };
 		0B0000532C18B5D600000001 /* MemoryListViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */; };
+		0B0000602C18B5D600000001 /* TodayDashboardViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000602C18B5D600000101 /* TodayDashboardViewModel.swift */; };
+		0B0000612C18B5D600000001 /* TodayDashboardViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000612C18B5D600000101 /* TodayDashboardViewModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +72,8 @@
 		0B0000512C18B5D600000101 /* MockMemoryAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryAPIClient.swift; sourceTree = "<group>"; };
 		0B0000522C18B5D600000101 /* MemoryListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryListViewModel.swift; sourceTree = "<group>"; };
 		0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryListViewModelTests.swift; sourceTree = "<group>"; };
+		0B0000602C18B5D600000101 /* TodayDashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayDashboardViewModel.swift; sourceTree = "<group>"; };
+		0B0000612C18B5D600000101 /* TodayDashboardViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayDashboardViewModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -160,6 +164,7 @@
 				0B0000222C18B5D600000101 /* TodoListViewModel.swift */,
 				0B0000422C18B5D600000101 /* BillListViewModel.swift */,
 				0B0000522C18B5D600000101 /* MemoryListViewModel.swift */,
+				0B0000602C18B5D600000101 /* TodayDashboardViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -198,6 +203,7 @@
 				0B0000302C18B5D600000101 /* TodoListViewModelTests.swift */,
 				0B0000432C18B5D600000101 /* BillListViewModelTests.swift */,
 				0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */,
+				0B0000612C18B5D600000101 /* TodayDashboardViewModelTests.swift */,
 			);
 			path = OrbitTests;
 			sourceTree = "<group>";
@@ -311,6 +317,7 @@
 				0B0000222C18B5D600000001 /* TodoListViewModel.swift in Sources */,
 				0B0000422C18B5D600000001 /* BillListViewModel.swift in Sources */,
 				0B0000522C18B5D600000001 /* MemoryListViewModel.swift in Sources */,
+				0B0000602C18B5D600000001 /* TodayDashboardViewModel.swift in Sources */,
 				0B0000252C18B5D600000001 /* MockTodoAPIClient.swift in Sources */,
 				0B0000412C18B5D600000001 /* MockBillAPIClient.swift in Sources */,
 				0B0000512C18B5D600000001 /* MockMemoryAPIClient.swift in Sources */,
@@ -332,6 +339,7 @@
 				0B0000302C18B5D600000001 /* TodoListViewModelTests.swift in Sources */,
 				0B0000432C18B5D600000001 /* BillListViewModelTests.swift in Sources */,
 				0B0000532C18B5D600000001 /* MemoryListViewModelTests.swift in Sources */,
+				0B0000612C18B5D600000001 /* TodayDashboardViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -1,0 +1,147 @@
+import Foundation
+
+@MainActor
+final class TodayDashboardViewModel: ObservableObject {
+    @Published private(set) var todos: [TodoDTO] = []
+    @Published private(set) var bills: [BillDTO] = []
+    @Published private(set) var memoryItems: [MemoryDTO] = []
+    @Published private(set) var isLoading = false
+    @Published var errorMessage: String?
+
+    private let todoAPIClient: any TodoAPIClientProtocol
+    private let billAPIClient: any BillAPIClientProtocol
+    private let memoryAPIClient: any MemoryAPIClientProtocol
+
+    var openTodos: [TodoDTO] {
+        Array(todos.filter { !$0.isComplete }.prefix(5))
+    }
+
+    var unpaidBills: [BillDTO] {
+        Array(bills.filter { !$0.isPaid }.prefix(5))
+    }
+
+    var recentMemoryItems: [MemoryDTO] {
+        Array(memoryItems.filter { !$0.isArchived }.prefix(5))
+    }
+
+    var openTodoCount: Int {
+        todos.filter { !$0.isComplete }.count
+    }
+
+    var unpaidBillCount: Int {
+        bills.filter { !$0.isPaid }.count
+    }
+
+    var recentMemoryCount: Int {
+        memoryItems.filter { !$0.isArchived }.count
+    }
+
+    init(
+        todoAPIClient: any TodoAPIClientProtocol = OrbitAPIClient(),
+        billAPIClient: any BillAPIClientProtocol = OrbitAPIClient(),
+        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient()
+    ) {
+        self.todoAPIClient = todoAPIClient
+        self.billAPIClient = billAPIClient
+        self.memoryAPIClient = memoryAPIClient
+    }
+
+    func loadDashboard() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let loadedTodos = try await todoAPIClient.listTodos()
+            let loadedBills = try await billAPIClient.listBills()
+            let loadedMemory = try await memoryAPIClient.listMemory(
+                includeArchived: false,
+                kind: nil,
+                tag: nil
+            )
+
+            todos = loadedTodos
+            bills = loadedBills
+            memoryItems = loadedMemory
+        } catch {
+            errorMessage = readableMessage(for: error)
+        }
+    }
+
+    func toggleTodoComplete(todo: TodoDTO) async {
+        errorMessage = nil
+        do {
+            let updatedTodo = try await todoAPIClient.updateTodo(
+                id: todo.id,
+                payload: TodoUpdateRequest(isComplete: !todo.isComplete)
+            )
+            replace(updatedTodo)
+        } catch {
+            errorMessage = readableMessage(for: error)
+        }
+    }
+
+    func toggleBillPaid(bill: BillDTO) async {
+        errorMessage = nil
+        do {
+            let updatedBill = try await billAPIClient.updateBill(
+                id: bill.id,
+                payload: BillUpdateRequest(isPaid: !bill.isPaid)
+            )
+            replace(updatedBill)
+        } catch {
+            errorMessage = readableMessage(for: error)
+        }
+    }
+
+    func archiveMemory(memory: MemoryDTO) async {
+        errorMessage = nil
+        do {
+            let archivedMemory = try await memoryAPIClient.updateMemory(
+                id: memory.id,
+                payload: MemoryUpdateRequest(isArchived: true)
+            )
+            replace(archivedMemory)
+        } catch {
+            errorMessage = readableMessage(for: error)
+        }
+    }
+
+    private func replace(_ todo: TodoDTO) {
+        guard let index = todos.firstIndex(where: { $0.id == todo.id }) else {
+            todos.insert(todo, at: 0)
+            return
+        }
+        todos[index] = todo
+    }
+
+    private func replace(_ bill: BillDTO) {
+        guard let index = bills.firstIndex(where: { $0.id == bill.id }) else {
+            bills.insert(bill, at: 0)
+            return
+        }
+        bills[index] = bill
+    }
+
+    private func replace(_ memory: MemoryDTO) {
+        guard let index = memoryItems.firstIndex(where: { $0.id == memory.id }) else {
+            if !memory.isArchived {
+                memoryItems.insert(memory, at: 0)
+            }
+            return
+        }
+        if memory.isArchived {
+            memoryItems.remove(at: index)
+        } else {
+            memoryItems[index] = memory
+        }
+    }
+
+    private func readableMessage(for error: Error) -> String {
+        if let localizedError = error as? LocalizedError,
+           let description = localizedError.errorDescription {
+            return description
+        }
+        return error.localizedDescription
+    }
+}

@@ -1,141 +1,177 @@
 import SwiftUI
 
 struct TodayScreen: View {
-    @StateObject private var todoViewModel: TodoListViewModel
-    @State private var newTodoTitle = ""
+    @StateObject private var dashboardViewModel: TodayDashboardViewModel
 
-    private let moodLog = SampleData.moodLogs.first
-
-    init(apiClient: any TodoAPIClientProtocol = OrbitAPIClient()) {
-        _todoViewModel = StateObject(wrappedValue: TodoListViewModel(apiClient: apiClient))
+    init(
+        todoAPIClient: any TodoAPIClientProtocol = OrbitAPIClient(),
+        billAPIClient: any BillAPIClientProtocol = OrbitAPIClient(),
+        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient()
+    ) {
+        _dashboardViewModel = StateObject(
+            wrappedValue: TodayDashboardViewModel(
+                todoAPIClient: todoAPIClient,
+                billAPIClient: billAPIClient,
+                memoryAPIClient: memoryAPIClient
+            )
+        )
     }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                OrbitCard {
-                    Label("Daily Plan", systemImage: "calendar")
-                        .font(.headline)
-                    Text("Start with the most important work, then clear small admin tasks.")
-                        .foregroundStyle(.secondary)
+                summaryCard
+
+                if dashboardViewModel.isLoading {
+                    loadingCard
+                } else if let errorMessage = dashboardViewModel.errorMessage {
+                    errorCard(errorMessage)
+                } else {
+                    openTodosSection
+                    unpaidBillsSection
+                    recentMemorySection
                 }
-
-                OrbitCard {
-                    Label("Mood Check-in", systemImage: "heart")
-                        .font(.headline)
-                    if let moodLog {
-                        Text("\(moodLog.mood) · Energy \(moodLog.energy)/5")
-                            .font(.subheadline)
-                        Text(moodLog.notes)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Today")
-                        .font(.headline)
-
-                    HStack(spacing: 8) {
-                        TextField("Add a todo", text: $newTodoTitle)
-                            .textFieldStyle(.roundedBorder)
-                            .submitLabel(.done)
-                            .onSubmit {
-                                createTodo()
-                            }
-
-                        Button {
-                            createTodo()
-                        } label: {
-                            Image(systemName: "plus")
-                                .frame(width: 32, height: 32)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .disabled(newTodoTitle.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .accessibilityLabel("Add todo")
-                    }
-
-                    if todoViewModel.isLoading {
-                        HStack(spacing: 10) {
-                            ProgressView()
-                            Text("Loading todos")
-                                .foregroundStyle(.secondary)
-                        }
-                        .padding(.vertical, 8)
-                    } else if let errorMessage = todoViewModel.errorMessage {
-                        OrbitCard {
-                            Label("Could not load todos", systemImage: "exclamationmark.triangle")
-                                .font(.headline)
-                            Text(errorMessage)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
-                            Button {
-                                Task {
-                                    await todoViewModel.loadTodos()
-                                }
-                            } label: {
-                                Label("Retry", systemImage: "arrow.clockwise")
-                            }
-                            .buttonStyle(.bordered)
-                        }
-                    } else if todoViewModel.todos.isEmpty {
-                        EmptyStateView(
-                            title: "No todos yet",
-                            message: "Add a task to start planning your day.",
-                            systemImage: "checklist"
-                        )
-                        .frame(minHeight: 180)
-                    } else {
-                        ForEach(todoViewModel.todos) { todo in
-                            TodoRow(todo: todo) {
-                                Task {
-                                    await todoViewModel.toggleTodoComplete(todo: todo)
-                                }
-                            } onDelete: {
-                                Task {
-                                    await todoViewModel.deleteTodo(todo: todo)
-                                }
-                            }
-                        }
-                    }
-                }
-                .padding(.top, 4)
             }
             .padding()
         }
         .background(Color(.systemGroupedBackground))
         .task {
-            await todoViewModel.loadTodos()
+            await dashboardViewModel.loadDashboard()
         }
     }
 
-    private func createTodo() {
-        let title = newTodoTitle
-        newTodoTitle = ""
-        Task {
-            await todoViewModel.createTodo(title: title)
+    private var summaryCard: some View {
+        OrbitCard {
+            Label("Daily Plan", systemImage: "calendar")
+                .font(.headline)
+            Text(
+                "You have \(dashboardViewModel.openTodoCount) open todos, \(dashboardViewModel.unpaidBillCount) unpaid bills, and \(dashboardViewModel.recentMemoryCount) recent captures."
+            )
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    private var loadingCard: some View {
+        OrbitCard {
+            HStack(spacing: 10) {
+                ProgressView()
+                Text("Loading today")
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    private func errorCard(_ message: String) -> some View {
+        OrbitCard {
+            Label("Could not load Today", systemImage: "exclamationmark.triangle")
+                .font(.headline)
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button {
+                Task { await dashboardViewModel.loadDashboard() }
+            } label: {
+                Label("Retry", systemImage: "arrow.clockwise")
+            }
+            .buttonStyle(.bordered)
+        }
+    }
+
+    private var openTodosSection: some View {
+        DashboardSection(title: "Open Todos", systemImage: "checklist") {
+            if dashboardViewModel.openTodos.isEmpty {
+                EmptyStateView(
+                    title: "No open todos",
+                    message: "Completed tasks are out of the way for today.",
+                    systemImage: "checkmark.circle"
+                )
+                .frame(minHeight: 120)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(dashboardViewModel.openTodos) { todo in
+                        TodayTodoRow(todo: todo) {
+                            Task { await dashboardViewModel.toggleTodoComplete(todo: todo) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var unpaidBillsSection: some View {
+        DashboardSection(title: "Upcoming Bills", systemImage: "creditcard") {
+            if dashboardViewModel.unpaidBills.isEmpty {
+                EmptyStateView(
+                    title: "No unpaid bills",
+                    message: "Payment reminders are clear.",
+                    systemImage: "checkmark.seal"
+                )
+                .frame(minHeight: 120)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(dashboardViewModel.unpaidBills) { bill in
+                        TodayBillRow(bill: bill) {
+                            Task { await dashboardViewModel.toggleBillPaid(bill: bill) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private var recentMemorySection: some View {
+        DashboardSection(title: "Recent Memory", systemImage: "tray") {
+            if dashboardViewModel.recentMemoryItems.isEmpty {
+                EmptyStateView(
+                    title: "No recent captures",
+                    message: "Notes, ideas, and links from Inbox will appear here.",
+                    systemImage: "tray"
+                )
+                .frame(minHeight: 120)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(dashboardViewModel.recentMemoryItems) { memory in
+                        TodayMemoryRow(memory: memory) {
+                            Task { await dashboardViewModel.archiveMemory(memory: memory) }
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
-private struct TodoRow: View {
+private struct DashboardSection<Content: View>: View {
+    let title: String
+    let systemImage: String
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Label(title, systemImage: systemImage)
+                .font(.headline)
+            content
+        }
+        .padding(.top, 4)
+    }
+}
+
+private struct TodayTodoRow: View {
     let todo: TodoDTO
     let onToggle: () -> Void
-    let onDelete: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onToggle) {
-                Image(systemName: todo.isComplete ? "checkmark.circle.fill" : "circle")
+                Image(systemName: "circle")
                     .font(.title3)
-                    .foregroundStyle(todo.isComplete ? .green : .secondary)
+                    .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(todo.isComplete ? "Mark incomplete" : "Mark complete")
+            .accessibilityLabel("Mark complete")
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(todo.title)
-                    .strikethrough(todo.isComplete)
-                    .foregroundStyle(todo.isComplete ? .secondary : .primary)
                 if let dueDate = todo.dueDate {
                     Text(dueDate, style: .date)
                         .font(.caption)
@@ -144,23 +180,96 @@ private struct TodoRow: View {
             }
 
             Spacer()
+        }
+        .padding(.vertical, 8)
+    }
+}
 
-            Button(action: onDelete) {
-                Image(systemName: "trash")
+private struct TodayBillRow: View {
+    let bill: BillDTO
+    let onTogglePaid: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Button(action: onTogglePaid) {
+                Image(systemName: "circle")
+                    .font(.title3)
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Delete todo")
+            .accessibilityLabel("Mark paid")
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(bill.name)
+                Text("Due \(bill.dueDate.formatted(date: .abbreviated, time: .omitted))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if let amount = bill.amount {
+                Text(amount, format: .currency(code: bill.currency))
+                    .font(.subheadline.weight(.semibold))
+            }
         }
         .padding(.vertical, 8)
+    }
+}
+
+private struct TodayMemoryRow: View {
+    let memory: MemoryDTO
+    let onArchive: () -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 5) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(memory.title)
+                        .font(.subheadline.weight(.semibold))
+                    Spacer(minLength: 8)
+                    Text(kindLabel(memory.kind))
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                if !memory.tags.isEmpty {
+                    Text(memory.tags.joined(separator: " · "))
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
+            }
+
+            Button(action: onArchive) {
+                Image(systemName: "archivebox")
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Archive memory")
+        }
+        .padding(.vertical, 8)
+    }
+
+    private func kindLabel(_ kind: String) -> String {
+        switch kind {
+        case "project_update":
+            "Project"
+        default:
+            kind.capitalized
+        }
     }
 }
 
 struct TodayScreen_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            TodayScreen(apiClient: MockTodoAPIClient())
-                .navigationTitle("Today")
+            TodayScreen(
+                todoAPIClient: MockTodoAPIClient(),
+                billAPIClient: MockBillAPIClient(),
+                memoryAPIClient: MockMemoryAPIClient()
+            )
+            .navigationTitle("Today")
         }
     }
 }
