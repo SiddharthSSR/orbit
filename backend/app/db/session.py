@@ -24,11 +24,18 @@ def init_db() -> None:
     from app.models.bill import BillRecord
     from app.models.memory import MemoryRecord
     from app.models.mood import MoodRecord
+    from app.models.project import ProjectRecord
     from app.models.todo import TodoRecord
 
     Base.metadata.create_all(
         bind=engine,
-        tables=[TodoRecord.__table__, BillRecord.__table__, MemoryRecord.__table__, MoodRecord.__table__],
+        tables=[
+            TodoRecord.__table__,
+            BillRecord.__table__,
+            MemoryRecord.__table__,
+            MoodRecord.__table__,
+            ProjectRecord.__table__,
+        ],
     )
 
 

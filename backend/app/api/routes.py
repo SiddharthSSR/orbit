@@ -6,14 +6,14 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_session
 from app.models.bill import BillCreate, BillRead, BillUpdate
-from app.models.domain import Project
 from app.models.memory import MemoryCreate, MemoryRead, MemoryUpdate
 from app.models.mood import MoodCreate, MoodRead, MoodUpdate
+from app.models.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.models.todo import TodoCreate, TodoRead, TodoUpdate
 from app.repositories.bill_repository import BillRepository
 from app.repositories.memory_item_repository import MemoryItemRepository
-from app.repositories.memory_repository import repository
 from app.repositories.mood_repository import MoodRepository
+from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
 
 router = APIRouter()
@@ -144,14 +144,56 @@ def delete_bill(bill_id: UUID, session: Session = Depends(get_session)) -> Respo
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/projects", response_model=list[Project], tags=["projects"])
-def list_projects() -> list[Project]:
-    return repository.list_projects()
+@router.get("/projects", response_model=list[ProjectRead], tags=["projects"])
+def list_projects(
+    include_archived: bool = False,
+    status: str | None = None,
+    tag: str | None = None,
+    area: str | None = None,
+    session: Session = Depends(get_session),
+) -> list[ProjectRead]:
+    return ProjectRepository(session).list(
+        include_archived=include_archived,
+        status=status,
+        tag=tag,
+        area=area,
+    )
 
 
-@router.post("/projects", response_model=Project, status_code=201, tags=["projects"])
-def create_project(project: Project) -> Project:
-    return repository.add_project(project)
+@router.post("/projects", response_model=ProjectRead, status_code=201, tags=["projects"])
+def create_project(project: ProjectCreate, session: Session = Depends(get_session)) -> ProjectRead:
+    return ProjectRepository(session).create(project)
+
+
+@router.get("/projects/{project_id}", response_model=ProjectRead, tags=["projects"])
+def get_project(project_id: UUID, session: Session = Depends(get_session)) -> ProjectRead:
+    project = ProjectRepository(session).get(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project
+
+
+@router.patch("/projects/{project_id}", response_model=ProjectRead, tags=["projects"])
+def update_project(
+    project_id: UUID,
+    payload: ProjectUpdate,
+    session: Session = Depends(get_session),
+) -> ProjectRead:
+    project_repository = ProjectRepository(session)
+    project = project_repository.get(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    return project_repository.update(project, payload)
+
+
+@router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["projects"])
+def delete_project(project_id: UUID, session: Session = Depends(get_session)) -> Response:
+    project_repository = ProjectRepository(session)
+    project = project_repository.get(project_id)
+    if project is None:
+        raise HTTPException(status_code=404, detail="Project not found")
+    project_repository.delete(project)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/moods", response_model=list[MoodRead], tags=["moods"])

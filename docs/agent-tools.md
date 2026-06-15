@@ -13,11 +13,13 @@ Orbit should eventually support personal automation and AI-assisted workflows. T
 
 ## Initial Backend Boundary
 
-The current backend should be treated as the system of record for structured memory types. Todos, bills, memory items, and mood check-ins are SQLite-backed; projects are still early in-memory endpoints.
+The current backend should be treated as the system of record for structured memory types. Todos, bills, memory items, mood check-ins, and projects are SQLite-backed.
 
 Memory persistence stores user-supplied content and tags only. It does not summarize articles, fetch link metadata, or perform retrieval-augmented chat yet.
 
 Mood persistence stores user-supplied check-ins only. It does not generate coaching, playlists, or planning personalization yet.
+
+Project persistence stores user-supplied status, area, and tags only. It does not generate AI project mentoring, summaries, or next-step recommendations yet.
 
 Future agent tools should call explicit backend endpoints rather than reaching into storage directly. This keeps automation behavior auditable and testable.
 

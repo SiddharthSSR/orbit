@@ -11,6 +11,7 @@ from app.main import app
 from app.models.bill import BillRecord
 from app.models.memory import MemoryRecord
 from app.models.mood import MoodRecord
+from app.models.project import ProjectRecord
 from app.models.todo import TodoRecord
 
 
@@ -23,7 +24,13 @@ def client() -> Generator[TestClient, None, None]:
     )
     Base.metadata.create_all(
         bind=engine,
-        tables=[TodoRecord.__table__, BillRecord.__table__, MemoryRecord.__table__, MoodRecord.__table__],
+        tables=[
+            TodoRecord.__table__,
+            BillRecord.__table__,
+            MemoryRecord.__table__,
+            MoodRecord.__table__,
+            ProjectRecord.__table__,
+        ],
     )
     testing_session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 

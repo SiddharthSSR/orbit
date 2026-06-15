@@ -11,13 +11,11 @@
 The backend exposes a small FastAPI app with:
 
 - `/health` for service health.
-- SQLite-backed CRUD endpoints for `Todo`, `Bill`, `Memory`, and `Mood`.
-- CRUD-style create/list endpoints for early non-persistent domain objects.
+- SQLite-backed CRUD endpoints for `Todo`, `Bill`, `Memory`, `Mood`, and `Project`.
 - Pydantic models for `Memory`, `Todo`, `Bill`, `Mood`, and `Project`.
-- An in-memory repository still used for `Project`.
 - CORS configured for common localhost development origins.
 
-Todo, Bill, Memory, and Mood now have persistence. Their APIs have separate create, read, and update schemas, and store records in SQLite by default at `backend/orbit.db`. Projects remain in-memory until their slice is ready.
+Todo, Bill, Memory, Mood, and Project now have persistence. Their APIs have separate create, read, and update schemas, and store records in SQLite by default at `backend/orbit.db`.
 
 ## iOS
 
@@ -34,7 +32,7 @@ The Today, Inbox, and Bills tabs use live backend APIs. Today now includes a liv
 
 Recommended next steps:
 
-- Expand SQLite or Postgres persistence beyond Todo, Bill, Memory, and Mood once each slice is ready.
+- Expand SQLite or Postgres persistence as the next slices need richer relational behavior.
 - Add repository interfaces where they reduce duplication.
 - Add API clients in the iOS app.
 - Introduce local caching after the API contract is stable.
