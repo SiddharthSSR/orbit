@@ -9,6 +9,7 @@ from sqlalchemy.pool import StaticPool
 from app.db.session import Base, get_session
 from app.main import app
 from app.models.bill import BillRecord
+from app.models.memory import MemoryRecord
 from app.models.todo import TodoRecord
 
 
@@ -19,7 +20,7 @@ def client() -> Generator[TestClient, None, None]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    Base.metadata.create_all(bind=engine, tables=[TodoRecord.__table__, BillRecord.__table__])
+    Base.metadata.create_all(bind=engine, tables=[TodoRecord.__table__, BillRecord.__table__, MemoryRecord.__table__])
     testing_session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
     def override_get_session() -> Generator[Session, None, None]:

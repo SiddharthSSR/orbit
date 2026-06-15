@@ -5,9 +5,11 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_session
 from app.models.bill import BillCreate, BillRead, BillUpdate
-from app.models.domain import MemoryItem, MoodLog, Project
+from app.models.domain import MoodLog, Project
+from app.models.memory import MemoryCreate, MemoryRead, MemoryUpdate
 from app.models.todo import TodoCreate, TodoRead, TodoUpdate
 from app.repositories.bill_repository import BillRepository
+from app.repositories.memory_item_repository import MemoryItemRepository
 from app.repositories.memory_repository import repository
 from app.repositories.todo_repository import TodoRepository
 
@@ -19,14 +21,50 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@router.get("/memory", response_model=list[MemoryItem], tags=["memory"])
-def list_memory_items() -> list[MemoryItem]:
-    return repository.list_memory_items()
+@router.get("/memory", response_model=list[MemoryRead], tags=["memory"])
+def list_memory_items(
+    include_archived: bool = False,
+    kind: str | None = None,
+    tag: str | None = None,
+    session: Session = Depends(get_session),
+) -> list[MemoryRead]:
+    return MemoryItemRepository(session).list(include_archived=include_archived, kind=kind, tag=tag)
 
 
-@router.post("/memory", response_model=MemoryItem, status_code=201, tags=["memory"])
-def create_memory_item(item: MemoryItem) -> MemoryItem:
-    return repository.add_memory_item(item)
+@router.post("/memory", response_model=MemoryRead, status_code=201, tags=["memory"])
+def create_memory_item(item: MemoryCreate, session: Session = Depends(get_session)) -> MemoryRead:
+    return MemoryItemRepository(session).create(item)
+
+
+@router.get("/memory/{memory_id}", response_model=MemoryRead, tags=["memory"])
+def get_memory_item(memory_id: UUID, session: Session = Depends(get_session)) -> MemoryRead:
+    memory_item = MemoryItemRepository(session).get(memory_id)
+    if memory_item is None:
+        raise HTTPException(status_code=404, detail="Memory item not found")
+    return memory_item
+
+
+@router.patch("/memory/{memory_id}", response_model=MemoryRead, tags=["memory"])
+def update_memory_item(
+    memory_id: UUID,
+    payload: MemoryUpdate,
+    session: Session = Depends(get_session),
+) -> MemoryRead:
+    memory_repository = MemoryItemRepository(session)
+    memory_item = memory_repository.get(memory_id)
+    if memory_item is None:
+        raise HTTPException(status_code=404, detail="Memory item not found")
+    return memory_repository.update(memory_item, payload)
+
+
+@router.delete("/memory/{memory_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["memory"])
+def delete_memory_item(memory_id: UUID, session: Session = Depends(get_session)) -> Response:
+    memory_repository = MemoryItemRepository(session)
+    memory_item = memory_repository.get(memory_id)
+    if memory_item is None:
+        raise HTTPException(status_code=404, detail="Memory item not found")
+    memory_repository.delete(memory_item)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/todos", response_model=list[TodoRead], tags=["todos"])

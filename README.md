@@ -76,11 +76,11 @@ Then run the iOS app from Xcode using an iPhone simulator. The iOS app's Todo AP
 http://127.0.0.1:8000
 ```
 
-That address lets the simulator reach the FastAPI server running on your Mac. The Today tab uses the live Todo API to load, create, toggle, and delete todos. The Bills tab uses the live Bill API to load, create, mark paid/unpaid, and delete bills.
+That address lets the simulator reach the FastAPI server running on your Mac. The Today tab uses the live Todo API to load, create, toggle, and delete todos. The Bills tab uses the live Bill API to load, create, mark paid/unpaid, and delete bills. Inbox/Memory capture is persistent on the backend, but the iOS Inbox tab is not connected yet.
 
 ## Backend API Notes
 
-Todos and Bills are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
+Todos, Bills, and Memory items are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
 
 Todo CRUD endpoints:
 
@@ -97,6 +97,17 @@ Bill CRUD endpoints:
 - `GET /bills/{bill_id}`
 - `PATCH /bills/{bill_id}`
 - `DELETE /bills/{bill_id}`
+
+Memory CRUD endpoints:
+
+- `POST /memory`
+- `GET /memory`
+- `GET /memory?include_archived=true`
+- `GET /memory?kind=link`
+- `GET /memory?tag=inbox`
+- `GET /memory/{memory_id}`
+- `PATCH /memory/{memory_id}`
+- `DELETE /memory/{memory_id}`
 
 The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.
 
