@@ -27,6 +27,10 @@
 		0B0000412C18B5D600000001 /* MockBillAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000412C18B5D600000101 /* MockBillAPIClient.swift */; };
 		0B0000422C18B5D600000001 /* BillListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000422C18B5D600000101 /* BillListViewModel.swift */; };
 		0B0000432C18B5D600000001 /* BillListViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000432C18B5D600000101 /* BillListViewModelTests.swift */; };
+		0B0000502C18B5D600000001 /* MemoryAPIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000502C18B5D600000101 /* MemoryAPIModels.swift */; };
+		0B0000512C18B5D600000001 /* MockMemoryAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000512C18B5D600000101 /* MockMemoryAPIClient.swift */; };
+		0B0000522C18B5D600000001 /* MemoryListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000522C18B5D600000101 /* MemoryListViewModel.swift */; };
+		0B0000532C18B5D600000001 /* MemoryListViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -62,6 +66,10 @@
 		0B0000412C18B5D600000101 /* MockBillAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockBillAPIClient.swift; sourceTree = "<group>"; };
 		0B0000422C18B5D600000101 /* BillListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillListViewModel.swift; sourceTree = "<group>"; };
 		0B0000432C18B5D600000101 /* BillListViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BillListViewModelTests.swift; sourceTree = "<group>"; };
+		0B0000502C18B5D600000101 /* MemoryAPIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryAPIModels.swift; sourceTree = "<group>"; };
+		0B0000512C18B5D600000101 /* MockMemoryAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockMemoryAPIClient.swift; sourceTree = "<group>"; };
+		0B0000522C18B5D600000101 /* MemoryListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryListViewModel.swift; sourceTree = "<group>"; };
+		0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryListViewModelTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -129,6 +137,7 @@
 				0B0000032C18B5D600000101 /* OrbitModels.swift */,
 				0B0000202C18B5D600000101 /* TodoAPIModels.swift */,
 				0B0000402C18B5D600000101 /* BillAPIModels.swift */,
+				0B0000502C18B5D600000101 /* MemoryAPIModels.swift */,
 				0B0000042C18B5D600000101 /* SampleData.swift */,
 			);
 			path = Models;
@@ -140,6 +149,7 @@
 				0B0000212C18B5D600000101 /* OrbitAPIClient.swift */,
 				0B0000252C18B5D600000101 /* MockTodoAPIClient.swift */,
 				0B0000412C18B5D600000101 /* MockBillAPIClient.swift */,
+				0B0000512C18B5D600000101 /* MockMemoryAPIClient.swift */,
 			);
 			path = Networking;
 			sourceTree = "<group>";
@@ -149,6 +159,7 @@
 			children = (
 				0B0000222C18B5D600000101 /* TodoListViewModel.swift */,
 				0B0000422C18B5D600000101 /* BillListViewModel.swift */,
+				0B0000522C18B5D600000101 /* MemoryListViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -186,6 +197,7 @@
 			children = (
 				0B0000302C18B5D600000101 /* TodoListViewModelTests.swift */,
 				0B0000432C18B5D600000101 /* BillListViewModelTests.swift */,
+				0B0000532C18B5D600000101 /* MemoryListViewModelTests.swift */,
 			);
 			path = OrbitTests;
 			sourceTree = "<group>";
@@ -294,11 +306,14 @@
 				0B0000032C18B5D600000001 /* OrbitModels.swift in Sources */,
 				0B0000202C18B5D600000001 /* TodoAPIModels.swift in Sources */,
 				0B0000402C18B5D600000001 /* BillAPIModels.swift in Sources */,
+				0B0000502C18B5D600000001 /* MemoryAPIModels.swift in Sources */,
 				0B0000212C18B5D600000001 /* OrbitAPIClient.swift in Sources */,
 				0B0000222C18B5D600000001 /* TodoListViewModel.swift in Sources */,
 				0B0000422C18B5D600000001 /* BillListViewModel.swift in Sources */,
+				0B0000522C18B5D600000001 /* MemoryListViewModel.swift in Sources */,
 				0B0000252C18B5D600000001 /* MockTodoAPIClient.swift in Sources */,
 				0B0000412C18B5D600000001 /* MockBillAPIClient.swift in Sources */,
+				0B0000512C18B5D600000001 /* MockMemoryAPIClient.swift in Sources */,
 				0B0000042C18B5D600000001 /* SampleData.swift in Sources */,
 				0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */,
 				0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */,
@@ -316,6 +331,7 @@
 			files = (
 				0B0000302C18B5D600000001 /* TodoListViewModelTests.swift in Sources */,
 				0B0000432C18B5D600000001 /* BillListViewModelTests.swift in Sources */,
+				0B0000532C18B5D600000001 /* MemoryListViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -14,6 +14,13 @@ protocol BillAPIClientProtocol: Sendable {
     func deleteBill(id: UUID) async throws
 }
 
+protocol MemoryAPIClientProtocol: Sendable {
+    func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO]
+    func createMemory(_ payload: MemoryCreateRequest) async throws -> MemoryDTO
+    func updateMemory(id: UUID, payload: MemoryUpdateRequest) async throws -> MemoryDTO
+    func deleteMemory(id: UUID) async throws
+}
+
 enum OrbitAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -31,7 +38,7 @@ enum OrbitAPIError: LocalizedError {
     }
 }
 
-struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, @unchecked Sendable {
+struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPIClientProtocol, @unchecked Sendable {
     var baseURL: URL
     var session: URLSession
 
@@ -75,11 +82,36 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, @unchecked 
         let _: EmptyResponse = try await request(path: "/bills/\(id.uuidString)", method: "DELETE")
     }
 
+    func listMemory(includeArchived: Bool = false, kind: String? = nil, tag: String? = nil) async throws -> [MemoryDTO] {
+        var queryItems = [URLQueryItem(name: "include_archived", value: includeArchived ? "true" : "false")]
+        if let kind, !kind.isEmpty {
+            queryItems.append(URLQueryItem(name: "kind", value: kind))
+        }
+        if let tag, !tag.isEmpty {
+            queryItems.append(URLQueryItem(name: "tag", value: tag))
+        }
+        let memoryItems: [MemoryDTO] = try await request(path: "/memory", queryItems: queryItems)
+        return memoryItems
+    }
+
+    func createMemory(_ payload: MemoryCreateRequest) async throws -> MemoryDTO {
+        try await request(path: "/memory", method: "POST", body: payload)
+    }
+
+    func updateMemory(id: UUID, payload: MemoryUpdateRequest) async throws -> MemoryDTO {
+        try await request(path: "/memory/\(id.uuidString)", method: "PATCH", body: payload)
+    }
+
+    func deleteMemory(id: UUID) async throws {
+        let _: EmptyResponse = try await request(path: "/memory/\(id.uuidString)", method: "DELETE")
+    }
+
     private func request<Response: Decodable>(
         path: String,
-        method: String = "GET"
+        method: String = "GET",
+        queryItems: [URLQueryItem] = []
     ) async throws -> Response {
-        let request = try makeRequest(path: path, method: method)
+        let request = try makeRequest(path: path, method: method, queryItems: queryItems)
         return try await send(request)
     }
 
@@ -93,12 +125,22 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, @unchecked 
         return try await send(request)
     }
 
-    private func makeRequest(path: String, method: String) throws -> URLRequest {
+    private func makeRequest(path: String, method: String, queryItems: [URLQueryItem] = []) throws -> URLRequest {
         guard let url = URL(string: path, relativeTo: baseURL)?.absoluteURL else {
             throw OrbitAPIError.invalidURL
         }
 
-        var request = URLRequest(url: url)
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            throw OrbitAPIError.invalidURL
+        }
+        if !queryItems.isEmpty {
+            components.queryItems = queryItems
+        }
+        guard let finalURL = components.url else {
+            throw OrbitAPIError.invalidURL
+        }
+
+        var request = URLRequest(url: finalURL)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Accept")
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
