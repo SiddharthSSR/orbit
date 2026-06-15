@@ -80,7 +80,7 @@ That address lets the simulator reach the FastAPI server running on your Mac. Th
 
 ## Backend API Notes
 
-Todos, Bills, and Memory items are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
+Todos, Bills, Memory items, and Mood check-ins are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
 
 Todo CRUD endpoints:
 
@@ -108,6 +108,16 @@ Memory CRUD endpoints:
 - `GET /memory/{memory_id}`
 - `PATCH /memory/{memory_id}`
 - `DELETE /memory/{memory_id}`
+
+Mood CRUD endpoints:
+
+- `POST /moods`
+- `GET /moods`
+- `GET /moods?limit=30`
+- `GET /moods?from_date=2026-06-01&to_date=2026-06-30`
+- `GET /moods/{mood_id}`
+- `PATCH /moods/{mood_id}`
+- `DELETE /moods/{mood_id}`
 
 The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.
 

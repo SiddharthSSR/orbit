@@ -1,16 +1,19 @@
 from uuid import UUID
+from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_session
 from app.models.bill import BillCreate, BillRead, BillUpdate
-from app.models.domain import MoodLog, Project
+from app.models.domain import Project
 from app.models.memory import MemoryCreate, MemoryRead, MemoryUpdate
+from app.models.mood import MoodCreate, MoodRead, MoodUpdate
 from app.models.todo import TodoCreate, TodoRead, TodoUpdate
 from app.repositories.bill_repository import BillRepository
 from app.repositories.memory_item_repository import MemoryItemRepository
 from app.repositories.memory_repository import repository
+from app.repositories.mood_repository import MoodRepository
 from app.repositories.todo_repository import TodoRepository
 
 router = APIRouter()
@@ -151,11 +154,43 @@ def create_project(project: Project) -> Project:
     return repository.add_project(project)
 
 
-@router.get("/moods", response_model=list[MoodLog], tags=["moods"])
-def list_mood_logs() -> list[MoodLog]:
-    return repository.list_mood_logs()
+@router.get("/moods", response_model=list[MoodRead], tags=["moods"])
+def list_mood_logs(
+    limit: int = 30,
+    from_date: date | None = None,
+    to_date: date | None = None,
+    session: Session = Depends(get_session),
+) -> list[MoodRead]:
+    return MoodRepository(session).list(limit=limit, from_date=from_date, to_date=to_date)
 
 
-@router.post("/moods", response_model=MoodLog, status_code=201, tags=["moods"])
-def create_mood_log(mood_log: MoodLog) -> MoodLog:
-    return repository.add_mood_log(mood_log)
+@router.post("/moods", response_model=MoodRead, status_code=201, tags=["moods"])
+def create_mood_log(mood_log: MoodCreate, session: Session = Depends(get_session)) -> MoodRead:
+    return MoodRepository(session).create(mood_log)
+
+
+@router.get("/moods/{mood_id}", response_model=MoodRead, tags=["moods"])
+def get_mood_log(mood_id: UUID, session: Session = Depends(get_session)) -> MoodRead:
+    mood = MoodRepository(session).get(mood_id)
+    if mood is None:
+        raise HTTPException(status_code=404, detail="Mood check-in not found")
+    return mood
+
+
+@router.patch("/moods/{mood_id}", response_model=MoodRead, tags=["moods"])
+def update_mood_log(mood_id: UUID, payload: MoodUpdate, session: Session = Depends(get_session)) -> MoodRead:
+    mood_repository = MoodRepository(session)
+    mood = mood_repository.get(mood_id)
+    if mood is None:
+        raise HTTPException(status_code=404, detail="Mood check-in not found")
+    return mood_repository.update(mood, payload)
+
+
+@router.delete("/moods/{mood_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["moods"])
+def delete_mood_log(mood_id: UUID, session: Session = Depends(get_session)) -> Response:
+    mood_repository = MoodRepository(session)
+    mood = mood_repository.get(mood_id)
+    if mood is None:
+        raise HTTPException(status_code=404, detail="Mood check-in not found")
+    mood_repository.delete(mood)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

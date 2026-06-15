@@ -23,11 +23,12 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 def init_db() -> None:
     from app.models.bill import BillRecord
     from app.models.memory import MemoryRecord
+    from app.models.mood import MoodRecord
     from app.models.todo import TodoRecord
 
     Base.metadata.create_all(
         bind=engine,
-        tables=[TodoRecord.__table__, BillRecord.__table__, MemoryRecord.__table__],
+        tables=[TodoRecord.__table__, BillRecord.__table__, MemoryRecord.__table__, MoodRecord.__table__],
     )
 
 

@@ -20,6 +20,7 @@ Orbit is a personal second brain for iPhone. It should collect lightweight perso
 The first version focuses on structure:
 
 - Capture memory items into a backend-persistent inbox.
+- Store mood check-ins as persistent backend records.
 - Show a Today view with plan, mood, and priority tasks.
 - Track projects and upcoming bills in dedicated tabs.
 - Provide an Ask tab as a placeholder for future AI chat.
@@ -28,6 +29,7 @@ The first version focuses on structure:
 
 - Authentication
 - AI summarization and automatic link fetching
+- AI coaching or planning personalization
 - Push notifications
 - Spotify integration
 - Production AI memory retrieval
