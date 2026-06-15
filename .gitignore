@@ -1,7 +1,10 @@
 .venv/
 *.egg-info/
+orbit.db
 __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.DS_Store
 DerivedData/
+*.xcuserdata

@@ -6,10 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "orbit-backend"
 version = "0.1.0"
 description = "FastAPI backend for Orbit."
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.111.0,<1.0.0",
     "pydantic>=2.7.0,<3.0.0",
+    "sqlalchemy>=2.0.0,<3.0.0",
     "uvicorn>=0.30.0,<1.0.0",
 ]
 

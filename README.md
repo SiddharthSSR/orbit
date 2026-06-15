@@ -54,6 +54,20 @@ open ios/Orbit/Orbit.xcodeproj
 
 The iOS app currently contains a tabbed SwiftUI shell with Today, Inbox, Ask, Projects, and Bills screens.
 
+## Backend API Notes
+
+Todos are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
+
+Todo CRUD endpoints:
+
+- `POST /todos`
+- `GET /todos`
+- `GET /todos/{todo_id}`
+- `PATCH /todos/{todo_id}`
+- `DELETE /todos/{todo_id}`
+
+The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.
+
 ## Repository Structure
 
 ```text
