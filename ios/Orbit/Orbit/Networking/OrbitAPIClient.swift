@@ -28,6 +28,13 @@ protocol MoodAPIClientProtocol: Sendable {
     func deleteMood(id: UUID) async throws
 }
 
+protocol ProjectAPIClientProtocol: Sendable {
+    func listProjects(includeArchived: Bool, status: String?, area: String?, tag: String?) async throws -> [ProjectDTO]
+    func createProject(_ payload: ProjectCreateRequest) async throws -> ProjectDTO
+    func updateProject(id: UUID, payload: ProjectUpdateRequest) async throws -> ProjectDTO
+    func deleteProject(id: UUID) async throws
+}
+
 enum OrbitAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -45,7 +52,7 @@ enum OrbitAPIError: LocalizedError {
     }
 }
 
-struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPIClientProtocol, MoodAPIClientProtocol, @unchecked Sendable {
+struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPIClientProtocol, MoodAPIClientProtocol, ProjectAPIClientProtocol, @unchecked Sendable {
     var baseURL: URL
     var session: URLSession
 
@@ -139,6 +146,38 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
 
     func deleteMood(id: UUID) async throws {
         let _: EmptyResponse = try await request(path: "/moods/\(id.uuidString)", method: "DELETE")
+    }
+
+    func listProjects(
+        includeArchived: Bool = false,
+        status: String? = nil,
+        area: String? = nil,
+        tag: String? = nil
+    ) async throws -> [ProjectDTO] {
+        var queryItems = [URLQueryItem(name: "include_archived", value: includeArchived ? "true" : "false")]
+        if let status, !status.isEmpty {
+            queryItems.append(URLQueryItem(name: "status", value: status))
+        }
+        if let area, !area.isEmpty {
+            queryItems.append(URLQueryItem(name: "area", value: area))
+        }
+        if let tag, !tag.isEmpty {
+            queryItems.append(URLQueryItem(name: "tag", value: tag))
+        }
+        let projects: [ProjectDTO] = try await request(path: "/projects", queryItems: queryItems)
+        return projects
+    }
+
+    func createProject(_ payload: ProjectCreateRequest) async throws -> ProjectDTO {
+        try await request(path: "/projects", method: "POST", body: payload)
+    }
+
+    func updateProject(id: UUID, payload: ProjectUpdateRequest) async throws -> ProjectDTO {
+        try await request(path: "/projects/\(id.uuidString)", method: "PATCH", body: payload)
+    }
+
+    func deleteProject(id: UUID) async throws {
+        let _: EmptyResponse = try await request(path: "/projects/\(id.uuidString)", method: "DELETE")
     }
 
     private func request<Response: Decodable>(

@@ -26,7 +26,7 @@ The iOS app is a SwiftUI shell organized into:
 - `Screens` for Today, Inbox, Ask, Projects, and Bills.
 - `Components` for reusable UI pieces.
 
-The Today, Inbox, and Bills tabs use live backend APIs. Today now includes a live Mood check-in section backed by the Mood API and shows the latest check-in in the dashboard. Ask and Projects still use placeholders or static sample data.
+The Today, Inbox, Bills, and Projects tabs use live backend APIs. Today now includes a live Mood check-in section backed by the Mood API and shows the latest check-in in the dashboard. Ask still uses placeholder UI for future AI chat.
 
 ## Future Persistence
 

@@ -21,7 +21,7 @@ The first version focuses on structure:
 
 - Capture memory items into a backend-persistent inbox.
 - Store mood check-ins as persistent backend records and let the user submit them from Today.
-- Store projects as persistent backend records with status, area, and tags.
+- Store projects as persistent backend records with status, area, and tags, editable from the Projects tab.
 - Show a Today view with plan, mood, and priority tasks.
 - Track projects and upcoming bills in dedicated tabs.
 - Provide an Ask tab as a placeholder for future AI chat.
