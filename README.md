@@ -14,7 +14,7 @@ Authentication is intentionally not implemented yet.
 
 Requirements:
 
-- Python 3.9+
+- Python 3.10+
 
 Run the API locally:
 
@@ -54,6 +54,12 @@ open ios/Orbit/Orbit.xcodeproj
 
 The iOS app currently contains a tabbed SwiftUI shell with Today, Inbox, Ask, Projects, and Bills screens.
 
+Run iOS unit tests:
+
+```bash
+xcodebuild test -project ios/Orbit/Orbit.xcodeproj -scheme Orbit -destination 'platform=iOS Simulator,name=iPhone 17'
+```
+
 ## Run Backend And iOS Together
 
 Start the backend first:
@@ -74,7 +80,7 @@ That address lets the simulator reach the FastAPI server running on your Mac. Th
 
 ## Backend API Notes
 
-Todos are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
+Todos and Bills are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
 
 Todo CRUD endpoints:
 
@@ -83,6 +89,14 @@ Todo CRUD endpoints:
 - `GET /todos/{todo_id}`
 - `PATCH /todos/{todo_id}`
 - `DELETE /todos/{todo_id}`
+
+Bill CRUD endpoints:
+
+- `POST /bills`
+- `GET /bills`
+- `GET /bills/{bill_id}`
+- `PATCH /bills/{bill_id}`
+- `DELETE /bills/{bill_id}`
 
 The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.
 

@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_session
-from app.models.domain import Bill, MemoryItem, MoodLog, Project
+from app.models.bill import BillCreate, BillRead, BillUpdate
+from app.models.domain import MemoryItem, MoodLog, Project
 from app.models.todo import TodoCreate, TodoRead, TodoUpdate
+from app.repositories.bill_repository import BillRepository
 from app.repositories.memory_repository import repository
 from app.repositories.todo_repository import TodoRepository
 
@@ -64,14 +66,41 @@ def delete_todo(todo_id: UUID, session: Session = Depends(get_session)) -> Respo
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/bills", response_model=list[Bill], tags=["bills"])
-def list_bills() -> list[Bill]:
-    return repository.list_bills()
+@router.get("/bills", response_model=list[BillRead], tags=["bills"])
+def list_bills(session: Session = Depends(get_session)) -> list[BillRead]:
+    return BillRepository(session).list()
 
 
-@router.post("/bills", response_model=Bill, status_code=201, tags=["bills"])
-def create_bill(bill: Bill) -> Bill:
-    return repository.add_bill(bill)
+@router.post("/bills", response_model=BillRead, status_code=201, tags=["bills"])
+def create_bill(bill: BillCreate, session: Session = Depends(get_session)) -> BillRead:
+    return BillRepository(session).create(bill)
+
+
+@router.get("/bills/{bill_id}", response_model=BillRead, tags=["bills"])
+def get_bill(bill_id: UUID, session: Session = Depends(get_session)) -> BillRead:
+    bill = BillRepository(session).get(bill_id)
+    if bill is None:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    return bill
+
+
+@router.patch("/bills/{bill_id}", response_model=BillRead, tags=["bills"])
+def update_bill(bill_id: UUID, payload: BillUpdate, session: Session = Depends(get_session)) -> BillRead:
+    bill_repository = BillRepository(session)
+    bill = bill_repository.get(bill_id)
+    if bill is None:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    return bill_repository.update(bill, payload)
+
+
+@router.delete("/bills/{bill_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["bills"])
+def delete_bill(bill_id: UUID, session: Session = Depends(get_session)) -> Response:
+    bill_repository = BillRepository(session)
+    bill = bill_repository.get(bill_id)
+    if bill is None:
+        raise HTTPException(status_code=404, detail="Bill not found")
+    bill_repository.delete(bill)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/projects", response_model=list[Project], tags=["projects"])

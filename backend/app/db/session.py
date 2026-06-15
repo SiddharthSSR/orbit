@@ -21,12 +21,12 @@ SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 
 
 def init_db() -> None:
+    from app.models.bill import BillRecord
     from app.models.todo import TodoRecord
 
-    Base.metadata.create_all(bind=engine, tables=[TodoRecord.__table__])
+    Base.metadata.create_all(bind=engine, tables=[TodoRecord.__table__, BillRecord.__table__])
 
 
 def get_session() -> Generator[Session, None, None]:
     with SessionLocal() as session:
         yield session
-

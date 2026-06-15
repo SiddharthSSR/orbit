@@ -27,8 +27,6 @@ The first version focuses on structure:
 ## Non-Goals For Now
 
 - Authentication
-- Database persistence
 - Push notifications
 - Spotify integration
 - Production AI memory retrieval
-

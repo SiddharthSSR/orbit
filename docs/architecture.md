@@ -11,13 +11,13 @@
 The backend exposes a small FastAPI app with:
 
 - `/health` for service health.
-- SQLite-backed CRUD endpoints for `Todo`.
-- CRUD-style create/list endpoints for early non-Todo domain objects.
+- SQLite-backed CRUD endpoints for `Todo` and `Bill`.
+- CRUD-style create/list endpoints for early non-persistent domain objects.
 - Pydantic models for `MemoryItem`, `Todo`, `Bill`, `Project`, and `MoodLog`.
-- An in-memory repository still used for `MemoryItem`, `Bill`, `Project`, and `MoodLog`.
+- An in-memory repository still used for `MemoryItem`, `Project`, and `MoodLog`.
 - CORS configured for common localhost development origins.
 
-Todo is the first vertical slice with persistence. Its API has separate create, read, and update schemas, and stores records in SQLite by default at `backend/orbit.db`. The other domain objects remain in-memory until their slices are ready.
+Todo and Bill now have persistence. Their APIs have separate create, read, and update schemas, and store records in SQLite by default at `backend/orbit.db`. Memory items, projects, and mood logs remain in-memory until their slices are ready.
 
 ## iOS
 
