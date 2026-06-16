@@ -7,7 +7,15 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.db.session import get_session
 from app.models.bill import BillCreate, BillRead, BillUpdate
-from app.models.chat import AskRequest, AskResponse, ChatMessageRead, ChatSessionCreate, ChatSessionRead
+from app.models.chat import (
+    AskContextPreviewRequest,
+    AskContextPreviewResponse,
+    AskRequest,
+    AskResponse,
+    ChatMessageRead,
+    ChatSessionCreate,
+    ChatSessionRead,
+)
 from app.models.memory import MemoryCreate, MemoryRead, MemoryUpdate
 from app.models.mood import MoodCreate, MoodRead, MoodUpdate
 from app.models.project import ProjectCreate, ProjectRead, ProjectUpdate
@@ -19,7 +27,7 @@ from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
 from app.services.ai_provider import AIProvider, AIProviderConfigurationError, build_ai_provider
-from app.services.context_builder import OrbitContextBuilder
+from app.services.context_builder import OrbitContextBuilder, extract_context_sections
 
 router = APIRouter()
 
@@ -41,6 +49,24 @@ def _chat_title_from_question(question: str) -> str:
 @router.get("/health", tags=["system"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.post("/ask/context-preview", response_model=AskContextPreviewResponse, tags=["chat"])
+def preview_ask_context(
+    payload: AskContextPreviewRequest,
+    session: Session = Depends(get_session),
+) -> AskContextPreviewResponse:
+    context = (
+        OrbitContextBuilder(session, question=payload.question).build_context()
+        if payload.include_context
+        else ""
+    )
+    return AskContextPreviewResponse(
+        question=payload.question,
+        include_context=payload.include_context,
+        context=context,
+        context_sections=extract_context_sections(context),
+    )
 
 
 @router.post("/ask", response_model=AskResponse, tags=["chat"])

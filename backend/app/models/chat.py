@@ -97,3 +97,23 @@ class AskResponse(BaseModel):
     user_message: ChatMessageRead
     assistant_message: ChatMessageRead
     answer: str
+
+
+class AskContextPreviewRequest(BaseModel):
+    question: str = Field(min_length=1)
+    include_context: bool = True
+
+    @field_validator("question")
+    @classmethod
+    def question_must_not_be_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Question must not be blank")
+        return stripped
+
+
+class AskContextPreviewResponse(BaseModel):
+    question: str
+    include_context: bool
+    context: str
+    context_sections: list[str]

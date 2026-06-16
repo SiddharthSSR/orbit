@@ -54,6 +54,94 @@ def test_ask_with_mock_provider_includes_relevant_context_section_names(client) 
     assert "Context sections: Today, Open todos, Unpaid bills, Recent memory" in response.json()["answer"]
 
 
+def test_ask_context_preview_returns_context_for_question(client) -> None:
+    client.post(
+        "/todos",
+        json={
+            "title": "Plan Orbit MVP",
+            "notes": "Focus on Ask context inspection",
+        },
+    )
+
+    response = client.post("/ask/context-preview", json={"question": "What should I focus on today?"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["question"] == "What should I focus on today?"
+    assert data["include_context"] is True
+    assert "Today:" in data["context"]
+    assert "Open todos:" in data["context"]
+    assert "Plan Orbit MVP" in data["context"]
+
+
+def test_ask_context_preview_includes_expected_sections(client) -> None:
+    response = client.post("/ask/context-preview", json={"question": "What should I focus on today?"})
+
+    assert response.status_code == 200
+    assert response.json()["context_sections"] == [
+        "Today",
+        "Open todos",
+        "Unpaid bills",
+        "Recent memory",
+        "Latest mood",
+        "Active projects",
+    ]
+
+
+def test_ask_context_preview_respects_include_context_false(client) -> None:
+    response = client.post(
+        "/ask/context-preview",
+        json={"question": "What should I focus on today?", "include_context": False},
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["include_context"] is False
+    assert data["context"] == ""
+    assert data["context_sections"] == []
+
+
+def test_ask_context_preview_rejects_blank_question(client) -> None:
+    response = client.post("/ask/context-preview", json={"question": "   "})
+
+    assert response.status_code == 422
+
+
+def test_ask_context_preview_does_not_create_chat_sessions_or_messages(client) -> None:
+    response = client.post("/ask/context-preview", json={"question": "What did I save about AI?"})
+
+    assert response.status_code == 200
+    sessions_response = client.get("/chat/sessions")
+    assert sessions_response.status_code == 200
+    assert sessions_response.json() == []
+
+
+def test_ask_context_preview_reflects_relevance_ordering(client) -> None:
+    client.post(
+        "/memory",
+        json={
+            "title": "Weekend plan",
+            "body": "Buy groceries and clean desk",
+            "kind": "note",
+        },
+    )
+    client.post(
+        "/memory",
+        json={
+            "title": "AI retrieval notes",
+            "body": "Lightweight relevance before embeddings",
+            "kind": "note",
+            "tags": ["ai"],
+        },
+    )
+
+    response = client.post("/ask/context-preview", json={"question": "What did I save about AI?"})
+
+    assert response.status_code == 200
+    context = response.json()["context"]
+    assert context.index("AI retrieval notes (note) [ai]") < context.index("Weekend plan (note)")
+
+
 def test_ask_with_existing_session_appends_messages(client) -> None:
     first = client.post("/ask", json={"question": "What bills are coming up?"}).json()
 

@@ -10,6 +10,15 @@ from app.repositories.todo_repository import TodoRepository
 from app.services.relevance import score_text, tokenize_query
 
 
+def extract_context_sections(context: str) -> list[str]:
+    sections: list[str] = []
+    for line in context.splitlines():
+        stripped = line.strip()
+        if stripped.endswith(":"):
+            sections.append(stripped[:-1])
+    return sections
+
+
 class OrbitContextBuilder:
     def __init__(
         self,
