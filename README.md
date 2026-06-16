@@ -73,6 +73,14 @@ Run iOS unit tests:
 xcodebuild test -project ios/Orbit/Orbit.xcodeproj -scheme Orbit -destination 'platform=iOS Simulator,name=iPhone 17'
 ```
 
+## Continuous Integration
+
+GitHub Actions runs lightweight validation on pushes to `main` and pull requests:
+
+- backend dependency install with `uv`, `pytest`, and an Alembic `upgrade head` smoke test against temporary SQLite
+- iOS `xcodebuild test` for `OrbitTests`
+- generic iOS Debug build with code signing disabled
+
 ## Run Backend And iOS Together
 
 Start the backend first:

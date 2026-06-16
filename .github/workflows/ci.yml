@@ -1,0 +1,86 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --extra dev
+
+      - name: Run backend tests
+        working-directory: backend
+        run: uv run pytest
+
+      - name: Run Alembic migration smoke test
+        working-directory: backend
+        env:
+          ORBIT_DATABASE_URL: sqlite:////tmp/orbit-ci-migration.db
+        run: |
+          rm -f /tmp/orbit-ci-migration.db
+          uv run alembic upgrade head
+
+  ios:
+    name: iOS
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Select an available iPhone simulator
+        id: simulator
+        run: |
+          SIMULATOR_NAME="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1; exit }')"
+          if [ -z "$SIMULATOR_NAME" ]; then
+            echo "No available iPhone simulator found."
+            xcrun simctl list devices available
+            exit 1
+          fi
+          echo "name=$SIMULATOR_NAME" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $SIMULATOR_NAME"
+
+      - name: Run iOS tests
+        run: |
+          xcodebuild test \
+            -project ios/Orbit/Orbit.xcodeproj \
+            -scheme Orbit \
+            -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.name }}" \
+            -derivedDataPath /tmp/orbit-derived-data \
+            -only-testing:OrbitTests
+
+      - name: Build iOS app
+        run: |
+          xcodebuild \
+            -project ios/Orbit/Orbit.xcodeproj \
+            -scheme Orbit \
+            -configuration Debug \
+            -destination generic/platform=iOS \
+            -derivedDataPath /tmp/orbit-derived-data \
+            CODE_SIGNING_ALLOWED=NO \
+            build
