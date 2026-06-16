@@ -114,6 +114,71 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(project.tags, ["ios", "backend"])
     }
 
+    func testDecodesChatSessionDTOFromBackendJSON() throws {
+        let session = try decoder.decode(ChatSessionDTO.self, from: Data("""
+        {
+          "id": "66666666-6666-6666-6666-666666666666",
+          "title": "What should I focus on today?",
+          "created_at": "2026-06-16T10:11:12.123456",
+          "updated_at": "2026-06-16T10:12:12.123456"
+        }
+        """.utf8))
+
+        XCTAssertEqual(session.id.uuidString, "66666666-6666-6666-6666-666666666666")
+        XCTAssertEqual(session.title, "What should I focus on today?")
+        XCTAssertEqual(formatDateOnly(session.createdAt), "2026-06-16")
+    }
+
+    func testDecodesChatMessageDTOFromBackendJSON() throws {
+        let message = try decoder.decode(ChatMessageDTO.self, from: Data("""
+        {
+          "id": "77777777-7777-7777-7777-777777777777",
+          "session_id": "66666666-6666-6666-6666-666666666666",
+          "role": "assistant",
+          "content": "Based on available Orbit context...",
+          "created_at": "2026-06-16T10:11:12.123456"
+        }
+        """.utf8))
+
+        XCTAssertEqual(message.id.uuidString, "77777777-7777-7777-7777-777777777777")
+        XCTAssertEqual(message.sessionId.uuidString, "66666666-6666-6666-6666-666666666666")
+        XCTAssertEqual(message.role, "assistant")
+        XCTAssertEqual(message.content, "Based on available Orbit context...")
+    }
+
+    func testDecodesAskResponseFromBackendJSON() throws {
+        let response = try decoder.decode(AskResponse.self, from: Data("""
+        {
+          "session": {
+            "id": "66666666-6666-6666-6666-666666666666",
+            "title": "What should I focus on today?",
+            "created_at": "2026-06-16T10:11:12.123456",
+            "updated_at": "2026-06-16T10:12:12.123456"
+          },
+          "user_message": {
+            "id": "77777777-7777-7777-7777-777777777777",
+            "session_id": "66666666-6666-6666-6666-666666666666",
+            "role": "user",
+            "content": "What should I focus on today?",
+            "created_at": "2026-06-16T10:11:12.123456"
+          },
+          "assistant_message": {
+            "id": "88888888-8888-8888-8888-888888888888",
+            "session_id": "66666666-6666-6666-6666-666666666666",
+            "role": "assistant",
+            "content": "Based on available Orbit context...",
+            "created_at": "2026-06-16T10:11:13.123456"
+          },
+          "answer": "Based on available Orbit context..."
+        }
+        """.utf8))
+
+        XCTAssertEqual(response.session.title, "What should I focus on today?")
+        XCTAssertEqual(response.userMessage.role, "user")
+        XCTAssertEqual(response.assistantMessage.role, "assistant")
+        XCTAssertEqual(response.answer, "Based on available Orbit context...")
+    }
+
     func testEncodesTodoCreateRequestWithSnakeCaseAndDateOnly() throws {
         let payload = TodoCreateRequest(
             title: "Plan launch",
@@ -207,6 +272,20 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(json["status"] as? String, "active")
         XCTAssertEqual(json["area"] as? String, "learning")
         XCTAssertEqual(json["tags"] as? [String], ["ai", "systems"])
+    }
+
+    func testEncodesAskRequestWithSnakeCase() throws {
+        let payload = AskRequest(
+            question: "What should I focus on today?",
+            sessionId: UUID(uuidString: "66666666-6666-6666-6666-666666666666"),
+            includeContext: true
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["question"] as? String, "What should I focus on today?")
+        XCTAssertEqual(json["session_id"] as? String, "66666666-6666-6666-6666-666666666666")
+        XCTAssertEqual(json["include_context"] as? Bool, true)
     }
 
     func testNonSuccessAPIResponseMapsToReadableRequestFailedError() async throws {

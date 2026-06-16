@@ -98,7 +98,7 @@ Then run the iOS app from Xcode using an iPhone simulator. The iOS app's Todo AP
 http://127.0.0.1:8000
 ```
 
-That address lets the simulator reach the FastAPI server running on your Mac. The Today tab combines live Todos, Bills, Memory, and the latest Mood check-in into a dashboard. It also lets you submit a simple Mood check-in. The Bills tab uses the live Bill API to load, create, mark paid/unpaid, and delete bills. The Inbox tab uses the live Memory API to load, capture, archive, and delete memory items. The Projects tab uses the live Project API to load, create, update status, archive, filter, and delete projects.
+That address lets the simulator reach the FastAPI server running on your Mac. The Today tab combines live Todos, Bills, Memory, and the latest Mood check-in into a dashboard. It also lets you submit a simple Mood check-in. The Bills tab uses the live Bill API to load, create, mark paid/unpaid, and delete bills. The Inbox tab uses the live Memory API to load, capture, archive, and delete memory items. The Projects tab uses the live Project API to load, create, update status, archive, filter, and delete projects. The Ask tab uses the backend `/ask` API with the deterministic mock AI provider.
 
 ## Backend API Notes
 
@@ -159,7 +159,7 @@ Ask/chat foundation endpoints:
 - `GET /chat/sessions`
 - `GET /chat/sessions/{session_id}/messages`
 
-The Ask backend currently uses a deterministic mock AI provider. It stores chat sessions/messages and builds a small plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. It does not call a real LLM yet, and it does not include embeddings, streaming, semantic search, or tool execution.
+The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. They store chat sessions/messages and build a small plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Orbit does not call a real LLM yet, and it does not include embeddings, streaming, semantic search, or tool execution.
 
 The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.
 

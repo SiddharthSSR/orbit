@@ -24,7 +24,7 @@ The first version focuses on structure:
 - Store projects as persistent backend records with status, area, and tags, editable from the Projects tab.
 - Show a Today view with plan, mood, and priority tasks.
 - Track projects and upcoming bills in dedicated tabs.
-- Provide an Ask tab as a placeholder for future AI chat.
+- Provide an Ask tab connected to the backend mock AI provider for non-streaming chat over basic Orbit context.
 
 ## Non-Goals For Now
 
@@ -32,6 +32,7 @@ The first version focuses on structure:
 - AI summarization and automatic link fetching
 - AI coaching or planning personalization
 - AI project mentoring
+- Real LLM integration, streaming chat, embeddings, and tool execution
 - Push notifications
 - Spotify integration
 - Production AI memory retrieval

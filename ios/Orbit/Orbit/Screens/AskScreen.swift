@@ -1,41 +1,157 @@
 import SwiftUI
 
 struct AskScreen: View {
-    @State private var prompt = ""
+    @StateObject private var viewModel: AskViewModel
+
+    init(apiClient: any ChatAPIClientProtocol = OrbitAPIClient()) {
+        _viewModel = StateObject(wrappedValue: AskViewModel(apiClient: apiClient))
+    }
 
     var body: some View {
-        VStack(spacing: 16) {
-            OrbitCard {
-                Label("Ask Orbit", systemImage: "sparkles")
-                    .font(.headline)
-                Text("AI chat over your personal memory will live here once the memory backend is connected.")
-                    .foregroundStyle(.secondary)
+        List {
+            Section {
+                HStack {
+                    Label("Ask Orbit", systemImage: "sparkles")
+                        .font(.headline)
+                    Spacer()
+                    Button {
+                        viewModel.startNewSession()
+                    } label: {
+                        Label("New", systemImage: "plus.bubble")
+                    }
+                    .buttonStyle(.borderless)
+                }
+
+                Toggle("Use Orbit context", isOn: $viewModel.includeContext)
             }
 
-            TextField("Ask about your notes, plans, or projects", text: $prompt, axis: .vertical)
-                .textFieldStyle(.roundedBorder)
-                .lineLimit(3...6)
+            if !viewModel.sessions.isEmpty {
+                Section("Chats") {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(viewModel.sessions) { session in
+                                Button {
+                                    Task { await viewModel.selectSession(session) }
+                                } label: {
+                                    Text(session.title ?? "Untitled")
+                                        .lineLimit(1)
+                                        .font(.subheadline.weight(.medium))
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(viewModel.selectedSession?.id == session.id ? .accentColor : .secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
+            }
 
-            Button {
-                prompt = ""
-            } label: {
-                Label("Send", systemImage: "paperplane")
+            if let errorMessage = viewModel.errorMessage {
+                Section {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                        Button {
+                            Task { await viewModel.loadSessions() }
+                        } label: {
+                            Label("Retry", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+
+            Section("Conversation") {
+                if viewModel.messages.isEmpty {
+                    EmptyStateView(
+                        title: "Ask a question",
+                        message: "Ask about your todos, bills, memory, moods, or projects.",
+                        systemImage: "bubble.left.and.bubble.right"
+                    )
                     .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(viewModel.messages) { message in
+                        ChatMessageRow(message: message)
+                    }
+                }
 
-            Spacer()
+                if viewModel.isLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                }
+            }
+
+            Section("Question") {
+                TextField("Ask about your day, memory, or projects", text: $viewModel.draftQuestion, axis: .vertical)
+                    .lineLimit(3...8)
+                    .textInputAutocapitalization(.sentences)
+
+                Button {
+                    Task { await viewModel.sendQuestion() }
+                } label: {
+                    Label("Send", systemImage: "paperplane.fill")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(
+                    viewModel.isLoading ||
+                    viewModel.draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
+            }
         }
-        .padding()
-        .background(Color(.systemGroupedBackground))
+        .task {
+            await viewModel.loadSessions()
+        }
+    }
+}
+
+private struct ChatMessageRow: View {
+    let message: ChatMessageDTO
+
+    var body: some View {
+        HStack {
+            if message.role == "assistant" {
+                bubble
+                Spacer(minLength: 32)
+            } else {
+                Spacer(minLength: 32)
+                bubble
+            }
+        }
+        .listRowSeparator(.hidden)
+    }
+
+    private var bubble: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(roleLabel, systemImage: roleIcon)
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            Text(message.content)
+                .font(.body)
+                .textSelection(.enabled)
+        }
+        .padding(12)
+        .background(message.role == "assistant" ? Color(.secondarySystemGroupedBackground) : Color.accentColor.opacity(0.14))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private var roleLabel: String {
+        message.role == "assistant" ? "Orbit" : "You"
+    }
+
+    private var roleIcon: String {
+        message.role == "assistant" ? "sparkles" : "person.crop.circle"
     }
 }
 
 struct AskScreen_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            AskScreen()
+            AskScreen(apiClient: MockChatAPIClient())
                 .navigationTitle("Ask")
         }
     }

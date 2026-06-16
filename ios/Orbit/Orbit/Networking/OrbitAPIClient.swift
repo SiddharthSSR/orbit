@@ -120,6 +120,12 @@ protocol ProjectAPIClientProtocol: Sendable {
     func deleteProject(id: UUID) async throws
 }
 
+protocol ChatAPIClientProtocol: Sendable {
+    func ask(_ payload: AskRequest) async throws -> AskResponse
+    func listChatSessions() async throws -> [ChatSessionDTO]
+    func listMessages(sessionId: UUID) async throws -> [ChatMessageDTO]
+}
+
 enum OrbitAPIError: LocalizedError {
     case invalidURL
     case invalidResponse
@@ -137,7 +143,7 @@ enum OrbitAPIError: LocalizedError {
     }
 }
 
-struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPIClientProtocol, MoodAPIClientProtocol, ProjectAPIClientProtocol, @unchecked Sendable {
+struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPIClientProtocol, MoodAPIClientProtocol, ProjectAPIClientProtocol, ChatAPIClientProtocol, @unchecked Sendable {
     var baseURL: URL
     var session: URLSession
 
@@ -263,6 +269,18 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
 
     func deleteProject(id: UUID) async throws {
         let _: EmptyResponse = try await request(path: "/projects/\(id.uuidString)", method: "DELETE")
+    }
+
+    func ask(_ payload: AskRequest) async throws -> AskResponse {
+        try await request(path: "/ask", method: "POST", body: payload)
+    }
+
+    func listChatSessions() async throws -> [ChatSessionDTO] {
+        try await request(path: "/chat/sessions")
+    }
+
+    func listMessages(sessionId: UUID) async throws -> [ChatMessageDTO] {
+        try await request(path: "/chat/sessions/\(sessionId.uuidString)/messages")
     }
 
     private func request<Response: Decodable>(
