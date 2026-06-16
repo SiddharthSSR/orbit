@@ -159,7 +159,7 @@ Ask/chat foundation endpoints:
 - `GET /chat/sessions`
 - `GET /chat/sessions/{session_id}/messages`
 
-The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. They store chat sessions/messages and build a small plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Orbit does not call a real LLM yet, and it does not include embeddings, streaming, semantic search, or tool execution.
+The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. They store chat sessions/messages and build a bounded, date-aware plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Todos and bills are labeled as overdue, due today, due soon, or no due date where applicable; memory and project bodies are included only as short previews. Orbit does not include embeddings, streaming, semantic search, or tool execution.
 
 To enable the experimental OpenAI-backed provider locally, set environment variables before starting the backend:
 

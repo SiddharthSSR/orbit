@@ -54,6 +54,22 @@ def test_openai_provider_uses_fake_client_without_network() -> None:
     assert request["messages"][-1] == {"role": "user", "content": "What should I focus on today?"}
 
 
+def test_mock_provider_mentions_context_sections() -> None:
+    provider = MockAIProvider()
+
+    answer = provider.generate_answer(
+        question="What should I do today?",
+        context=(
+            "Today:\n- 2026-06-16\n\n"
+            "Open todos:\n- [Due today] Plan day\n\n"
+            "Unpaid bills:\n- [Due soon] Credit card"
+        ),
+        history=[],
+    )
+
+    assert "Context sections: Today, Open todos, Unpaid bills." in answer
+
+
 def test_ask_uses_mock_provider_by_default_without_network(client, monkeypatch) -> None:
     monkeypatch.delenv("ORBIT_AI_PROVIDER", raising=False)
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)

@@ -18,7 +18,7 @@ The backend exposes a small FastAPI app with:
 
 Todo, Bill, Memory, Mood, Project, and chat records now have persistence. Their APIs have separate create, read, and update schemas where useful, and store records in SQLite by default at `backend/orbit.db`.
 
-The Ask backend foundation builds a small plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. It uses a deterministic mock AI provider by default. A real OpenAI provider can be enabled locally with `ORBIT_AI_PROVIDER=openai` and `OPENAI_API_KEY`, with `ORBIT_OPENAI_MODEL` and `ORBIT_AI_TIMEOUT_SECONDS` available for configuration. Tests and CI use the mock provider. There is no streaming, embeddings, semantic search, or tool execution yet.
+The Ask backend foundation builds a bounded, date-aware plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Todos and bills are prioritized around overdue, due-today, and upcoming dates. Memory and project content is represented as short previews with tags and source URLs where available. It uses a deterministic mock AI provider by default. A real OpenAI provider can be enabled locally with `ORBIT_AI_PROVIDER=openai` and `OPENAI_API_KEY`, with `ORBIT_OPENAI_MODEL` and `ORBIT_AI_TIMEOUT_SECONDS` available for configuration. Tests and CI use the mock provider. There is no streaming, embeddings, semantic search, or tool execution yet.
 
 Schema changes are managed with Alembic migrations. App startup does not create tables as the normal schema evolution path; local development should run `alembic upgrade head` before starting `uvicorn`. Tests still use isolated in-memory SQLite tables for speed and independence.
 
@@ -31,7 +31,7 @@ The iOS app is a SwiftUI shell organized into:
 - `Screens` for Today, Inbox, Ask, Projects, and Bills.
 - `Components` for reusable UI pieces.
 
-The Today, Inbox, Bills, Projects, and Ask tabs use live backend APIs. Today now includes a live Mood check-in section backed by the Mood API and shows the latest check-in in the dashboard. Ask uses the backend mock AI provider only; there is no real LLM integration, streaming, embeddings, or tool execution yet.
+The Today, Inbox, Bills, Projects, and Ask tabs use live backend APIs. Today now includes a live Mood check-in section backed by the Mood API and shows the latest check-in in the dashboard. Ask uses the backend `/ask` endpoint; by default that endpoint uses the deterministic mock provider, while local development can opt into the OpenAI provider with environment variables. There is no streaming, embeddings, or tool execution yet.
 
 ## Future Persistence
 

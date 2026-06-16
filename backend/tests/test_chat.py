@@ -139,16 +139,117 @@ def test_context_builder_includes_current_orbit_context() -> None:
             )
         )
 
-        context = OrbitContextBuilder(session).build_context()
+        context = OrbitContextBuilder(session, today=date(2026, 6, 16)).build_context()
 
+    assert "Today:\n- 2026-06-16" in context
     assert "Open todos:" in context
-    assert "Plan Orbit MVP" in context
+    assert "[No due date] Plan Orbit MVP" in context
     assert "Completed item" not in context
     assert "Unpaid bills:" in context
-    assert "Credit card: due 2026-06-20 (2500 INR)" in context
+    assert "[Due soon] Credit card: due 2026-06-20 (2500 INR)" in context
     assert "Recent memory:" in context
     assert "AI article (article) [ai]" in context
-    assert "Latest moods:" in context
+    assert "Latest mood:" in context
     assert "focused, energy 4/5" in context
     assert "Active projects:" in context
     assert "Orbit (personal) [app]: Personal second brain app" in context
+
+
+def test_context_builder_prioritizes_overdue_and_today_todos_before_no_due_todos() -> None:
+    engine, testing_session_local = make_context_test_session()
+
+    with testing_session_local() as session:
+        TodoRepository(session).create(TodoCreate(title="No due todo"))
+        TodoRepository(session).create(TodoCreate(title="Future todo", due_date=date(2026, 6, 19)))
+        TodoRepository(session).create(TodoCreate(title="Today todo", due_date=date(2026, 6, 16)))
+        TodoRepository(session).create(TodoCreate(title="Overdue todo", due_date=date(2026, 6, 15)))
+
+        context = OrbitContextBuilder(session, today=date(2026, 6, 16)).build_context()
+
+    assert context.index("[Overdue] Overdue todo") < context.index("[Due today] Today todo")
+    assert context.index("[Due today] Today todo") < context.index("[Due soon] Future todo")
+    assert context.index("[Due soon] Future todo") < context.index("[No due date] No due todo")
+    engine.dispose()
+
+
+def test_context_builder_prioritizes_overdue_and_today_bills() -> None:
+    engine, testing_session_local = make_context_test_session()
+
+    with testing_session_local() as session:
+        BillRepository(session).create(BillCreate(name="Future bill", due_date=date(2026, 6, 20)))
+        BillRepository(session).create(BillCreate(name="Today bill", due_date=date(2026, 6, 16)))
+        BillRepository(session).create(BillCreate(name="Overdue bill", due_date=date(2026, 6, 14)))
+
+        context = OrbitContextBuilder(session, today=date(2026, 6, 16)).build_context()
+
+    assert context.index("[Overdue] Overdue bill") < context.index("[Due today] Today bill")
+    assert context.index("[Due today] Today bill") < context.index("[Due soon] Future bill")
+    engine.dispose()
+
+
+def test_context_builder_truncates_long_memory_body_and_includes_source_url() -> None:
+    engine, testing_session_local = make_context_test_session()
+    long_body = " ".join(["memory"] * 80)
+
+    with testing_session_local() as session:
+        MemoryItemRepository(session).create(
+            MemoryCreate(
+                title="Long AI article",
+                body=long_body,
+                kind="article",
+                source_url="https://example.com/ai",
+                tags=["ai"],
+            )
+        )
+
+        context = OrbitContextBuilder(session, today=date(2026, 6, 16), preview_length=60).build_context()
+
+    assert "source: https://example.com/ai" in context
+    assert "Long AI article (article) [ai]" in context
+    assert "..." in context
+    assert long_body not in context
+    engine.dispose()
+
+
+def test_context_builder_includes_latest_mood_and_active_projects() -> None:
+    engine, testing_session_local = make_context_test_session()
+
+    with testing_session_local() as session:
+        MoodRepository(session).create(MoodCreate(mood="focused", energy=4, check_in_date=date(2026, 6, 16)))
+        ProjectRepository(session).create(
+            ProjectCreate(
+                name="Orbit",
+                description="Build a personal second brain with reliable capture and planning.",
+                area="personal",
+                tags=["ios", "backend"],
+            )
+        )
+        ProjectRepository(session).create(ProjectCreate(name="Archived project", status="archived"))
+
+        context = OrbitContextBuilder(session, today=date(2026, 6, 16), preview_length=80).build_context()
+
+    assert "Latest mood:" in context
+    assert "2026-06-16: focused, energy 4/5" in context
+    assert "Active projects:" in context
+    assert "Orbit (personal) [ios, backend]: Build a personal second brain" in context
+    assert "Archived project" not in context
+    engine.dispose()
+
+
+def make_context_test_session():
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    Base.metadata.create_all(
+        bind=engine,
+        tables=[
+            TodoRecord.__table__,
+            BillRecord.__table__,
+            MemoryRecord.__table__,
+            MoodRecord.__table__,
+            ProjectRecord.__table__,
+        ],
+    )
+    return engine, sessionmaker(bind=engine, autoflush=False, autocommit=False)

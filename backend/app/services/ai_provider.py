@@ -4,9 +4,9 @@ from app.core.config import Settings
 
 
 SYSTEM_PROMPT = (
-    "You are Orbit, a personal second-brain assistant. "
-    "Use the provided Orbit context. Be practical and concise. "
-    "If context is insufficient, say what is missing."
+    "You are Orbit, Siddharth's personal second-brain assistant. "
+    "Use Orbit context first. Give practical next steps. Be concise. "
+    "Do not invent facts not in context. If context is missing, ask for the missing detail."
 )
 
 
@@ -22,12 +22,22 @@ class AIProviderConfigurationError(RuntimeError):
 class MockAIProvider:
     def generate_answer(self, question: str, context: str, history: list[dict[str, str]]) -> str:
         context_note = "available Orbit context" if context.strip() else "your question"
+        sections = self._context_sections(context)
+        sections_note = f" Context sections: {', '.join(sections)}." if sections else " Context sections: none."
         history_note = f" I also considered {len(history)} recent chat message(s)." if history else ""
         return (
             f"Based on {context_note}, here is a starting point: {question.strip()} "
             "I can help connect your todos, bills, memory, moods, and projects once a real model is connected."
-            f"{history_note}"
+            f"{sections_note}{history_note}"
         )
+
+    def _context_sections(self, context: str) -> list[str]:
+        sections: list[str] = []
+        for line in context.splitlines():
+            stripped = line.strip()
+            if stripped.endswith(":"):
+                sections.append(stripped[:-1])
+        return sections
 
 
 class OpenAIProvider:
