@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.db.session import Base
 
 # Import model modules so their tables are registered on Base.metadata.
-from app.models import bill, memory, mood, project, todo  # noqa: F401
+from app.models import bill, chat, memory, mood, project, todo  # noqa: F401
 
 
 config = context.config

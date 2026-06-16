@@ -6,22 +6,94 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_session
 from app.models.bill import BillCreate, BillRead, BillUpdate
+from app.models.chat import AskRequest, AskResponse, ChatMessageRead, ChatSessionCreate, ChatSessionRead
 from app.models.memory import MemoryCreate, MemoryRead, MemoryUpdate
 from app.models.mood import MoodCreate, MoodRead, MoodUpdate
 from app.models.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.models.todo import TodoCreate, TodoRead, TodoUpdate
 from app.repositories.bill_repository import BillRepository
+from app.repositories.chat_repository import ChatRepository
 from app.repositories.memory_item_repository import MemoryItemRepository
 from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
+from app.services.ai_provider import AIProvider, MockAIProvider
+from app.services.context_builder import OrbitContextBuilder
 
 router = APIRouter()
+
+
+def get_ai_provider() -> AIProvider:
+    return MockAIProvider()
+
+
+def _chat_title_from_question(question: str) -> str:
+    title = question.strip()
+    if len(title) <= 80:
+        return title
+    return f"{title[:77].rstrip()}..."
 
 
 @router.get("/health", tags=["system"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.post("/ask", response_model=AskResponse, tags=["chat"])
+def ask(
+    payload: AskRequest,
+    session: Session = Depends(get_session),
+    ai_provider: AIProvider = Depends(get_ai_provider),
+) -> AskResponse:
+    chat_repository = ChatRepository(session)
+
+    if payload.session_id is None:
+        chat_session = chat_repository.create_session(
+            ChatSessionCreate(title=_chat_title_from_question(payload.question))
+        )
+    else:
+        chat_session = chat_repository.get_session(payload.session_id)
+        if chat_session is None:
+            raise HTTPException(status_code=404, detail="Chat session not found")
+
+    user_message = chat_repository.create_message(
+        session_id=chat_session.id,
+        role="user",
+        content=payload.question,
+    )
+    context = OrbitContextBuilder(session).build_context() if payload.include_context else ""
+    history = [
+        {"role": message.role, "content": message.content}
+        for message in chat_repository.list_messages_for_session(chat_session.id)
+    ]
+    answer = ai_provider.generate_answer(payload.question, context, history)
+    assistant_message = chat_repository.create_message(
+        session_id=chat_session.id,
+        role="assistant",
+        content=answer,
+    )
+    session.refresh(chat_session)
+
+    return AskResponse(
+        session=chat_session,
+        user_message=user_message,
+        assistant_message=assistant_message,
+        answer=answer,
+    )
+
+
+@router.get("/chat/sessions", response_model=list[ChatSessionRead], tags=["chat"])
+def list_chat_sessions(session: Session = Depends(get_session)) -> list[ChatSessionRead]:
+    return ChatRepository(session).list_sessions()
+
+
+@router.get("/chat/sessions/{session_id}/messages", response_model=list[ChatMessageRead], tags=["chat"])
+def list_chat_messages(session_id: UUID, session: Session = Depends(get_session)) -> list[ChatMessageRead]:
+    chat_repository = ChatRepository(session)
+    chat_session = chat_repository.get_session(session_id)
+    if chat_session is None:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    return chat_repository.list_messages_for_session(session_id)
 
 
 @router.get("/memory", response_model=list[MemoryRead], tags=["memory"])

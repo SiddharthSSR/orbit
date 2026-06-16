@@ -20,4 +20,6 @@ def test_alembic_upgrade_head_creates_expected_tables(tmp_path) -> None:
         "memory_items",
         "moods",
         "projects",
+        "chat_sessions",
+        "chat_messages",
     }.issubset(table_names)

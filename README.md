@@ -102,7 +102,7 @@ That address lets the simulator reach the FastAPI server running on your Mac. Th
 
 ## Backend API Notes
 
-Todos, Bills, Memory items, Mood check-ins, and Projects are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
+Todos, Bills, Memory items, Mood check-ins, Projects, and chat sessions/messages are backed by SQLite and default to `backend/orbit.db`. Set `ORBIT_DATABASE_URL` to point the backend at another database URL for local experiments or tests.
 
 Todo CRUD endpoints:
 
@@ -152,6 +152,14 @@ Project CRUD endpoints:
 - `GET /projects/{project_id}`
 - `PATCH /projects/{project_id}`
 - `DELETE /projects/{project_id}`
+
+Ask/chat foundation endpoints:
+
+- `POST /ask`
+- `GET /chat/sessions`
+- `GET /chat/sessions/{session_id}/messages`
+
+The Ask backend currently uses a deterministic mock AI provider. It stores chat sessions/messages and builds a small plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. It does not call a real LLM yet, and it does not include embeddings, streaming, semantic search, or tool execution.
 
 The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.
 
