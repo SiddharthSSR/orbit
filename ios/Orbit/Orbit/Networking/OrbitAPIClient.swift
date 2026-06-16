@@ -1,5 +1,90 @@
 import Foundation
 
+enum OrbitAPICoding {
+    static var jsonDecoder: JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let value = try container.decode(String.self)
+
+            if let date = decodeDate(value) {
+                return date
+            }
+
+            throw DecodingError.dataCorruptedError(
+                in: container,
+                debugDescription: "Unsupported date format: \(value)"
+            )
+        }
+        return decoder
+    }
+
+    static var jsonEncoder: JSONEncoder {
+        let encoder = JSONEncoder()
+        encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .formatted(makeDateOnlyFormatter())
+        return encoder
+    }
+
+    static func decodeDate(_ value: String) -> Date? {
+        for formatter in dateDecodingFormatters() {
+            if let date = formatter(value) {
+                return date
+            }
+        }
+        return nil
+    }
+
+    static func makeDateOnlyFormatter() -> DateFormatter {
+        let formatter = makeBaseDateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }
+
+    private static func dateDecodingFormatters() -> [(String) -> Date?] {
+        [
+            { makeBackendDateTimeWithFractionalSecondsFormatter().date(from: $0) },
+            { makeBackendDateTimeFormatter().date(from: $0) },
+            { makeISODateTimeWithFractionalSecondsFormatter().date(from: $0) },
+            { makeISODateTimeFormatter().date(from: $0) },
+            { makeDateOnlyFormatter().date(from: $0) }
+        ]
+    }
+
+    private static func makeISODateTimeWithFractionalSecondsFormatter() -> ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
+    }
+
+    private static func makeISODateTimeFormatter() -> ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter
+    }
+
+    private static func makeBackendDateTimeWithFractionalSecondsFormatter() -> DateFormatter {
+        let formatter = makeBaseDateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+        return formatter
+    }
+
+    private static func makeBackendDateTimeFormatter() -> DateFormatter {
+        let formatter = makeBaseDateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+        return formatter
+    }
+
+    private static func makeBaseDateFormatter() -> DateFormatter {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .iso8601)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        return formatter
+    }
+}
+
 protocol TodoAPIClientProtocol: Sendable {
     func listTodos() async throws -> [TodoDTO]
     func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO
@@ -126,10 +211,10 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
             queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
         }
         if let fromDate {
-            queryItems.append(URLQueryItem(name: "from_date", value: Self.makeDateOnlyFormatter().string(from: fromDate)))
+            queryItems.append(URLQueryItem(name: "from_date", value: OrbitAPICoding.makeDateOnlyFormatter().string(from: fromDate)))
         }
         if let toDate {
-            queryItems.append(URLQueryItem(name: "to_date", value: Self.makeDateOnlyFormatter().string(from: toDate)))
+            queryItems.append(URLQueryItem(name: "to_date", value: OrbitAPICoding.makeDateOnlyFormatter().string(from: toDate)))
         }
 
         let moods: [MoodDTO] = try await request(path: "/moods", queryItems: queryItems)
@@ -195,7 +280,7 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
         body: RequestBody
     ) async throws -> Response {
         var request = try makeRequest(path: path, method: method)
-        request.httpBody = try jsonEncoder.encode(body)
+        request.httpBody = try OrbitAPICoding.jsonEncoder.encode(body)
         return try await send(request)
     }
 
@@ -236,83 +321,7 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
             return EmptyResponse() as! Response
         }
 
-        return try jsonDecoder.decode(Response.self, from: data)
-    }
-
-    private var jsonDecoder: JSONDecoder {
-        let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
-        decoder.dateDecodingStrategy = .custom { decoder in
-            let container = try decoder.singleValueContainer()
-            let value = try container.decode(String.self)
-
-            for formatter in Self.dateDecodingFormatters() {
-                if let date = formatter(value) {
-                    return date
-                }
-            }
-
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "Unsupported date format: \(value)"
-            )
-        }
-        return decoder
-    }
-
-    private var jsonEncoder: JSONEncoder {
-        let encoder = JSONEncoder()
-        encoder.keyEncodingStrategy = .convertToSnakeCase
-        encoder.dateEncodingStrategy = .formatted(Self.makeDateOnlyFormatter())
-        return encoder
-    }
-
-    private static func dateDecodingFormatters() -> [(String) -> Date?] {
-        [
-            { Self.makeISODateTimeWithFractionalSecondsFormatter().date(from: $0) },
-            { Self.makeISODateTimeFormatter().date(from: $0) },
-            { Self.makeBackendDateTimeWithFractionalSecondsFormatter().date(from: $0) },
-            { Self.makeBackendDateTimeFormatter().date(from: $0) },
-            { Self.makeDateOnlyFormatter().date(from: $0) }
-        ]
-    }
-
-    private static func makeISODateTimeWithFractionalSecondsFormatter() -> ISO8601DateFormatter {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter
-    }
-
-    private static func makeISODateTimeFormatter() -> ISO8601DateFormatter {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime]
-        return formatter
-    }
-
-    private static func makeBackendDateTimeWithFractionalSecondsFormatter() -> DateFormatter {
-        let formatter = makeBaseDateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
-        return formatter
-    }
-
-    private static func makeBackendDateTimeFormatter() -> DateFormatter {
-        let formatter = makeBaseDateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
-        return formatter
-    }
-
-    private static func makeDateOnlyFormatter() -> DateFormatter {
-        let formatter = makeBaseDateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter
-    }
-
-    private static func makeBaseDateFormatter() -> DateFormatter {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .iso8601)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        return formatter
+        return try OrbitAPICoding.jsonDecoder.decode(Response.self, from: data)
     }
 }
 

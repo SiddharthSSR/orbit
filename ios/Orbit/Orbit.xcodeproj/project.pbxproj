@@ -9,8 +9,6 @@
 /* Begin PBXBuildFile section */
 		0B0000012C18B5D600000001 /* OrbitApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000012C18B5D600000101 /* OrbitApp.swift */; };
 		0B0000022C18B5D600000001 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000022C18B5D600000101 /* RootTabView.swift */; };
-		0B0000032C18B5D600000001 /* OrbitModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000032C18B5D600000101 /* OrbitModels.swift */; };
-		0B0000042C18B5D600000001 /* SampleData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000042C18B5D600000101 /* SampleData.swift */; };
 		0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000052C18B5D600000101 /* EmptyStateView.swift */; };
 		0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000062C18B5D600000101 /* OrbitCard.swift */; };
 		0B0000072C18B5D600000001 /* TodayScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000072C18B5D600000101 /* TodayScreen.swift */; };
@@ -41,6 +39,7 @@
 		0B0000812C18B5D600000001 /* MockProjectAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000812C18B5D600000101 /* MockProjectAPIClient.swift */; };
 		0B0000822C18B5D600000001 /* ProjectListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000822C18B5D600000101 /* ProjectListViewModel.swift */; };
 		0B0000832C18B5D600000001 /* ProjectListViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000832C18B5D600000101 /* ProjectListViewModelTests.swift */; };
+		0B0000902C18B5D600000001 /* OrbitAPIClientContractTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000902C18B5D600000101 /* OrbitAPIClientContractTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,8 +55,6 @@
 /* Begin PBXFileReference section */
 		0B0000012C18B5D600000101 /* OrbitApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitApp.swift; sourceTree = "<group>"; };
 		0B0000022C18B5D600000101 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
-		0B0000032C18B5D600000101 /* OrbitModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitModels.swift; sourceTree = "<group>"; };
-		0B0000042C18B5D600000101 /* SampleData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SampleData.swift; sourceTree = "<group>"; };
 		0B0000052C18B5D600000101 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		0B0000062C18B5D600000101 /* OrbitCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitCard.swift; sourceTree = "<group>"; };
 		0B0000072C18B5D600000101 /* TodayScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayScreen.swift; sourceTree = "<group>"; };
@@ -90,6 +87,7 @@
 		0B0000812C18B5D600000101 /* MockProjectAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockProjectAPIClient.swift; sourceTree = "<group>"; };
 		0B0000822C18B5D600000101 /* ProjectListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectListViewModel.swift; sourceTree = "<group>"; };
 		0B0000832C18B5D600000101 /* ProjectListViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectListViewModelTests.swift; sourceTree = "<group>"; };
+		0B0000902C18B5D600000101 /* OrbitAPIClientContractTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitAPIClientContractTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -154,13 +152,11 @@
 		0B0000122C18B5D600000101 /* Models */ = {
 			isa = PBXGroup;
 			children = (
-				0B0000032C18B5D600000101 /* OrbitModels.swift */,
 				0B0000202C18B5D600000101 /* TodoAPIModels.swift */,
 				0B0000402C18B5D600000101 /* BillAPIModels.swift */,
 				0B0000502C18B5D600000101 /* MemoryAPIModels.swift */,
 				0B0000702C18B5D600000101 /* MoodAPIModels.swift */,
 				0B0000802C18B5D600000101 /* ProjectAPIModels.swift */,
-				0B0000042C18B5D600000101 /* SampleData.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -228,6 +224,7 @@
 				0B0000612C18B5D600000101 /* TodayDashboardViewModelTests.swift */,
 				0B0000732C18B5D600000101 /* MoodCheckInViewModelTests.swift */,
 				0B0000832C18B5D600000101 /* ProjectListViewModelTests.swift */,
+				0B0000902C18B5D600000101 /* OrbitAPIClientContractTests.swift */,
 			);
 			path = OrbitTests;
 			sourceTree = "<group>";
@@ -333,7 +330,6 @@
 			files = (
 				0B0000012C18B5D600000001 /* OrbitApp.swift in Sources */,
 				0B0000022C18B5D600000001 /* RootTabView.swift in Sources */,
-				0B0000032C18B5D600000001 /* OrbitModels.swift in Sources */,
 				0B0000202C18B5D600000001 /* TodoAPIModels.swift in Sources */,
 				0B0000402C18B5D600000001 /* BillAPIModels.swift in Sources */,
 				0B0000502C18B5D600000001 /* MemoryAPIModels.swift in Sources */,
@@ -351,7 +347,6 @@
 				0B0000512C18B5D600000001 /* MockMemoryAPIClient.swift in Sources */,
 				0B0000712C18B5D600000001 /* MockMoodAPIClient.swift in Sources */,
 				0B0000812C18B5D600000001 /* MockProjectAPIClient.swift in Sources */,
-				0B0000042C18B5D600000001 /* SampleData.swift in Sources */,
 				0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */,
 				0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */,
 				0B0000072C18B5D600000001 /* TodayScreen.swift in Sources */,
@@ -372,6 +367,7 @@
 				0B0000612C18B5D600000001 /* TodayDashboardViewModelTests.swift in Sources */,
 				0B0000732C18B5D600000001 /* MoodCheckInViewModelTests.swift in Sources */,
 				0B0000832C18B5D600000001 /* ProjectListViewModelTests.swift in Sources */,
+				0B0000902C18B5D600000001 /* OrbitAPIClientContractTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
