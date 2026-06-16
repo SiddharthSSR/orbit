@@ -161,6 +161,17 @@ Ask/chat foundation endpoints:
 
 The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. They store chat sessions/messages and build a small plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Orbit does not call a real LLM yet, and it does not include embeddings, streaming, semantic search, or tool execution.
 
+To enable the experimental OpenAI-backed provider locally, set environment variables before starting the backend:
+
+```bash
+export ORBIT_AI_PROVIDER=openai
+export OPENAI_API_KEY=<your-openai-api-key>
+export ORBIT_OPENAI_MODEL=gpt-4o-mini
+export ORBIT_AI_TIMEOUT_SECONDS=30
+```
+
+If `ORBIT_AI_PROVIDER` is unset or set to `mock`, Orbit uses the deterministic mock provider. Tests and CI use the mock provider and must not call external AI services.
+
 The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.
 
 ## Repository Structure

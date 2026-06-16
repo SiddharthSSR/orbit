@@ -15,7 +15,7 @@ Orbit should eventually support personal automation and AI-assisted workflows. T
 
 The current backend should be treated as the system of record for structured memory types. Todos, bills, memory items, mood check-ins, and projects are SQLite-backed.
 
-The Ask backend foundation now stores chat sessions and messages, builds a small text context from existing Orbit records, and calls a deterministic mock AI provider. This is not a real LLM integration yet. It does not perform embeddings, vector search, streaming, semantic retrieval, or tool execution.
+The Ask backend foundation now stores chat sessions and messages, builds a small text context from existing Orbit records, and calls a deterministic mock AI provider by default. A real OpenAI provider can be enabled locally through environment variables, but tests and CI must keep using mock/fake providers. Orbit does not perform embeddings, vector search, streaming, semantic retrieval, or tool execution yet.
 
 Memory persistence stores user-supplied content and tags only. It does not summarize articles, fetch link metadata, or perform retrieval-augmented chat yet.
 

@@ -4,6 +4,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.session import get_session
 from app.models.bill import BillCreate, BillRead, BillUpdate
 from app.models.chat import AskRequest, AskResponse, ChatMessageRead, ChatSessionCreate, ChatSessionRead
@@ -17,14 +18,17 @@ from app.repositories.memory_item_repository import MemoryItemRepository
 from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
-from app.services.ai_provider import AIProvider, MockAIProvider
+from app.services.ai_provider import AIProvider, AIProviderConfigurationError, build_ai_provider
 from app.services.context_builder import OrbitContextBuilder
 
 router = APIRouter()
 
 
 def get_ai_provider() -> AIProvider:
-    return MockAIProvider()
+    try:
+        return build_ai_provider(settings)
+    except AIProviderConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 def _chat_title_from_question(question: str) -> str:
