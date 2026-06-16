@@ -6,7 +6,7 @@ from sqlalchemy import Date, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
-from app.models.domain import utc_now
+from app.core.time import utc_now
 
 
 def today() -> date:

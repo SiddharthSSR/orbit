@@ -17,6 +17,8 @@ The backend exposes a small FastAPI app with:
 
 Todo, Bill, Memory, Mood, and Project now have persistence. Their APIs have separate create, read, and update schemas, and store records in SQLite by default at `backend/orbit.db`.
 
+Schema changes are managed with Alembic migrations. App startup does not create tables as the normal schema evolution path; local development should run `alembic upgrade head` before starting `uvicorn`. Tests still use isolated in-memory SQLite tables for speed and independence.
+
 ## iOS
 
 The iOS app is a SwiftUI shell organized into:

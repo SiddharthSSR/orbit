@@ -1,12 +1,12 @@
 from datetime import date, datetime
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy import Boolean, Date, DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
-from app.models.domain import utc_now
+from app.core.time import utc_now
 
 
 class TodoRecord(Base):
@@ -34,6 +34,14 @@ class TodoCreate(BaseModel):
     project_id: UUID | None = None
     is_complete: bool = False
 
+    @field_validator("title")
+    @classmethod
+    def title_must_not_be_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Title must not be blank")
+        return stripped
+
 
 class TodoUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=240)
@@ -41,6 +49,16 @@ class TodoUpdate(BaseModel):
     due_date: date | None = None
     project_id: UUID | None = None
     is_complete: bool | None = None
+
+    @field_validator("title")
+    @classmethod
+    def title_must_not_be_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return value
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("Title must not be blank")
+        return stripped
 
 
 class TodoRead(BaseModel):
@@ -54,4 +72,3 @@ class TodoRead(BaseModel):
     is_complete: bool
     created_at: datetime
     updated_at: datetime
-

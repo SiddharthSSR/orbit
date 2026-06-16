@@ -8,7 +8,7 @@ from sqlalchemy import Boolean, DateTime, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.session import Base
-from app.models.domain import utc_now
+from app.core.time import utc_now
 
 
 MemoryKind = Literal["note", "idea", "link", "article", "tweet", "project_update", "daily_plan"]

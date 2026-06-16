@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.models.bill import BillCreate, BillRecord, BillUpdate
-from app.models.domain import utc_now
+from app.core.time import utc_now
 
 
 class BillRepository:

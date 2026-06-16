@@ -3,12 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import router
 from app.core.config import settings
-from app.db.session import init_db
 
 
 def create_app() -> FastAPI:
-    init_db()
-
     app = FastAPI(
         title=settings.app_name,
         version=settings.version,

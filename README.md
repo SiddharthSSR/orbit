@@ -23,8 +23,21 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install ".[dev]"
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
+
+The backend uses Alembic migrations for local database schema setup and evolution. `Base.metadata.create_all()` is still used in isolated tests, but it is not the normal app startup path.
+
+For a fresh local database, run:
+
+```bash
+cd backend
+source .venv/bin/activate
+alembic upgrade head
+```
+
+If you have an old disposable `backend/orbit.db` created before Alembic, delete it and run `alembic upgrade head` again. If you need to keep an existing local database whose schema already matches the first migration, use `alembic stamp head` instead of recreating it.
 
 Health check:
 
@@ -67,6 +80,7 @@ Start the backend first:
 ```bash
 cd backend
 source .venv/bin/activate
+alembic upgrade head
 uvicorn app.main:app --reload
 ```
 

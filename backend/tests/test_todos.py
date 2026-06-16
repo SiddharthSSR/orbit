@@ -26,6 +26,12 @@ def test_create_todo_requires_title(client) -> None:
     assert response.status_code == 422
 
 
+def test_create_todo_rejects_whitespace_title(client) -> None:
+    response = client.post("/todos", json={"title": "   "})
+
+    assert response.status_code == 422
+
+
 def test_list_todos(client) -> None:
     client.post("/todos", json={"title": "First"})
     client.post("/todos", json={"title": "Second"})
@@ -55,6 +61,14 @@ def test_patch_todo_completion(client) -> None:
     data = response.json()
     assert data["is_complete"] is True
     assert data["updated_at"] >= created["updated_at"]
+
+
+def test_patch_todo_rejects_whitespace_title(client) -> None:
+    created = client.post("/todos", json={"title": "File receipt"}).json()
+
+    response = client.patch(f"/todos/{created['id']}", json={"title": "   "})
+
+    assert response.status_code == 422
 
 
 def test_delete_todo(client) -> None:
