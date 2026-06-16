@@ -65,7 +65,7 @@ def ask(
         role="user",
         content=payload.question,
     )
-    context = OrbitContextBuilder(session).build_context() if payload.include_context else ""
+    context = OrbitContextBuilder(session, question=payload.question).build_context() if payload.include_context else ""
     history = [
         {"role": message.role, "content": message.content}
         for message in chat_repository.list_messages_for_session(chat_session.id)

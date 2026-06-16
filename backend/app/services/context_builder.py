@@ -7,6 +7,7 @@ from app.repositories.memory_item_repository import MemoryItemRepository
 from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
+from app.services.relevance import score_text, tokenize_query
 
 
 class OrbitContextBuilder:
@@ -14,12 +15,14 @@ class OrbitContextBuilder:
         self,
         session: Session,
         *,
+        question: str | None = None,
         today: date | None = None,
         section_limit: int = 5,
         mood_limit: int = 3,
         preview_length: int = 180,
     ) -> None:
         self.session = session
+        self.query_tokens = tokenize_query(question or "")
         self.today = today or date.today()
         self.section_limit = section_limit
         self.mood_limit = mood_limit
@@ -39,7 +42,10 @@ class OrbitContextBuilder:
     def _open_todos_section(self) -> str:
         todos = sorted(
             [todo for todo in TodoRepository(self.session).list() if not todo.is_complete],
-            key=lambda todo: self._optional_due_date_sort_key(todo.due_date),
+            key=lambda todo: (
+                -score_text(self.query_tokens, todo.title, todo.notes),
+                *self._optional_due_date_sort_key(todo.due_date),
+            ),
         )[: self.section_limit]
         if not todos:
             return "Open todos:\n- None"
@@ -55,7 +61,10 @@ class OrbitContextBuilder:
     def _unpaid_bills_section(self) -> str:
         bills = sorted(
             [bill for bill in BillRepository(self.session).list() if not bill.is_paid],
-            key=lambda bill: self._due_date_sort_key(bill.due_date),
+            key=lambda bill: (
+                -score_text(self.query_tokens, bill.name, bill.notes, bill.currency, bill.recurrence),
+                *self._due_date_sort_key(bill.due_date),
+            ),
         )[: self.section_limit]
         if not bills:
             return "Unpaid bills:\n- None"
@@ -69,7 +78,17 @@ class OrbitContextBuilder:
         return "Unpaid bills:\n" + "\n".join(lines)
 
     def _recent_memory_section(self) -> str:
-        memory_items = MemoryItemRepository(self.session).list(include_archived=False)[: self.section_limit]
+        memory_items = sorted(
+            MemoryItemRepository(self.session).list(include_archived=False),
+            key=lambda item: -score_text(
+                self.query_tokens,
+                item.title,
+                item.body,
+                item.kind,
+                item.source_url,
+                " ".join(item.tags),
+            ),
+        )[: self.section_limit]
         if not memory_items:
             return "Recent memory:\n- None"
 
@@ -81,7 +100,10 @@ class OrbitContextBuilder:
         return "Recent memory:\n" + "\n".join(lines)
 
     def _latest_moods_section(self) -> str:
-        moods = MoodRepository(self.session).list(limit=self.mood_limit)
+        moods = sorted(
+            MoodRepository(self.session).list(limit=30),
+            key=lambda mood: -score_text(self.query_tokens, mood.mood, mood.notes),
+        )[: self.mood_limit]
         if not moods:
             return "Latest mood:\n- None"
 
@@ -93,7 +115,17 @@ class OrbitContextBuilder:
         return "Latest mood:\n" + "\n".join(lines)
 
     def _active_projects_section(self) -> str:
-        projects = ProjectRepository(self.session).list(status="active")[: self.section_limit]
+        projects = sorted(
+            ProjectRepository(self.session).list(status="active"),
+            key=lambda project: -score_text(
+                self.query_tokens,
+                project.name,
+                project.description,
+                project.area,
+                project.status,
+                " ".join(project.tags),
+            ),
+        )[: self.section_limit]
         if not projects:
             return "Active projects:\n- None"
 

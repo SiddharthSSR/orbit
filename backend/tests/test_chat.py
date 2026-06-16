@@ -37,6 +37,23 @@ def test_ask_creates_new_session_and_two_messages(client) -> None:
     assert [message["role"] for message in messages_response.json()] == ["user", "assistant"]
 
 
+def test_ask_with_mock_provider_includes_relevant_context_section_names(client) -> None:
+    client.post(
+        "/memory",
+        json={
+            "title": "AI retrieval notes",
+            "body": "Lightweight relevance before embeddings",
+            "kind": "note",
+            "tags": ["ai"],
+        },
+    )
+
+    response = client.post("/ask", json={"question": "What did I save about AI?"})
+
+    assert response.status_code == 200
+    assert "Context sections: Today, Open todos, Unpaid bills, Recent memory" in response.json()["answer"]
+
+
 def test_ask_with_existing_session_appends_messages(client) -> None:
     first = client.post("/ask", json={"question": "What bills are coming up?"}).json()
 
@@ -233,6 +250,109 @@ def test_context_builder_includes_latest_mood_and_active_projects() -> None:
     assert "Active projects:" in context
     assert "Orbit (personal) [ios, backend]: Build a personal second brain" in context
     assert "Archived project" not in context
+    engine.dispose()
+
+
+def test_context_builder_prioritizes_ai_memory_when_question_asks_about_ai() -> None:
+    engine, testing_session_local = make_context_test_session()
+
+    with testing_session_local() as session:
+        MemoryItemRepository(session).create(
+            MemoryCreate(
+                title="Weekend plan",
+                body="Buy groceries and clean desk",
+                kind="note",
+            )
+        )
+        MemoryItemRepository(session).create(
+            MemoryCreate(
+                title="AI article",
+                body="Notes about AI memory and retrieval",
+                kind="article",
+                tags=["ai"],
+            )
+        )
+
+        context = OrbitContextBuilder(
+            session,
+            question="What did I save about AI?",
+            today=date(2026, 6, 16),
+        ).build_context()
+
+    assert context.index("AI article (article) [ai]") < context.index("Weekend plan (note)")
+    engine.dispose()
+
+
+def test_context_builder_prioritizes_worldlens_project_when_question_asks_about_worldlens() -> None:
+    engine, testing_session_local = make_context_test_session()
+
+    with testing_session_local() as session:
+        ProjectRepository(session).create(
+            ProjectCreate(
+                name="Orbit",
+                description="Personal second brain app",
+                area="personal",
+            )
+        )
+        ProjectRepository(session).create(
+            ProjectCreate(
+                name="WorldLens",
+                description="Camera translation and visual language learning app",
+                area="learning",
+                tags=["ios"],
+            )
+        )
+
+        context = OrbitContextBuilder(
+            session,
+            question="How is WorldLens going?",
+            today=date(2026, 6, 16),
+        ).build_context()
+
+    assert context.index("WorldLens (learning) [ios]") < context.index("Orbit (personal)")
+    engine.dispose()
+
+
+def test_context_builder_prioritizes_furlenco_bill_when_question_asks_about_furlenco() -> None:
+    engine, testing_session_local = make_context_test_session()
+
+    with testing_session_local() as session:
+        BillRepository(session).create(BillCreate(name="Credit card", due_date=date(2026, 6, 14)))
+        BillRepository(session).create(
+            BillCreate(
+                name="Furlenco rent",
+                due_date=date(2026, 6, 20),
+                recurrence="monthly",
+                notes="Furniture rental",
+            )
+        )
+
+        context = OrbitContextBuilder(
+            session,
+            question="Any bills related to Furlenco?",
+            today=date(2026, 6, 16),
+        ).build_context()
+
+    assert context.index("Furlenco rent") < context.index("Credit card")
+    engine.dispose()
+
+
+def test_context_builder_falls_back_to_date_order_when_question_has_no_matches() -> None:
+    engine, testing_session_local = make_context_test_session()
+
+    with testing_session_local() as session:
+        TodoRepository(session).create(TodoCreate(title="No due todo"))
+        TodoRepository(session).create(TodoCreate(title="Today todo", due_date=date(2026, 6, 16)))
+        TodoRepository(session).create(TodoCreate(title="Overdue todo", due_date=date(2026, 6, 15)))
+
+        context = OrbitContextBuilder(
+            session,
+            question="Tell me about quantum cooking",
+            today=date(2026, 6, 16),
+        ).build_context()
+
+    assert context.index("[Overdue] Overdue todo") < context.index("[Due today] Today todo")
+    assert context.index("[Due today] Today todo") < context.index("[No due date] No due todo")
     engine.dispose()
 
 
