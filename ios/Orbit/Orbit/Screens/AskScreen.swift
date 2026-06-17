@@ -18,7 +18,7 @@ struct AskScreen: View {
                     Button {
                         viewModel.startNewSession()
                     } label: {
-                        Label("New", systemImage: "plus.bubble")
+                        Label("New Chat", systemImage: "plus.bubble")
                     }
                     .buttonStyle(.borderless)
                 }
@@ -62,6 +62,38 @@ struct AskScreen: View {
                 }
             }
 
+            Section("Ask") {
+                TextField("Ask about your day, memory, or projects", text: $viewModel.draftQuestion, axis: .vertical)
+                    .lineLimit(3...8)
+                    .textInputAutocapitalization(.sentences)
+
+                HStack(spacing: 10) {
+                    Button {
+                        Task { await viewModel.previewContext() }
+                    } label: {
+                        Label("Preview", systemImage: "doc.text.magnifyingglass")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(
+                        viewModel.isPreviewLoading ||
+                        viewModel.draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+
+                    Button {
+                        Task { await viewModel.sendQuestion() }
+                    } label: {
+                        Label("Send", systemImage: "paperplane.fill")
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(
+                        viewModel.isLoading ||
+                        viewModel.draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    )
+                }
+            }
+
             Section("Conversation") {
                 if viewModel.messages.isEmpty {
                     EmptyStateView(
@@ -86,37 +118,7 @@ struct AskScreen: View {
                 }
             }
 
-            Section("Question") {
-                TextField("Ask about your day, memory, or projects", text: $viewModel.draftQuestion, axis: .vertical)
-                    .lineLimit(3...8)
-                    .textInputAutocapitalization(.sentences)
-
-                Button {
-                    Task { await viewModel.sendQuestion() }
-                } label: {
-                    Label("Send", systemImage: "paperplane.fill")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(
-                    viewModel.isLoading ||
-                    viewModel.draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                )
-            }
-
-            Section("Debug context") {
-                Button {
-                    Task { await viewModel.previewContext() }
-                } label: {
-                    Label("Preview context", systemImage: "doc.text.magnifyingglass")
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.bordered)
-                .disabled(
-                    viewModel.isPreviewLoading ||
-                    viewModel.draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                )
-
+            Section("Inspect context") {
                 if viewModel.isPreviewLoading {
                     HStack {
                         Spacer()
@@ -132,8 +134,23 @@ struct AskScreen: View {
                 }
 
                 if let preview = viewModel.contextPreview {
-                    if preview.contextSections.isEmpty {
-                        Text("No context sections")
+                    VStack(alignment: .leading, spacing: 8) {
+                        Label(viewModel.contextConfidence.label, systemImage: contextConfidenceIcon)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(contextConfidenceColor)
+
+                        Text(contextSummary(for: preview))
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 2)
+
+                    if !preview.includeContext {
+                        Label("Context is disabled for this preview.", systemImage: "eye.slash")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else if preview.contextSections.isEmpty {
+                        Text("No context sections found.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
@@ -149,7 +166,7 @@ struct AskScreen: View {
                         }
                     }
 
-                    DisclosureGroup("Raw context", isExpanded: $isContextPreviewExpanded) {
+                    DisclosureGroup("Show raw context", isExpanded: $isContextPreviewExpanded) {
                         Text(preview.context.isEmpty ? "Context disabled for this preview." : preview.context)
                             .font(.footnote.monospaced())
                             .foregroundStyle(.secondary)
@@ -162,6 +179,36 @@ struct AskScreen: View {
         .task {
             await viewModel.loadSessions()
         }
+    }
+
+    private var contextConfidenceIcon: String {
+        switch viewModel.contextConfidence {
+        case .noContext:
+            "circle"
+        case .lowContext:
+            "circle.lefthalf.filled"
+        case .ready:
+            "checkmark.circle.fill"
+        }
+    }
+
+    private var contextConfidenceColor: Color {
+        switch viewModel.contextConfidence {
+        case .noContext:
+            .secondary
+        case .lowContext:
+            .orange
+        case .ready:
+            .green
+        }
+    }
+
+    private func contextSummary(for preview: AskContextPreviewResponse) -> String {
+        guard preview.includeContext else {
+            return "Context disabled"
+        }
+        let count = preview.contextSections.count
+        return "\(count) context \(count == 1 ? "section" : "sections") available"
     }
 }
 
@@ -185,15 +232,8 @@ private struct ChatMessageRow: View {
     let message: ChatMessageDTO
 
     var body: some View {
-        HStack {
-            if message.role == "assistant" {
-                bubble
-                Spacer(minLength: 32)
-            } else {
-                Spacer(minLength: 32)
-                bubble
-            }
-        }
+        bubble
+            .frame(maxWidth: .infinity, alignment: isAssistant ? .leading : .trailing)
         .listRowSeparator(.hidden)
     }
 
@@ -201,22 +241,31 @@ private struct ChatMessageRow: View {
         VStack(alignment: .leading, spacing: 6) {
             Label(roleLabel, systemImage: roleIcon)
                 .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(isAssistant ? Color.secondary : Color.accentColor)
             Text(message.content)
                 .font(.body)
                 .textSelection(.enabled)
         }
         .padding(12)
-        .background(message.role == "assistant" ? Color(.secondarySystemGroupedBackground) : Color.accentColor.opacity(0.14))
+        .frame(maxWidth: 360, alignment: .leading)
+        .background(isAssistant ? Color(.secondarySystemGroupedBackground) : Color.accentColor.opacity(0.14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(isAssistant ? Color(.separator).opacity(0.4) : Color.accentColor.opacity(0.18))
+        }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
     }
 
+    private var isAssistant: Bool {
+        message.role == "assistant"
+    }
+
     private var roleLabel: String {
-        message.role == "assistant" ? "Orbit" : "You"
+        isAssistant ? "Orbit" : "You"
     }
 
     private var roleIcon: String {
-        message.role == "assistant" ? "sparkles" : "person.crop.circle"
+        isAssistant ? "sparkles" : "person.crop.circle"
     }
 }
 

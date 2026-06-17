@@ -1,5 +1,22 @@
 import Foundation
 
+enum AskContextConfidence: Equatable {
+    case noContext
+    case lowContext
+    case ready
+
+    var label: String {
+        switch self {
+        case .noContext:
+            "No context"
+        case .lowContext:
+            "Low context"
+        case .ready:
+            "Context ready"
+        }
+    }
+}
+
 @MainActor
 final class AskViewModel: ObservableObject {
     @Published private(set) var sessions: [ChatSessionDTO] = []
@@ -12,6 +29,10 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var contextPreview: AskContextPreviewResponse?
     @Published private(set) var isPreviewLoading = false
     @Published var previewErrorMessage: String?
+
+    var contextConfidence: AskContextConfidence {
+        Self.contextConfidence(for: contextPreview)
+    }
 
     private let apiClient: any ChatAPIClientProtocol
 
@@ -114,5 +135,37 @@ final class AskViewModel: ObservableObject {
             return description
         }
         return error.localizedDescription
+    }
+
+    static func contextConfidence(for preview: AskContextPreviewResponse?) -> AskContextConfidence {
+        guard let preview,
+              preview.includeContext,
+              !preview.contextSections.isEmpty,
+              !preview.context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return .noContext
+        }
+
+        let dataSections = ["Open todos", "Unpaid bills", "Recent memory", "Latest mood", "Active projects"]
+        let hasUsableData = preview.contextSections.contains { section in
+            dataSections.contains(section) && !sectionIsEmpty(section, in: preview.context)
+        }
+
+        return hasUsableData ? .ready : .lowContext
+    }
+
+    private static func sectionIsEmpty(_ section: String, in context: String) -> Bool {
+        let lines = context.components(separatedBy: .newlines)
+        guard let sectionIndex = lines.firstIndex(where: { $0.trimmingCharacters(in: .whitespacesAndNewlines) == "\(section):" }) else {
+            return true
+        }
+
+        let bodyLines = lines.dropFirst(sectionIndex + 1).prefix { line in
+            !line.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix(":")
+        }
+
+        return !bodyLines.contains { line in
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.hasPrefix("-") && trimmed != "- None"
+        }
     }
 }

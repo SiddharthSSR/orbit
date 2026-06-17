@@ -171,6 +171,74 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isPreviewLoading)
     }
 
+    func testContextConfidenceIsNoContextForEmptySections() {
+        let confidence = AskViewModel.contextConfidence(
+            for: AskContextPreviewResponse(
+                question: "What should I do?",
+                includeContext: true,
+                context: "",
+                contextSections: []
+            )
+        )
+
+        XCTAssertEqual(confidence, .noContext)
+        XCTAssertEqual(confidence.label, "No context")
+    }
+
+    func testContextConfidenceIsLowContextForOnlyGenericOrEmptySections() {
+        let confidence = AskViewModel.contextConfidence(
+            for: AskContextPreviewResponse(
+                question: "What should I do?",
+                includeContext: true,
+                context: """
+                Today:
+                - 2026-06-17
+
+                Open todos:
+                - None
+
+                Unpaid bills:
+                - None
+                """,
+                contextSections: ["Today", "Open todos", "Unpaid bills"]
+            )
+        )
+
+        XCTAssertEqual(confidence, .lowContext)
+    }
+
+    func testContextConfidenceIsReadyWhenDataSectionsIncludeUsableContext() {
+        let confidence = AskViewModel.contextConfidence(
+            for: AskContextPreviewResponse(
+                question: "What did I save about AI?",
+                includeContext: true,
+                context: """
+                Today:
+                - 2026-06-17
+
+                Recent memory:
+                - AI retrieval notes (note) [ai]: Lightweight relevance before embeddings
+                """,
+                contextSections: ["Today", "Recent memory"]
+            )
+        )
+
+        XCTAssertEqual(confidence, .ready)
+    }
+
+    func testContextConfidenceIsNoContextWhenIncludeContextIsFalse() {
+        let confidence = AskViewModel.contextConfidence(
+            for: AskContextPreviewResponse(
+                question: "What should I do?",
+                includeContext: false,
+                context: "",
+                contextSections: []
+            )
+        )
+
+        XCTAssertEqual(confidence, .noContext)
+    }
+
     private func makeSession(title: String) -> ChatSessionDTO {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         return ChatSessionDTO(id: UUID(), title: title, createdAt: now, updatedAt: now)
