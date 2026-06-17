@@ -2,7 +2,15 @@ import json
 
 import pytest
 
-from scripts.run_ask_eval import AskEvalQuestion, build_eval_result, load_eval_questions, write_results
+from scripts.run_ask_eval import (
+    AskEvalQuestion,
+    build_eval_result,
+    context_summary,
+    load_eval_questions,
+    parse_context_sections,
+    useful_context_sections,
+    write_results,
+)
 
 
 def test_ask_eval_questions_have_expected_shape() -> None:
@@ -30,6 +38,67 @@ def test_load_eval_questions_rejects_invalid_shape(tmp_path) -> None:
         load_eval_questions(invalid_file)
 
 
+def test_parse_context_sections_parses_sections_and_body_lines() -> None:
+    context = """
+    Today:
+    - 2026-06-17
+
+    Open todos:
+    - None
+
+    Unpaid bills:
+    - [Due soon] Furlenco: due 2026-06-21
+    """
+
+    sections = parse_context_sections(context)
+
+    assert sections == {
+        "Today": ["- 2026-06-17"],
+        "Open todos": ["- None"],
+        "Unpaid bills": ["- [Due soon] Furlenco: due 2026-06-21"],
+    }
+
+
+def test_useful_context_sections_excludes_sections_with_none() -> None:
+    context = """
+    Today:
+    - 2026-06-17
+
+    Open todos:
+    - None
+
+    Unpaid bills:
+    - [Due soon] Furlenco: due 2026-06-21
+
+    Recent memory:
+    - None
+    """
+
+    assert useful_context_sections(context) == ["Today", "Unpaid bills"]
+
+
+def test_context_summary_is_low_context_when_data_sections_are_empty() -> None:
+    preview = {
+        "include_context": True,
+        "context_sections": ["Today", "Open todos", "Unpaid bills", "Recent memory"],
+        "context": """
+        Today:
+        - 2026-06-17
+
+        Open todos:
+        - None
+
+        Unpaid bills:
+        - None
+
+        Recent memory:
+        - None
+        """,
+    }
+
+    assert context_summary(preview) == "Low context (1 useful section(s))"
+
+
 def test_write_results_json_writes_list_of_result_objects(tmp_path) -> None:
     result = make_result()
     output_path = tmp_path / "results" / "latest.json"
@@ -41,6 +110,7 @@ def test_write_results_json_writes_list_of_result_objects(tmp_path) -> None:
     assert saved[0]["run_id"] == "run-1"
     assert saved[0]["question_id"] == "saved_ai"
     assert saved[0]["returned_context_sections"] == ["Today", "Recent memory"]
+    assert saved[0]["useful_context_sections"] == ["Today", "Recent memory"]
 
 
 def test_write_results_jsonl_writes_one_object_per_line(tmp_path) -> None:
@@ -75,10 +145,53 @@ def test_build_eval_result_represents_per_question_error() -> None:
     assert result["mode"] == "context_preview"
     assert result["question_id"] == "saved_ai"
     assert result["returned_context_sections"] == []
+    assert result["useful_context_sections"] == []
+    assert result["matched_expected_sections"] == []
+    assert result["missing_expected_sections"] == ["Recent memory"]
+    assert result["empty_expected_sections"] == []
     assert result["context_summary"] == "No context"
     assert result["context"] == ""
     assert result["answer"] is None
     assert result["error"] == "Could not connect"
+
+
+def test_build_eval_result_includes_matched_missing_and_empty_expected_sections() -> None:
+    question = AskEvalQuestion(
+        id="mixed",
+        question="What should I do?",
+        intent="daily_planning",
+        expected_context_sections=["Open todos", "Unpaid bills", "Recent memory"],
+        notes="Mixed section state.",
+    )
+
+    result = build_eval_result(
+        run_id="run-1",
+        run_label=None,
+        timestamp="2026-06-17T00:00:00+00:00",
+        base_url="http://127.0.0.1:8000",
+        mode="context_preview",
+        question=question,
+        preview={
+            "include_context": True,
+            "context_sections": ["Today", "Open todos", "Unpaid bills"],
+            "context": """
+            Today:
+            - 2026-06-17
+
+            Open todos:
+            - [Due today] Plan day
+
+            Unpaid bills:
+            - None
+            """,
+        },
+    )
+
+    assert result["useful_context_sections"] == ["Today", "Open todos"]
+    assert result["matched_expected_sections"] == ["Open todos"]
+    assert result["empty_expected_sections"] == ["Unpaid bills"]
+    assert result["missing_expected_sections"] == ["Recent memory"]
+    assert result["context_summary"] == "Context ready (2 useful section(s))"
 
 
 def make_result(question_id: str = "saved_ai") -> dict:

@@ -112,7 +112,22 @@ def main() -> int:
         sections = preview.get("context_sections", [])
         context = str(preview.get("context", ""))
         summary = context_summary(preview)
+        useful_sections = useful_context_sections(context)
+        expected_summary = expected_section_summary(question.expected_context_sections, context, sections)
         print(f"Returned sections: {', '.join(sections) if sections else '(none)'}")
+        print(f"Useful sections: {', '.join(useful_sections) if useful_sections else '(none)'}")
+        print(
+            "Matched expected sections: "
+            f"{', '.join(expected_summary['matched_expected_sections']) if expected_summary['matched_expected_sections'] else '(none)'}"
+        )
+        print(
+            "Empty expected sections: "
+            f"{', '.join(expected_summary['empty_expected_sections']) if expected_summary['empty_expected_sections'] else '(none)'}"
+        )
+        print(
+            "Missing expected sections: "
+            f"{', '.join(expected_summary['missing_expected_sections']) if expected_summary['missing_expected_sections'] else '(none)'}"
+        )
         print(f"Context summary: {summary}")
         print("Context preview:")
         print(indent_block(truncate_text(context, args.context_chars) or "(empty)"))
@@ -190,6 +205,12 @@ def build_eval_result(
     error: str | None = None,
 ) -> dict[str, Any]:
     preview = preview or {}
+    context = str(preview.get("context", ""))
+    expected_summary = expected_section_summary(
+        question.expected_context_sections,
+        context,
+        preview.get("context_sections", []),
+    )
     return {
         "run_id": run_id,
         "run_label": run_label,
@@ -201,8 +222,12 @@ def build_eval_result(
         "intent": question.intent,
         "expected_context_sections": question.expected_context_sections,
         "returned_context_sections": preview.get("context_sections", []),
+        "useful_context_sections": useful_context_sections(context),
+        "matched_expected_sections": expected_summary["matched_expected_sections"],
+        "missing_expected_sections": expected_summary["missing_expected_sections"],
+        "empty_expected_sections": expected_summary["empty_expected_sections"],
         "context_summary": context_summary(preview) if preview else "No context",
-        "context": str(preview.get("context", "")),
+        "context": context,
         "answer": answer,
         "error": error,
     }
@@ -233,16 +258,81 @@ def utc_timestamp() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def parse_context_sections(context: str) -> dict[str, list[str]]:
+    sections: dict[str, list[str]] = {}
+    current_section: str | None = None
+
+    for raw_line in context.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line.endswith(":"):
+            current_section = line[:-1]
+            sections.setdefault(current_section, [])
+            continue
+        if current_section is not None:
+            sections[current_section].append(line)
+
+    return sections
+
+
+def section_has_useful_data(section_name: str, lines: list[str]) -> bool:
+    item_lines = [line.strip() for line in lines if line.strip().startswith("-")]
+    if not item_lines:
+        return False
+    if section_name == "Today":
+        return any(line != "- None" for line in item_lines)
+    return any(line != "- None" for line in item_lines)
+
+
+def useful_context_sections(context: str) -> list[str]:
+    sections = parse_context_sections(context)
+    return [
+        section_name
+        for section_name, lines in sections.items()
+        if section_has_useful_data(section_name, lines)
+    ]
+
+
+def expected_section_summary(
+    expected_sections: list[str],
+    context: str,
+    returned_sections: list[str] | None = None,
+) -> dict[str, list[str]]:
+    parsed_sections = parse_context_sections(context)
+    returned_section_set = set(returned_sections or parsed_sections.keys())
+    useful_section_set = set(useful_context_sections(context))
+
+    matched: list[str] = []
+    missing: list[str] = []
+    empty: list[str] = []
+
+    for section in expected_sections:
+        if section in useful_section_set:
+            matched.append(section)
+        elif section in returned_section_set:
+            empty.append(section)
+        else:
+            missing.append(section)
+
+    return {
+        "matched_expected_sections": matched,
+        "missing_expected_sections": missing,
+        "empty_expected_sections": empty,
+    }
+
+
 def context_summary(preview: dict[str, Any]) -> str:
     if not preview.get("include_context", True):
         return "Context disabled"
-    sections = preview.get("context_sections", [])
-    if not sections:
+    context = str(preview.get("context", ""))
+    if not context.strip() or not preview.get("context_sections", []):
         return "No context"
-    useful_sections = {"Open todos", "Unpaid bills", "Recent memory", "Latest mood", "Active projects"}
-    if any(section in useful_sections for section in sections):
-        return f"Context ready ({len(sections)} section(s))"
-    return f"Low context ({len(sections)} section(s))"
+    useful_sections = useful_context_sections(context)
+    data_sections = {"Open todos", "Unpaid bills", "Recent memory", "Latest mood", "Active projects"}
+    if any(section in data_sections for section in useful_sections):
+        return f"Context ready ({len(useful_sections)} useful section(s))"
+    return f"Low context ({len(useful_sections)} useful section(s))"
 
 
 def truncate_text(value: str, max_chars: int) -> str:
