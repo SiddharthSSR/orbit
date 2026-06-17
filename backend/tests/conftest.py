@@ -18,7 +18,7 @@ from app.models.todo import TodoRecord
 
 
 @pytest.fixture()
-def client() -> Generator[TestClient, None, None]:
+def testing_session_local():
     engine = create_engine(
         "sqlite://",
         connect_args={"check_same_thread": False},
@@ -37,7 +37,19 @@ def client() -> Generator[TestClient, None, None]:
             ChatMessageRecord.__table__,
         ],
     )
-    testing_session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    session_local = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+    yield session_local
+    engine.dispose()
+
+
+@pytest.fixture()
+def db_session(testing_session_local) -> Generator[Session, None, None]:
+    with testing_session_local() as session:
+        yield session
+
+
+@pytest.fixture()
+def client(testing_session_local) -> Generator[TestClient, None, None]:
 
     def override_get_session() -> Generator[Session, None, None]:
         with testing_session_local() as session:

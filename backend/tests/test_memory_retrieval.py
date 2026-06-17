@@ -124,8 +124,31 @@ def test_search_returns_relevant_ai_and_worldlens_memory() -> None:
 
         assert ai_results[0].memory_item.title == "AI Agents Reading List"
         assert worldlens_results[0].memory_item.title == "WorldLens Project Update"
-        assert ai_results[0].score > ai_results[1].score
-        assert worldlens_results[0].score > worldlens_results[1].score
+        assert len(ai_results) == 1
+        assert len(worldlens_results) == 1
+    engine.dispose()
+
+
+def test_search_can_include_zero_score_results_with_negative_minimum() -> None:
+    engine, session_local = make_retrieval_test_session()
+    with session_local() as session:
+        memory_repository = MemoryItemRepository(session)
+        memory_repository.create(
+            MemoryCreate(title="AI Agents Reading List", body="Agent retrieval", tags=["ai"])
+        )
+        memory_repository.create(
+            MemoryCreate(title="Weekend Grocery List", body="Coffee and vegetables")
+        )
+        service = MemoryRetrievalService(session, MockEmbeddingProvider())
+        service.index_all_memory_items()
+
+        results = service.search("AI", top_k=5, min_score=-1)
+
+        assert [result.memory_item.title for result in results] == [
+            "AI Agents Reading List",
+            "Weekend Grocery List",
+        ]
+        assert results[1].score == 0.0
     engine.dispose()
 
 

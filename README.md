@@ -134,7 +134,7 @@ Memory CRUD endpoints:
 Memory embedding development endpoints:
 
 - `POST /memory/embeddings/reindex`
-- `GET /memory/search?query=AI&top_k=5`
+- `GET /memory/search?query=AI&top_k=5&min_score=0`
 
 Mood CRUD endpoints:
 
@@ -167,7 +167,7 @@ Ask/chat foundation endpoints:
 
 The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. They store chat sessions/messages and build a bounded, date-aware plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Ask applies lightweight keyword relevance from the user's question so matching memory, projects, todos, and bills surface before the default ordering. Todos and bills are labeled as overdue, due today, due soon, or no due date where applicable; memory and project bodies are included only as short previews. `POST /ask/context-preview` is a backend development/debug helper that returns the context string and section names without calling the AI provider or saving chat messages.
 
-Orbit includes an embeddings/RAG foundation for memory items only. Embeddings are stored as JSON vectors in SQLite and searched with cosine similarity in Python; there is no external vector database. This retrieval path is development-only and is not connected to `/ask`, which continues to use keyword-ranked context. Embeddings are generated only when a reindex or search endpoint is explicitly called. Orbit does not yet include production authentication/security for these development endpoints, streaming, or tool execution.
+Orbit includes an embeddings/RAG foundation for memory items only. Embeddings are stored as JSON vectors in SQLite and searched with cosine similarity in Python; there is no external vector database. This retrieval path is development-only and is not connected to `/ask`, which continues to use keyword-ranked context. Orbit does not yet include production authentication/security for these development endpoints, streaming, or tool execution.
 
 The default embedding provider is deterministic and local:
 
@@ -178,7 +178,16 @@ curl --get http://127.0.0.1:8000/memory/search \
   --data-urlencode 'top_k=5'
 ```
 
-Reindex after creating or changing memory items. Reindexing skips provider work when the stored content hash is already current. Search embeds the query and compares it only with stored embeddings for the active provider/model.
+Memory embeddings are maintained automatically for API mutations: active items are indexed after creation, content changes refresh the configured provider's embedding, archiving removes all embeddings for the item, and deletion cleans embeddings before removing the memory row. Non-content updates reuse the existing content hash and do not create duplicate embeddings. `POST /memory/embeddings/reindex` remains available for backfills and local repair; it skips provider work for current hashes and removes embeddings from archived items.
+
+Search embeds the query and compares it only with current, non-archived embeddings for the active provider/model. Results must have `score > min_score`; the default `min_score=0` excludes zero-score results. Use a negative value for debugging when zero-score candidates are useful:
+
+```bash
+curl --get http://127.0.0.1:8000/memory/search \
+  --data-urlencode 'query=AI' \
+  --data-urlencode 'top_k=5' \
+  --data-urlencode 'min_score=-1'
+```
 
 To opt into OpenAI embeddings locally, reuse the runtime API key and select the provider before starting the backend:
 

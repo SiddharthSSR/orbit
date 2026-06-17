@@ -24,6 +24,7 @@ from app.models.todo import TodoCreate, TodoRead, TodoUpdate
 from app.repositories.bill_repository import BillRepository
 from app.repositories.chat_repository import ChatRepository
 from app.repositories.memory_item_repository import MemoryItemRepository
+from app.repositories.memory_embedding_repository import MemoryEmbeddingRepository
 from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
@@ -151,8 +152,15 @@ def list_memory_items(
 
 
 @router.post("/memory", response_model=MemoryRead, status_code=201, tags=["memory"])
-def create_memory_item(item: MemoryCreate, session: Session = Depends(get_session)) -> MemoryRead:
-    return MemoryItemRepository(session).create(item)
+def create_memory_item(
+    item: MemoryCreate,
+    session: Session = Depends(get_session),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
+) -> MemoryRead:
+    memory_item = MemoryItemRepository(session).create(item)
+    if not memory_item.is_archived:
+        MemoryRetrievalService(session, embedding_provider).index_memory_item(memory_item)
+    return memory_item
 
 
 @router.post(
@@ -176,10 +184,15 @@ def reindex_memory_embeddings(
 def search_memory_embeddings(
     query: str = Query(min_length=1),
     top_k: int = Query(default=5, ge=1, le=50),
+    min_score: float = Query(default=0.0),
     session: Session = Depends(get_session),
     embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
 ) -> list[MemorySearchResultRead]:
-    results = MemoryRetrievalService(session, embedding_provider).search(query, top_k=top_k)
+    results = MemoryRetrievalService(session, embedding_provider).search(
+        query,
+        top_k=top_k,
+        min_score=min_score,
+    )
     return [
         MemorySearchResultRead(
             score=result.score,
@@ -202,12 +215,18 @@ def update_memory_item(
     memory_id: UUID,
     payload: MemoryUpdate,
     session: Session = Depends(get_session),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
 ) -> MemoryRead:
     memory_repository = MemoryItemRepository(session)
     memory_item = memory_repository.get(memory_id)
     if memory_item is None:
         raise HTTPException(status_code=404, detail="Memory item not found")
-    return memory_repository.update(memory_item, payload)
+    updated_memory_item = memory_repository.update(memory_item, payload)
+    if updated_memory_item.is_archived:
+        MemoryEmbeddingRepository(session).delete_for_memory_item(updated_memory_item.id)
+    else:
+        MemoryRetrievalService(session, embedding_provider).index_memory_item(updated_memory_item)
+    return updated_memory_item
 
 
 @router.delete("/memory/{memory_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["memory"])
@@ -216,6 +235,7 @@ def delete_memory_item(memory_id: UUID, session: Session = Depends(get_session))
     memory_item = memory_repository.get(memory_id)
     if memory_item is None:
         raise HTTPException(status_code=404, detail="Memory item not found")
+    MemoryEmbeddingRepository(session).delete_for_memory_item(memory_item.id)
     memory_repository.delete(memory_item)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

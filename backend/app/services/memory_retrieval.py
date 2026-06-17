@@ -74,12 +74,21 @@ class MemoryRetrievalService:
         )
 
     def index_all_memory_items(self) -> list[MemoryEmbeddingRecord]:
-        return [
-            self.index_memory_item(memory_item)
-            for memory_item in self.memory_repository.list(include_archived=True)
-        ]
+        indexed: list[MemoryEmbeddingRecord] = []
+        for memory_item in self.memory_repository.list(include_archived=True):
+            if memory_item.is_archived:
+                self.embedding_repository.delete_for_memory_item(memory_item.id)
+            else:
+                indexed.append(self.index_memory_item(memory_item))
+        return indexed
 
-    def search(self, query: str, *, top_k: int = 5) -> list[MemorySearchResult]:
+    def search(
+        self,
+        query: str,
+        *,
+        top_k: int = 5,
+        min_score: float = 0.0,
+    ) -> list[MemorySearchResult]:
         if not query.strip():
             raise ValueError("Search query must not be blank")
         if top_k <= 0:
@@ -94,11 +103,10 @@ class MemoryRetrievalService:
             memory_item = self.memory_repository.get(embedding_record.memory_item_id)
             if memory_item is None or memory_item.is_archived:
                 continue
-            results.append(
-                MemorySearchResult(
-                    score=cosine_similarity(query_embedding, embedding_record.embedding),
-                    memory_item=memory_item,
-                )
-            )
+            if embedding_record.content_hash != memory_content_hash(memory_item):
+                continue
+            score = cosine_similarity(query_embedding, embedding_record.embedding)
+            if score > min_score:
+                results.append(MemorySearchResult(score=score, memory_item=memory_item))
 
         return sorted(results, key=lambda result: result.score, reverse=True)[:top_k]
