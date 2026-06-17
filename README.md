@@ -202,7 +202,9 @@ python scripts/run_ask_eval.py --output eval-results/latest.json
 python scripts/run_ask_eval.py --ask --output eval-results/openai-run.jsonl --format jsonl --run-label openai-smoke
 ```
 
-Eval logs distinguish returned section headers from useful sections with real data, so sections containing only `- None` do not count as matched context. Selected eval questions also declare expected top/absent items and section-aware top items. Logs record case-insensitive global positions, top-five matches, positions within each expected section, top-three section matches, missing expected items, and unexpected absence-check hits. These ranking signals are informational and do not fail the run automatically.
+Eval logs distinguish returned section headers from useful sections with real data, so sections containing only `- None` do not count as matched context. Selected eval questions also declare expected top/absent items and section-aware top items. Logs record case-insensitive global positions, top-five matches, positions within each expected section, top-three section matches, missing expected items, and unexpected absence-check hits. A compact run summary reports section matching, section-aware ranking, legacy global ranking, request errors, and unexpected absence hits. Section-aware ranking is preferred because it evaluates an item relative to the section where it belongs; global ranking remains informational. Scores do not affect the script exit status—only request errors do.
+
+JSON output now uses the breaking shape `{"summary": {...}, "results": [...]}` instead of a top-level result list. JSONL remains one result per line for compatibility and appends a final `{"type": "summary", "summary": {...}}` line.
 
 Ask mode uses whichever provider the running backend is configured with. It stays mock-only unless the backend process was started with `ORBIT_AI_PROVIDER=openai` and a valid `OPENAI_API_KEY`.
 

@@ -191,6 +191,9 @@ def main() -> int:
             )
         )
 
+    eval_summary = summarize_results(results)
+    print_eval_summary(eval_summary)
+
     if args.output:
         write_results(results, args.output, args.format)
         print(f"\nWrote {len(results)} result(s) to {args.output}")
@@ -272,19 +275,103 @@ def build_eval_result(
 
 def write_results(results: list[dict[str, Any]], output_path: Path, output_format: str) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    summary = summarize_results(results)
     if output_format == "json":
         output_path.write_text(
-            json.dumps(results, indent=2, ensure_ascii=False) + "\n",
+            json.dumps({"summary": summary, "results": results}, indent=2, ensure_ascii=False) + "\n",
             encoding="utf-8",
         )
         return
     if output_format == "jsonl":
+        lines = [*results, {"type": "summary", "summary": summary}]
         output_path.write_text(
-            "".join(json.dumps(result, ensure_ascii=False) + "\n" for result in results),
+            "".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines),
             encoding="utf-8",
         )
         return
     raise ValueError(f"Unsupported output format: {output_format}")
+
+
+def summarize_results(results: list[dict[str, Any]]) -> dict[str, int | float]:
+    total_questions = len(results)
+    questions_with_errors = sum(result.get("error") is not None for result in results)
+
+    section_match_pass_count = sum(
+        not result.get("missing_expected_sections")
+        and not result.get("empty_expected_sections")
+        for result in results
+    )
+    section_match_fail_count = total_questions - section_match_pass_count
+
+    section_ranking_results = [
+        result for result in results if result.get("expected_top_items_by_section")
+    ]
+    section_item_ranking_pass_count = sum(
+        all(not missing_items for missing_items in result.get("section_top_items_missing", {}).values())
+        for result in section_ranking_results
+    )
+    section_item_ranking_evaluated_count = len(section_ranking_results)
+    section_item_ranking_fail_count = (
+        section_item_ranking_evaluated_count - section_item_ranking_pass_count
+    )
+
+    global_ranking_results = [result for result in results if result.get("expected_top_items")]
+    global_item_ranking_pass_count = sum(
+        not result.get("expected_top_items_missing") for result in global_ranking_results
+    )
+    global_item_ranking_evaluated_count = len(global_ranking_results)
+    global_item_ranking_fail_count = (
+        global_item_ranking_evaluated_count - global_item_ranking_pass_count
+    )
+
+    return {
+        "total_questions": total_questions,
+        "questions_with_errors": questions_with_errors,
+        "section_match_pass_count": section_match_pass_count,
+        "section_match_fail_count": section_match_fail_count,
+        "section_match_pass_rate": _pass_rate(section_match_pass_count, total_questions),
+        "section_item_ranking_evaluated_count": section_item_ranking_evaluated_count,
+        "section_item_ranking_pass_count": section_item_ranking_pass_count,
+        "section_item_ranking_fail_count": section_item_ranking_fail_count,
+        "section_item_ranking_pass_rate": _pass_rate(
+            section_item_ranking_pass_count, section_item_ranking_evaluated_count
+        ),
+        "global_item_ranking_evaluated_count": global_item_ranking_evaluated_count,
+        "global_item_ranking_pass_count": global_item_ranking_pass_count,
+        "global_item_ranking_fail_count": global_item_ranking_fail_count,
+        "global_item_ranking_pass_rate": _pass_rate(
+            global_item_ranking_pass_count, global_item_ranking_evaluated_count
+        ),
+        "unexpected_absent_item_hit_count": sum(
+            len(result.get("unexpected_absent_item_hits", [])) for result in results
+        ),
+    }
+
+
+def print_eval_summary(summary: dict[str, int | float]) -> None:
+    print("\nAsk eval summary")
+    print(f"* Questions: {summary['total_questions']}")
+    print(f"* Request errors: {summary['questions_with_errors']}")
+    print(
+        "* Section match: "
+        f"{summary['section_match_pass_count']}/{summary['total_questions']} passed"
+    )
+    print(
+        "* Section item ranking: "
+        f"{summary['section_item_ranking_pass_count']}/"
+        f"{summary['section_item_ranking_evaluated_count']} passed"
+    )
+    print(
+        "* Global item ranking: "
+        f"{summary['global_item_ranking_pass_count']}/"
+        f"{summary['global_item_ranking_evaluated_count']} passed"
+    )
+    print(f"* Unexpected absent hits: {summary['unexpected_absent_item_hit_count']}")
+    print("* Global item ranking is legacy/informational; section-aware ranking is preferred.")
+
+
+def _pass_rate(pass_count: int, evaluated_count: int) -> float:
+    return pass_count / evaluated_count if evaluated_count else 0.0
 
 
 def generate_run_id() -> str:

@@ -11,6 +11,7 @@ from scripts.run_ask_eval import (
     load_eval_questions,
     parse_context_sections,
     section_top_item_matches,
+    summarize_results,
     useful_context_sections,
     write_results,
 )
@@ -217,21 +218,22 @@ def test_section_top_item_matches_does_not_count_item_from_wrong_section() -> No
     assert matches["missing"] == {"Recent memory": ["AI Agents Reading List"]}
 
 
-def test_write_results_json_writes_list_of_result_objects(tmp_path) -> None:
+def test_write_results_json_writes_summary_and_result_objects(tmp_path) -> None:
     result = make_result()
     output_path = tmp_path / "results" / "latest.json"
 
     write_results([result], output_path, "json")
 
     saved = json.loads(output_path.read_text(encoding="utf-8"))
-    assert isinstance(saved, list)
-    assert saved[0]["run_id"] == "run-1"
-    assert saved[0]["question_id"] == "saved_ai"
-    assert saved[0]["returned_context_sections"] == ["Today", "Recent memory"]
-    assert saved[0]["useful_context_sections"] == ["Today", "Recent memory"]
+    assert saved["summary"]["total_questions"] == 1
+    assert saved["summary"]["section_match_pass_count"] == 1
+    assert saved["results"][0]["run_id"] == "run-1"
+    assert saved["results"][0]["question_id"] == "saved_ai"
+    assert saved["results"][0]["returned_context_sections"] == ["Today", "Recent memory"]
+    assert saved["results"][0]["useful_context_sections"] == ["Today", "Recent memory"]
 
 
-def test_write_results_jsonl_writes_one_object_per_line(tmp_path) -> None:
+def test_write_results_jsonl_appends_summary_line(tmp_path) -> None:
     first = make_result(question_id="saved_ai")
     second = make_result(question_id="focus_today")
     output_path = tmp_path / "results.jsonl"
@@ -239,9 +241,73 @@ def test_write_results_jsonl_writes_one_object_per_line(tmp_path) -> None:
     write_results([first, second], output_path, "jsonl")
 
     lines = output_path.read_text(encoding="utf-8").splitlines()
-    assert len(lines) == 2
+    assert len(lines) == 3
     assert json.loads(lines[0])["question_id"] == "saved_ai"
     assert json.loads(lines[1])["question_id"] == "focus_today"
+    summary_line = json.loads(lines[2])
+    assert summary_line["type"] == "summary"
+    assert summary_line["summary"]["total_questions"] == 2
+
+
+def test_summarize_results_computes_section_match_pass_and_fail_counts() -> None:
+    results = [
+        make_summary_result(),
+        make_summary_result(missing_expected_sections=["Recent memory"]),
+        make_summary_result(empty_expected_sections=["Unpaid bills"], error="Request failed"),
+    ]
+
+    summary = summarize_results(results)
+
+    assert summary["total_questions"] == 3
+    assert summary["questions_with_errors"] == 1
+    assert summary["section_match_pass_count"] == 1
+    assert summary["section_match_fail_count"] == 2
+    assert summary["section_match_pass_rate"] == pytest.approx(1 / 3)
+
+
+def test_summarize_results_computes_section_item_ranking_counts() -> None:
+    results = [
+        make_summary_result(
+            expected_top_items_by_section={"Recent memory": ["AI Notes"]},
+            section_top_items_missing={"Recent memory": []},
+        ),
+        make_summary_result(
+            expected_top_items_by_section={"Open todos": ["Ship Orbit"]},
+            section_top_items_missing={"Open todos": ["Ship Orbit"]},
+        ),
+        make_summary_result(),
+    ]
+
+    summary = summarize_results(results)
+
+    assert summary["section_item_ranking_evaluated_count"] == 2
+    assert summary["section_item_ranking_pass_count"] == 1
+    assert summary["section_item_ranking_fail_count"] == 1
+    assert summary["section_item_ranking_pass_rate"] == 0.5
+
+
+def test_summarize_results_computes_global_ranking_and_absent_hit_counts() -> None:
+    results = [
+        make_summary_result(
+            expected_top_items=["AI Notes"],
+            expected_top_items_missing=[],
+            unexpected_absent_item_hits=["Archived note"],
+        ),
+        make_summary_result(
+            expected_top_items=["WorldLens"],
+            expected_top_items_missing=["WorldLens"],
+            unexpected_absent_item_hits=["Paid bill", "Archived project"],
+        ),
+        make_summary_result(),
+    ]
+
+    summary = summarize_results(results)
+
+    assert summary["global_item_ranking_evaluated_count"] == 2
+    assert summary["global_item_ranking_pass_count"] == 1
+    assert summary["global_item_ranking_fail_count"] == 1
+    assert summary["global_item_ranking_pass_rate"] == 0.5
+    assert summary["unexpected_absent_item_hit_count"] == 3
 
 
 def test_build_eval_result_represents_per_question_error() -> None:
@@ -408,3 +474,18 @@ def make_question(question_id: str = "saved_ai") -> AskEvalQuestion:
         expected_context_sections=["Recent memory"],
         notes="Should prioritize AI memory.",
     )
+
+
+def make_summary_result(**overrides) -> dict:
+    result = {
+        "error": None,
+        "missing_expected_sections": [],
+        "empty_expected_sections": [],
+        "expected_top_items_by_section": {},
+        "section_top_items_missing": {},
+        "expected_top_items": [],
+        "expected_top_items_missing": [],
+        "unexpected_absent_item_hits": [],
+    }
+    result.update(overrides)
+    return result
