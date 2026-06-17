@@ -120,6 +120,39 @@ def test_unknown_memory_returns_404(client) -> None:
     assert client.delete(f"/memory/{missing_id}").status_code == 404
 
 
+def test_reindex_and_search_memory_embeddings_with_mock_provider(client) -> None:
+    client.post(
+        "/memory",
+        json={
+            "title": "AI Agents Reading List",
+            "body": "Notes about agent memory and retrieval",
+            "kind": "article",
+            "tags": ["ai", "agents"],
+        },
+    )
+    client.post(
+        "/memory",
+        json={
+            "title": "WorldLens Project Update",
+            "body": "Camera translation prototype",
+            "kind": "project_update",
+            "tags": ["worldlens", "ios"],
+        },
+    )
+
+    reindex_response = client.post("/memory/embeddings/reindex")
+    search_response = client.get("/memory/search", params={"query": "AI", "top_k": 1})
+
+    assert reindex_response.status_code == 200
+    assert reindex_response.json() == {
+        "indexed_count": 2,
+        "provider": "mock",
+        "model": "mock-token-hash-v1-64d",
+    }
+    assert search_response.status_code == 200
+    assert search_response.json()[0]["memory_item"]["title"] == "AI Agents Reading List"
+
+
 def test_memory_validation_fails_for_blank_title_or_body(client) -> None:
     blank_title = client.post("/memory", json={"title": "   ", "body": "Body"})
     blank_body = client.post("/memory", json={"title": "Title", "body": "   "})

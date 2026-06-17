@@ -17,6 +17,12 @@ class Settings(BaseModel):
     openai_api_key: str | None = Field(default_factory=lambda: os.getenv("OPENAI_API_KEY"))
     openai_model: str = Field(default_factory=lambda: os.getenv("ORBIT_OPENAI_MODEL", "gpt-4o-mini"))
     ai_timeout_seconds: float = Field(default_factory=lambda: float(os.getenv("ORBIT_AI_TIMEOUT_SECONDS", "30")))
+    embedding_provider: str = Field(
+        default_factory=lambda: os.getenv("ORBIT_EMBEDDING_PROVIDER", "mock").strip().lower() or "mock"
+    )
+    openai_embedding_model: str = Field(
+        default_factory=lambda: os.getenv("ORBIT_OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
+    )
     cors_allow_origins: list[str] = Field(
         default_factory=lambda: [
             "http://localhost:3000",

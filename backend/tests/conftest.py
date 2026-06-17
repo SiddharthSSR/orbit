@@ -10,6 +10,7 @@ from app.db.session import Base, get_session
 from app.main import app
 from app.models.bill import BillRecord
 from app.models.chat import ChatMessageRecord, ChatSessionRecord
+from app.models.embedding import MemoryEmbeddingRecord
 from app.models.memory import MemoryRecord
 from app.models.mood import MoodRecord
 from app.models.project import ProjectRecord
@@ -29,6 +30,7 @@ def client() -> Generator[TestClient, None, None]:
             TodoRecord.__table__,
             BillRecord.__table__,
             MemoryRecord.__table__,
+            MemoryEmbeddingRecord.__table__,
             MoodRecord.__table__,
             ProjectRecord.__table__,
             ChatSessionRecord.__table__,

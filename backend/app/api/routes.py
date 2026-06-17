@@ -1,7 +1,7 @@
 from uuid import UUID
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -17,6 +17,7 @@ from app.models.chat import (
     ChatSessionRead,
 )
 from app.models.memory import MemoryCreate, MemoryRead, MemoryUpdate
+from app.models.embedding import MemoryEmbeddingReindexResponse, MemorySearchResultRead
 from app.models.mood import MoodCreate, MoodRead, MoodUpdate
 from app.models.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.models.todo import TodoCreate, TodoRead, TodoUpdate
@@ -28,6 +29,12 @@ from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
 from app.services.ai_provider import AIProvider, AIProviderConfigurationError, build_ai_provider
 from app.services.context_builder import OrbitContextBuilder, extract_context_sections
+from app.services.embedding_provider import (
+    EmbeddingProvider,
+    EmbeddingProviderConfigurationError,
+    build_embedding_provider,
+)
+from app.services.memory_retrieval import MemoryRetrievalService
 
 router = APIRouter()
 
@@ -36,6 +43,13 @@ def get_ai_provider() -> AIProvider:
     try:
         return build_ai_provider(settings)
     except AIProviderConfigurationError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+def get_embedding_provider() -> EmbeddingProvider:
+    try:
+        return build_embedding_provider(settings)
+    except EmbeddingProviderConfigurationError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
@@ -139,6 +153,40 @@ def list_memory_items(
 @router.post("/memory", response_model=MemoryRead, status_code=201, tags=["memory"])
 def create_memory_item(item: MemoryCreate, session: Session = Depends(get_session)) -> MemoryRead:
     return MemoryItemRepository(session).create(item)
+
+
+@router.post(
+    "/memory/embeddings/reindex",
+    response_model=MemoryEmbeddingReindexResponse,
+    tags=["memory-dev"],
+)
+def reindex_memory_embeddings(
+    session: Session = Depends(get_session),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
+) -> MemoryEmbeddingReindexResponse:
+    indexed = MemoryRetrievalService(session, embedding_provider).index_all_memory_items()
+    return MemoryEmbeddingReindexResponse(
+        indexed_count=len(indexed),
+        provider=embedding_provider.provider_name,
+        model=embedding_provider.model,
+    )
+
+
+@router.get("/memory/search", response_model=list[MemorySearchResultRead], tags=["memory-dev"])
+def search_memory_embeddings(
+    query: str = Query(min_length=1),
+    top_k: int = Query(default=5, ge=1, le=50),
+    session: Session = Depends(get_session),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
+) -> list[MemorySearchResultRead]:
+    results = MemoryRetrievalService(session, embedding_provider).search(query, top_k=top_k)
+    return [
+        MemorySearchResultRead(
+            score=result.score,
+            memory_item=MemoryRead.model_validate(result.memory_item),
+        )
+        for result in results
+    ]
 
 
 @router.get("/memory/{memory_id}", response_model=MemoryRead, tags=["memory"])

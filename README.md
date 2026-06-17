@@ -131,6 +131,11 @@ Memory CRUD endpoints:
 - `PATCH /memory/{memory_id}`
 - `DELETE /memory/{memory_id}`
 
+Memory embedding development endpoints:
+
+- `POST /memory/embeddings/reindex`
+- `GET /memory/search?query=AI&top_k=5`
+
 Mood CRUD endpoints:
 
 - `POST /moods`
@@ -160,7 +165,30 @@ Ask/chat foundation endpoints:
 - `GET /chat/sessions`
 - `GET /chat/sessions/{session_id}/messages`
 
-The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. They store chat sessions/messages and build a bounded, date-aware plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Ask applies lightweight keyword relevance from the user's question so matching memory, projects, todos, and bills surface before the default ordering. Todos and bills are labeled as overdue, due today, due soon, or no due date where applicable; memory and project bodies are included only as short previews. `POST /ask/context-preview` is a backend development/debug helper that returns the context string and section names without calling the AI provider or saving chat messages. Orbit does not include embeddings, vector search, streaming, semantic search, or tool execution.
+The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. They store chat sessions/messages and build a bounded, date-aware plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Ask applies lightweight keyword relevance from the user's question so matching memory, projects, todos, and bills surface before the default ordering. Todos and bills are labeled as overdue, due today, due soon, or no due date where applicable; memory and project bodies are included only as short previews. `POST /ask/context-preview` is a backend development/debug helper that returns the context string and section names without calling the AI provider or saving chat messages.
+
+Orbit includes an embeddings/RAG foundation for memory items only. Embeddings are stored as JSON vectors in SQLite and searched with cosine similarity in Python; there is no external vector database. This retrieval path is development-only and is not connected to `/ask`, which continues to use keyword-ranked context. Embeddings are generated only when a reindex or search endpoint is explicitly called. Orbit does not yet include production authentication/security for these development endpoints, streaming, or tool execution.
+
+The default embedding provider is deterministic and local:
+
+```bash
+curl -X POST http://127.0.0.1:8000/memory/embeddings/reindex
+curl --get http://127.0.0.1:8000/memory/search \
+  --data-urlencode 'query=AI' \
+  --data-urlencode 'top_k=5'
+```
+
+Reindex after creating or changing memory items. Reindexing skips provider work when the stored content hash is already current. Search embeds the query and compares it only with stored embeddings for the active provider/model.
+
+To opt into OpenAI embeddings locally, reuse the runtime API key and select the provider before starting the backend:
+
+```bash
+export ORBIT_EMBEDDING_PROVIDER=openai
+export OPENAI_API_KEY=<your-openai-api-key>
+export ORBIT_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+The OpenAI embedding client is constructed only for explicit embedding endpoint requests when `ORBIT_EMBEDDING_PROVIDER=openai`. Missing credentials produce a configuration error. Tests and CI remain mock-only and make no external embedding calls.
 
 To enable the experimental OpenAI-backed provider locally, set environment variables before starting the backend:
 

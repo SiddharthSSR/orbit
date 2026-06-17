@@ -48,7 +48,7 @@ class MemoryItemRepository:
             return memory_items
         return [item for item in memory_items if normalized_tag in item.tags]
 
-    def get(self, memory_id: UUID) -> MemoryRecord | None:
+    def get(self, memory_id: UUID | str) -> MemoryRecord | None:
         return self.session.get(MemoryRecord, str(memory_id))
 
     def update(self, memory_item: MemoryRecord, payload: MemoryUpdate) -> MemoryRecord:
