@@ -348,7 +348,7 @@ def test_context_builder_prioritizes_ai_memory_when_question_asks_about_ai() -> 
         MemoryItemRepository(session).create(
             MemoryCreate(
                 title="Weekend plan",
-                body="Buy groceries and clean desk",
+                body="Things I saved for the weekend",
                 kind="note",
             )
         )

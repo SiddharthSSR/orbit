@@ -28,10 +28,16 @@ STOPWORDS = {
     "you",
 }
 
+MEANINGFUL_SHORT_TOKENS = {"ai", "ui", "ux", "ml", "llm", "ios"}
+
 
 def tokenize_query(text: str) -> set[str]:
     tokens = re.findall(r"[a-z0-9]+", text.lower())
-    return {token for token in tokens if len(token) >= 3 and token not in STOPWORDS}
+    return {
+        token
+        for token in tokens
+        if token not in STOPWORDS and (len(token) >= 3 or token in MEANINGFUL_SHORT_TOKENS)
+    }
 
 
 def score_text(query_tokens: set[str], *fields: str | None) -> int:

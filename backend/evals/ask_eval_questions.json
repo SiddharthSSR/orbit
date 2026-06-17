@@ -21,6 +21,9 @@
     "intent": "memory_recall",
     "expected_context_sections": ["Recent memory"],
     "expected_top_items": ["AI Agents Reading List"],
+    "expected_top_items_by_section": {
+      "Recent memory": ["AI Agents Reading List"]
+    },
     "notes": "Should prioritize memory items with AI in title, body, kind, tags, or source URL."
   },
   {
@@ -29,6 +32,11 @@
     "intent": "project_status",
     "expected_context_sections": ["Active projects", "Recent memory", "Open todos"],
     "expected_top_items": ["WorldLens", "WorldLens Project Update", "Review WorldLens prototype"],
+    "expected_top_items_by_section": {
+      "Open todos": ["Review WorldLens prototype"],
+      "Recent memory": ["WorldLens Project Update"],
+      "Active projects": ["WorldLens"]
+    },
     "notes": "Should prioritize WorldLens project records and related project updates or todos."
   },
   {
@@ -37,6 +45,9 @@
     "intent": "bill_search",
     "expected_context_sections": ["Unpaid bills"],
     "expected_top_items": ["Furlenco"],
+    "expected_top_items_by_section": {
+      "Unpaid bills": ["Furlenco"]
+    },
     "notes": "Should prioritize bills whose name, notes, recurrence, or currency mention Furlenco."
   },
   {
@@ -67,6 +78,10 @@
     "intent": "urgency_review",
     "expected_context_sections": ["Open todos", "Unpaid bills"],
     "expected_top_items": ["Credit Card Payment", "Ship Orbit Ask eval improvements"],
+    "expected_top_items_by_section": {
+      "Open todos": ["Ship Orbit Ask eval improvements"],
+      "Unpaid bills": ["Credit Card Payment"]
+    },
     "notes": "Should emphasize overdue and due-today todos and bills."
   },
   {
@@ -75,6 +90,11 @@
     "intent": "project_status",
     "expected_context_sections": ["Active projects", "Recent memory", "Open todos"],
     "expected_top_items": ["Orbit", "Orbit iOS Design Notes", "Ship Orbit Ask eval improvements"],
+    "expected_top_items_by_section": {
+      "Open todos": ["Ship Orbit Ask eval improvements"],
+      "Recent memory": ["Orbit iOS Design Notes"],
+      "Active projects": ["Orbit"]
+    },
     "notes": "Should prioritize Orbit project records, captures, and open todos."
   }
 ]

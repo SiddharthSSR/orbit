@@ -7,8 +7,10 @@ from scripts.run_ask_eval import (
     build_eval_result,
     context_summary,
     find_item_positions,
+    find_item_positions_by_section,
     load_eval_questions,
     parse_context_sections,
+    section_top_item_matches,
     useful_context_sections,
     write_results,
 )
@@ -25,6 +27,9 @@ def test_ask_eval_questions_have_expected_shape() -> None:
     assert "furlenco_bill" in ids
     saved_ai = next(question for question in questions if question.id == "saved_ai")
     assert saved_ai.expected_top_items == ["AI Agents Reading List"]
+    assert saved_ai.expected_top_items_by_section == {
+        "Recent memory": ["AI Agents Reading List"]
+    }
 
     for question in questions:
         assert question.question
@@ -60,6 +65,30 @@ def test_load_eval_questions_rejects_non_string_expected_top_items(tmp_path) -> 
     )
 
     with pytest.raises(ValueError, match="expected_top_items"):
+        load_eval_questions(invalid_file)
+
+
+def test_load_eval_questions_rejects_non_list_section_expectations(tmp_path) -> None:
+    invalid_file = tmp_path / "invalid_section_top_items.json"
+    invalid_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "saved_ai",
+                    "question": "What did I save about AI?",
+                    "intent": "memory_recall",
+                    "expected_context_sections": ["Recent memory"],
+                    "expected_top_items_by_section": {
+                        "Recent memory": "AI Agents Reading List"
+                    },
+                    "notes": "Invalid section ranking fixture.",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="expected_top_items_by_section.*must be a list"):
         load_eval_questions(invalid_file)
 
 
@@ -149,6 +178,43 @@ def test_find_item_positions_reports_missing_item_as_none() -> None:
 
     assert positions["AI Agents Reading List"] == 1
     assert positions["WorldLens"] is None
+
+
+def test_find_item_positions_by_section_is_case_insensitive_and_section_local() -> None:
+    context = """
+    Open todos:
+    - Review WorldLens prototype
+    - Ship Orbit Ask eval improvements
+
+    Recent memory:
+    - WorldLens Project Update (note): Status
+    - AI Agents Reading List (article): Notes
+    """
+
+    positions = find_item_positions_by_section(
+        context,
+        {
+            "Open todos": ["review worldlens prototype", "AI Agents Reading List"],
+            "Recent memory": ["ai agents reading list"],
+        },
+    )
+
+    assert positions == {
+        "Open todos": {"review worldlens prototype": 1, "AI Agents Reading List": None},
+        "Recent memory": {"ai agents reading list": 2},
+    }
+
+
+def test_section_top_item_matches_does_not_count_item_from_wrong_section() -> None:
+    context = "Open todos:\n- AI Agents Reading List\n\nRecent memory:\n- Weekend notes"
+
+    matches = section_top_item_matches(
+        context,
+        {"Recent memory": ["AI Agents Reading List"]},
+    )
+
+    assert matches["found"] == {"Recent memory": []}
+    assert matches["missing"] == {"Recent memory": ["AI Agents Reading List"]}
 
 
 def test_write_results_json_writes_list_of_result_objects(tmp_path) -> None:
@@ -254,6 +320,10 @@ def test_build_eval_result_includes_item_ranking_fields() -> None:
         expected_context_sections=["Recent memory"],
         notes="AI memory should rank highly.",
         expected_top_items=["AI Agents Reading List", "Missing AI Note"],
+        expected_top_items_by_section={
+            "Recent memory": ["AI Agents Reading List", "Missing AI Note"],
+            "Unpaid bills": ["Internet Bill Paid"],
+        },
         expected_absent_items=["Internet Bill Paid"],
     )
 
@@ -287,6 +357,25 @@ def test_build_eval_result_includes_item_ranking_fields() -> None:
     }
     assert result["expected_top_items_found"] == ["AI Agents Reading List"]
     assert result["expected_top_items_missing"] == ["Missing AI Note"]
+    assert result["expected_top_items_by_section"] == {
+        "Recent memory": ["AI Agents Reading List", "Missing AI Note"],
+        "Unpaid bills": ["Internet Bill Paid"],
+    }
+    assert result["expected_item_positions_by_section"] == {
+        "Recent memory": {"AI Agents Reading List": 1, "Missing AI Note": None},
+        "Unpaid bills": {"Internet Bill Paid": 1},
+    }
+    assert result["section_top_items_found"] == {
+        "Recent memory": ["AI Agents Reading List"],
+        "Unpaid bills": ["Internet Bill Paid"],
+    }
+    assert result["section_top_items_missing"] == {
+        "Recent memory": ["Missing AI Note"],
+        "Unpaid bills": [],
+    }
+    assert result["section_item_ranking_summary"] == (
+        "2/3 expected section item(s) in first 3"
+    )
     assert result["expected_absent_items"] == ["Internet Bill Paid"]
     assert result["unexpected_absent_item_hits"] == ["Internet Bill Paid"]
     assert result["item_ranking_summary"] == (
