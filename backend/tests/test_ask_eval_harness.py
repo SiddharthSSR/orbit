@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from scripts.run_ask_eval import load_eval_questions
+from scripts.run_ask_eval import AskEvalQuestion, build_eval_result, load_eval_questions, write_results
 
 
 def test_ask_eval_questions_have_expected_shape() -> None:
@@ -28,3 +28,81 @@ def test_load_eval_questions_rejects_invalid_shape(tmp_path) -> None:
 
     with pytest.raises(ValueError, match="question"):
         load_eval_questions(invalid_file)
+
+
+def test_write_results_json_writes_list_of_result_objects(tmp_path) -> None:
+    result = make_result()
+    output_path = tmp_path / "results" / "latest.json"
+
+    write_results([result], output_path, "json")
+
+    saved = json.loads(output_path.read_text(encoding="utf-8"))
+    assert isinstance(saved, list)
+    assert saved[0]["run_id"] == "run-1"
+    assert saved[0]["question_id"] == "saved_ai"
+    assert saved[0]["returned_context_sections"] == ["Today", "Recent memory"]
+
+
+def test_write_results_jsonl_writes_one_object_per_line(tmp_path) -> None:
+    first = make_result(question_id="saved_ai")
+    second = make_result(question_id="focus_today")
+    output_path = tmp_path / "results.jsonl"
+
+    write_results([first, second], output_path, "jsonl")
+
+    lines = output_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 2
+    assert json.loads(lines[0])["question_id"] == "saved_ai"
+    assert json.loads(lines[1])["question_id"] == "focus_today"
+
+
+def test_build_eval_result_represents_per_question_error() -> None:
+    question = make_question()
+
+    result = build_eval_result(
+        run_id="run-1",
+        run_label="mock-smoke",
+        timestamp="2026-06-17T00:00:00+00:00",
+        base_url="http://127.0.0.1:8000/",
+        mode="context_preview",
+        question=question,
+        error="Could not connect",
+    )
+
+    assert result["run_id"] == "run-1"
+    assert result["run_label"] == "mock-smoke"
+    assert result["base_url"] == "http://127.0.0.1:8000"
+    assert result["mode"] == "context_preview"
+    assert result["question_id"] == "saved_ai"
+    assert result["returned_context_sections"] == []
+    assert result["context_summary"] == "No context"
+    assert result["context"] == ""
+    assert result["answer"] is None
+    assert result["error"] == "Could not connect"
+
+
+def make_result(question_id: str = "saved_ai") -> dict:
+    return build_eval_result(
+        run_id="run-1",
+        run_label=None,
+        timestamp="2026-06-17T00:00:00+00:00",
+        base_url="http://127.0.0.1:8000",
+        mode="ask",
+        question=make_question(question_id=question_id),
+        preview={
+            "include_context": True,
+            "context_sections": ["Today", "Recent memory"],
+            "context": "Today:\n- 2026-06-17\n\nRecent memory:\n- AI notes",
+        },
+        answer="Mock answer",
+    )
+
+
+def make_question(question_id: str = "saved_ai") -> AskEvalQuestion:
+    return AskEvalQuestion(
+        id=question_id,
+        question="What did I save about AI?",
+        intent="memory_recall",
+        expected_context_sections=["Recent memory"],
+        notes="Should prioritize AI memory.",
+    )

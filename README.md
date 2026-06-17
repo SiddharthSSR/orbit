@@ -187,6 +187,13 @@ By default, the eval harness only calls `POST /ask/context-preview`, prints retu
 python scripts/run_ask_eval.py --ask
 ```
 
+Save structured eval results locally:
+
+```bash
+python scripts/run_ask_eval.py --output eval-results/latest.json
+python scripts/run_ask_eval.py --ask --output eval-results/openai-run.jsonl --format jsonl --run-label openai-smoke
+```
+
 Ask mode uses whichever provider the running backend is configured with. It stays mock-only unless the backend process was started with `ORBIT_AI_PROVIDER=openai` and a valid `OPENAI_API_KEY`.
 
 The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.

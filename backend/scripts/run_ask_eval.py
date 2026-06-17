@@ -6,8 +6,10 @@ import json
 import sys
 import textwrap
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -55,12 +57,24 @@ def main() -> int:
     parser.add_argument("--ask", action="store_true", help="Also call /ask and print the answer.")
     parser.add_argument("--include-context", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--context-chars", type=int, default=700, help="Context preview characters to print.")
+    parser.add_argument("--output", type=Path, help="Optional path to write structured eval results.")
+    parser.add_argument("--format", choices=["json", "jsonl"], default="json", help="Output format. Default: json.")
+    parser.add_argument("--run-label", help="Optional label stored with every result.")
     args = parser.parse_args()
 
     questions = load_eval_questions(args.questions_file)
+    run_id = generate_run_id()
+    timestamp = utc_timestamp()
+    mode = "ask" if args.ask else "context_preview"
+    results: list[dict[str, Any]] = []
+    had_error = False
+
     print(f"Loaded {len(questions)} Ask eval question(s).")
     print(f"Backend: {args.base_url.rstrip('/')}")
     print(f"Mode: {'context preview + ask' if args.ask else 'context preview only'}")
+    if args.run_label:
+        print(f"Run label: {args.run_label}")
+    print(f"Run ID: {run_id}")
 
     for question in questions:
         print("\n" + "=" * 88)
@@ -79,16 +93,32 @@ def main() -> int:
                 },
             )
         except RuntimeError as exc:
-            print(f"ERROR: {exc}", file=sys.stderr)
-            return 1
+            error = str(exc)
+            had_error = True
+            print(f"ERROR: {error}", file=sys.stderr)
+            results.append(
+                build_eval_result(
+                    run_id=run_id,
+                    run_label=args.run_label,
+                    timestamp=timestamp,
+                    base_url=args.base_url,
+                    mode=mode,
+                    question=question,
+                    error=error,
+                )
+            )
+            continue
 
         sections = preview.get("context_sections", [])
         context = str(preview.get("context", ""))
+        summary = context_summary(preview)
         print(f"Returned sections: {', '.join(sections) if sections else '(none)'}")
-        print(f"Context summary: {context_summary(preview)}")
+        print(f"Context summary: {summary}")
         print("Context preview:")
         print(indent_block(truncate_text(context, args.context_chars) or "(empty)"))
 
+        answer: str | None = None
+        error: str | None = None
         if args.ask:
             try:
                 ask_response = post_json(
@@ -100,12 +130,33 @@ def main() -> int:
                     },
                 )
             except RuntimeError as exc:
-                print(f"ERROR: {exc}", file=sys.stderr)
-                return 1
-            print("Answer:")
-            print(indent_block(str(ask_response.get("answer", "")) or "(empty)"))
+                error = str(exc)
+                had_error = True
+                print(f"ERROR: {error}", file=sys.stderr)
+            else:
+                answer = str(ask_response.get("answer", ""))
+                print("Answer:")
+                print(indent_block(answer or "(empty)"))
 
-    return 0
+        results.append(
+            build_eval_result(
+                run_id=run_id,
+                run_label=args.run_label,
+                timestamp=timestamp,
+                base_url=args.base_url,
+                mode=mode,
+                question=question,
+                preview=preview,
+                answer=answer,
+                error=error,
+            )
+        )
+
+    if args.output:
+        write_results(results, args.output, args.format)
+        print(f"\nWrote {len(results)} result(s) to {args.output}")
+
+    return 1 if had_error else 0
 
 
 def post_json(base_url: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -124,6 +175,62 @@ def post_json(base_url: str, path: str, payload: dict[str, Any]) -> dict[str, An
         raise RuntimeError(f"{path} failed with HTTP {exc.code}: {body}") from exc
     except URLError as exc:
         raise RuntimeError(f"Could not connect to {url}: {exc.reason}") from exc
+
+
+def build_eval_result(
+    *,
+    run_id: str,
+    run_label: str | None,
+    timestamp: str,
+    base_url: str,
+    mode: str,
+    question: AskEvalQuestion,
+    preview: dict[str, Any] | None = None,
+    answer: str | None = None,
+    error: str | None = None,
+) -> dict[str, Any]:
+    preview = preview or {}
+    return {
+        "run_id": run_id,
+        "run_label": run_label,
+        "timestamp": timestamp,
+        "base_url": base_url.rstrip("/"),
+        "mode": mode,
+        "question_id": question.id,
+        "question": question.question,
+        "intent": question.intent,
+        "expected_context_sections": question.expected_context_sections,
+        "returned_context_sections": preview.get("context_sections", []),
+        "context_summary": context_summary(preview) if preview else "No context",
+        "context": str(preview.get("context", "")),
+        "answer": answer,
+        "error": error,
+    }
+
+
+def write_results(results: list[dict[str, Any]], output_path: Path, output_format: str) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if output_format == "json":
+        output_path.write_text(
+            json.dumps(results, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        return
+    if output_format == "jsonl":
+        output_path.write_text(
+            "".join(json.dumps(result, ensure_ascii=False) + "\n" for result in results),
+            encoding="utf-8",
+        )
+        return
+    raise ValueError(f"Unsupported output format: {output_format}")
+
+
+def generate_run_id() -> str:
+    return str(uuid4())
+
+
+def utc_timestamp() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 def context_summary(preview: dict[str, Any]) -> str:
