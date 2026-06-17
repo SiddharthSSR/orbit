@@ -173,6 +173,22 @@ export ORBIT_AI_TIMEOUT_SECONDS=30
 
 If `ORBIT_AI_PROVIDER` is unset or set to `mock`, Orbit uses the deterministic mock provider. Tests and CI use the mock provider and must not call external AI services.
 
+Run the manual Ask eval harness against a local backend:
+
+```bash
+cd backend
+source .venv/bin/activate
+python scripts/run_ask_eval.py
+```
+
+By default, the eval harness only calls `POST /ask/context-preview`, prints returned context sections, and shows a truncated context preview. To also call `POST /ask` and print answers, run:
+
+```bash
+python scripts/run_ask_eval.py --ask
+```
+
+Ask mode uses whichever provider the running backend is configured with. It stays mock-only unless the backend process was started with `ORBIT_AI_PROVIDER=openai` and a valid `OPENAI_API_KEY`.
+
 The backend enables CORS for common localhost development origins, including `localhost:3000`, `localhost:5173`, `127.0.0.1:3000`, and `127.0.0.1:5173`.
 
 ## Repository Structure

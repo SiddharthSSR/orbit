@@ -1,0 +1,72 @@
+[
+  {
+    "id": "focus_today",
+    "question": "What should I focus on today?",
+    "intent": "daily_planning",
+    "expected_context_sections": ["Today", "Open todos", "Unpaid bills", "Latest mood", "Active projects"],
+    "notes": "Should surface urgent todos, unpaid bills, latest mood, and active projects."
+  },
+  {
+    "id": "upcoming_bills",
+    "question": "What bills are coming up?",
+    "intent": "bill_review",
+    "expected_context_sections": ["Today", "Unpaid bills"],
+    "notes": "Should prioritize unpaid bills by overdue/today/upcoming due dates."
+  },
+  {
+    "id": "saved_ai",
+    "question": "What did I save about AI?",
+    "intent": "memory_recall",
+    "expected_context_sections": ["Recent memory"],
+    "notes": "Should prioritize memory items with AI in title, body, kind, tags, or source URL."
+  },
+  {
+    "id": "worldlens_status",
+    "question": "How is WorldLens going?",
+    "intent": "project_status",
+    "expected_context_sections": ["Active projects", "Recent memory", "Open todos"],
+    "notes": "Should prioritize WorldLens project records and related project updates or todos."
+  },
+  {
+    "id": "furlenco_bill",
+    "question": "Any bills related to Furlenco?",
+    "intent": "bill_search",
+    "expected_context_sections": ["Unpaid bills"],
+    "notes": "Should prioritize bills whose name, notes, recurrence, or currency mention Furlenco."
+  },
+  {
+    "id": "projects_attention",
+    "question": "What projects need attention?",
+    "intent": "project_planning",
+    "expected_context_sections": ["Active projects", "Open todos", "Recent memory"],
+    "notes": "Should summarize active projects and any related open tasks or recent updates."
+  },
+  {
+    "id": "recent_saves",
+    "question": "What did I save recently?",
+    "intent": "memory_review",
+    "expected_context_sections": ["Recent memory"],
+    "notes": "Should show recent non-archived memory captures."
+  },
+  {
+    "id": "mood_next_step",
+    "question": "Based on my mood, what should I do next?",
+    "intent": "mood_guidance",
+    "expected_context_sections": ["Latest mood", "Open todos", "Active projects"],
+    "notes": "Should use latest mood alongside practical todos/projects without inventing coaching details."
+  },
+  {
+    "id": "overdue_items",
+    "question": "What is overdue or due today?",
+    "intent": "urgency_review",
+    "expected_context_sections": ["Open todos", "Unpaid bills"],
+    "notes": "Should emphasize overdue and due-today todos and bills."
+  },
+  {
+    "id": "orbit_progress",
+    "question": "What is the status of Orbit?",
+    "intent": "project_status",
+    "expected_context_sections": ["Active projects", "Recent memory", "Open todos"],
+    "notes": "Should prioritize Orbit project records, captures, and open todos."
+  }
+]
