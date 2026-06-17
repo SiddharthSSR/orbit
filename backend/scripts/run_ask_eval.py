@@ -5,7 +5,7 @@ import argparse
 import json
 import sys
 import textwrap
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -25,6 +25,8 @@ class AskEvalQuestion:
     intent: str
     expected_context_sections: list[str]
     notes: str
+    expected_top_items: list[str] = field(default_factory=list)
+    expected_absent_items: list[str] = field(default_factory=list)
 
 
 def load_eval_questions(path: Path = DEFAULT_QUESTIONS_PATH) -> list[AskEvalQuestion]:
@@ -45,6 +47,8 @@ def load_eval_questions(path: Path = DEFAULT_QUESTIONS_PATH) -> list[AskEvalQues
                 intent=_required_string(item, "intent", index),
                 expected_context_sections=_required_string_list(item, "expected_context_sections", index),
                 notes=_required_string(item, "notes", index),
+                expected_top_items=_optional_string_list(item, "expected_top_items", index),
+                expected_absent_items=_optional_string_list(item, "expected_absent_items", index),
             )
         )
     return questions
@@ -114,6 +118,7 @@ def main() -> int:
         summary = context_summary(preview)
         useful_sections = useful_context_sections(context)
         expected_summary = expected_section_summary(question.expected_context_sections, context, sections)
+        ranking = item_ranking_details(question, context)
         print(f"Returned sections: {', '.join(sections) if sections else '(none)'}")
         print(f"Useful sections: {', '.join(useful_sections) if useful_sections else '(none)'}")
         print(
@@ -128,6 +133,19 @@ def main() -> int:
             "Missing expected sections: "
             f"{', '.join(expected_summary['missing_expected_sections']) if expected_summary['missing_expected_sections'] else '(none)'}"
         )
+        print(
+            "Expected top items: "
+            f"{', '.join(question.expected_top_items) if question.expected_top_items else '(none)'}"
+        )
+        print(
+            "Found top items: "
+            f"{', '.join(ranking['expected_top_items_found']) if ranking['expected_top_items_found'] else '(none)'}"
+        )
+        print(
+            "Missing top items: "
+            f"{', '.join(ranking['expected_top_items_missing']) if ranking['expected_top_items_missing'] else '(none)'}"
+        )
+        print(f"Item ranking summary: {ranking['item_ranking_summary']}")
         print(f"Context summary: {summary}")
         print("Context preview:")
         print(indent_block(truncate_text(context, args.context_chars) or "(empty)"))
@@ -211,6 +229,7 @@ def build_eval_result(
         context,
         preview.get("context_sections", []),
     )
+    ranking = item_ranking_details(question, context)
     return {
         "run_id": run_id,
         "run_label": run_label,
@@ -226,6 +245,13 @@ def build_eval_result(
         "matched_expected_sections": expected_summary["matched_expected_sections"],
         "missing_expected_sections": expected_summary["missing_expected_sections"],
         "empty_expected_sections": expected_summary["empty_expected_sections"],
+        "expected_top_items": question.expected_top_items,
+        "expected_item_positions": ranking["expected_item_positions"],
+        "expected_top_items_found": ranking["expected_top_items_found"],
+        "expected_top_items_missing": ranking["expected_top_items_missing"],
+        "expected_absent_items": question.expected_absent_items,
+        "unexpected_absent_item_hits": ranking["unexpected_absent_item_hits"],
+        "item_ranking_summary": ranking["item_ranking_summary"],
         "context_summary": context_summary(preview) if preview else "No context",
         "context": context,
         "answer": answer,
@@ -294,6 +320,72 @@ def useful_context_sections(context: str) -> list[str]:
     ]
 
 
+def useful_item_lines(context: str) -> list[str]:
+    items: list[str] = []
+    for section_name, lines in parse_context_sections(context).items():
+        if section_name == "Today":
+            continue
+        items.extend(
+            line
+            for line in lines
+            if line.startswith("-") and line != "- None"
+        )
+    return items
+
+
+def find_item_positions(context: str, expected_items: list[str]) -> dict[str, int | None]:
+    item_lines = useful_item_lines(context)
+    positions: dict[str, int | None] = {}
+    for expected_item in expected_items:
+        expected_lower = expected_item.lower()
+        positions[expected_item] = next(
+            (
+                position
+                for position, line in enumerate(item_lines, start=1)
+                if expected_lower in line.lower()
+            ),
+            None,
+        )
+    return positions
+
+
+def top_item_matches(context: str, expected_items: list[str], *, top_n: int = 5) -> dict[str, Any]:
+    positions = find_item_positions(context, expected_items)
+    found = [item for item in expected_items if positions[item] is not None and positions[item] <= top_n]
+    missing = [item for item in expected_items if item not in found]
+    return {
+        "positions": positions,
+        "found": found,
+        "missing": missing,
+    }
+
+
+def absent_item_matches(context: str, expected_absent_items: list[str]) -> list[str]:
+    positions = find_item_positions(context, expected_absent_items)
+    return [item for item in expected_absent_items if positions[item] is not None]
+
+
+def item_ranking_details(question: AskEvalQuestion, context: str, *, top_n: int = 5) -> dict[str, Any]:
+    top_matches = top_item_matches(context, question.expected_top_items, top_n=top_n)
+    absent_hits = absent_item_matches(context, question.expected_absent_items)
+
+    if not question.expected_top_items and not question.expected_absent_items:
+        summary = "No item ranking expectations"
+    else:
+        summary = (
+            f"{len(top_matches['found'])}/{len(question.expected_top_items)} expected top item(s) "
+            f"in first {top_n}; {len(absent_hits)} unexpected absent item hit(s)"
+        )
+
+    return {
+        "expected_item_positions": top_matches["positions"],
+        "expected_top_items_found": top_matches["found"],
+        "expected_top_items_missing": top_matches["missing"],
+        "unexpected_absent_item_hits": absent_hits,
+        "item_ranking_summary": summary,
+    }
+
+
 def expected_section_summary(
     expected_sections: list[str],
     context: str,
@@ -357,6 +449,15 @@ def _required_string_list(item: dict[str, Any], key: str, index: int) -> list[st
     if not isinstance(value, list) or not value:
         raise ValueError(f"Eval question at index {index} requires non-empty list field '{key}'.")
     if not all(isinstance(section, str) and section.strip() for section in value):
+        raise ValueError(f"Eval question at index {index} field '{key}' must contain strings.")
+    return value
+
+
+def _optional_string_list(item: dict[str, Any], key: str, index: int) -> list[str]:
+    value = item.get(key, [])
+    if not isinstance(value, list):
+        raise ValueError(f"Eval question at index {index} field '{key}' must be a list of strings.")
+    if not all(isinstance(entry, str) and entry.strip() for entry in value):
         raise ValueError(f"Eval question at index {index} field '{key}' must contain strings.")
     return value
 

@@ -11,6 +11,8 @@
     "question": "What bills are coming up?",
     "intent": "bill_review",
     "expected_context_sections": ["Today", "Unpaid bills"],
+    "expected_top_items": ["Credit Card Payment", "Furlenco"],
+    "expected_absent_items": ["Internet Bill Paid"],
     "notes": "Should prioritize unpaid bills by overdue/today/upcoming due dates."
   },
   {
@@ -18,6 +20,7 @@
     "question": "What did I save about AI?",
     "intent": "memory_recall",
     "expected_context_sections": ["Recent memory"],
+    "expected_top_items": ["AI Agents Reading List"],
     "notes": "Should prioritize memory items with AI in title, body, kind, tags, or source URL."
   },
   {
@@ -25,6 +28,7 @@
     "question": "How is WorldLens going?",
     "intent": "project_status",
     "expected_context_sections": ["Active projects", "Recent memory", "Open todos"],
+    "expected_top_items": ["WorldLens", "WorldLens Project Update", "Review WorldLens prototype"],
     "notes": "Should prioritize WorldLens project records and related project updates or todos."
   },
   {
@@ -32,6 +36,7 @@
     "question": "Any bills related to Furlenco?",
     "intent": "bill_search",
     "expected_context_sections": ["Unpaid bills"],
+    "expected_top_items": ["Furlenco"],
     "notes": "Should prioritize bills whose name, notes, recurrence, or currency mention Furlenco."
   },
   {
@@ -39,6 +44,7 @@
     "question": "What projects need attention?",
     "intent": "project_planning",
     "expected_context_sections": ["Active projects", "Open todos", "Recent memory"],
+    "expected_absent_items": ["SwiftUI Learning Sprint"],
     "notes": "Should summarize active projects and any related open tasks or recent updates."
   },
   {
@@ -60,6 +66,7 @@
     "question": "What is overdue or due today?",
     "intent": "urgency_review",
     "expected_context_sections": ["Open todos", "Unpaid bills"],
+    "expected_top_items": ["Credit Card Payment", "Ship Orbit Ask eval improvements"],
     "notes": "Should emphasize overdue and due-today todos and bills."
   },
   {
@@ -67,6 +74,7 @@
     "question": "What is the status of Orbit?",
     "intent": "project_status",
     "expected_context_sections": ["Active projects", "Recent memory", "Open todos"],
+    "expected_top_items": ["Orbit", "Orbit iOS Design Notes", "Ship Orbit Ask eval improvements"],
     "notes": "Should prioritize Orbit project records, captures, and open todos."
   }
 ]

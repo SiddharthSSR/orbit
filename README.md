@@ -202,7 +202,7 @@ python scripts/run_ask_eval.py --output eval-results/latest.json
 python scripts/run_ask_eval.py --ask --output eval-results/openai-run.jsonl --format jsonl --run-label openai-smoke
 ```
 
-Eval logs distinguish returned section headers from useful sections with real data, so sections containing only `- None` do not count as matched context.
+Eval logs distinguish returned section headers from useful sections with real data, so sections containing only `- None` do not count as matched context. Selected eval questions also declare expected top/absent items; logs record case-insensitive item positions, top-five matches, missing expected items, and unexpected absence-check hits. These ranking signals are informational and do not fail the run automatically.
 
 Ask mode uses whichever provider the running backend is configured with. It stays mock-only unless the backend process was started with `ORBIT_AI_PROVIDER=openai` and a valid `OPENAI_API_KEY`.
 
