@@ -2,6 +2,7 @@ import SwiftUI
 
 struct AskScreen: View {
     @StateObject private var viewModel: AskViewModel
+    @State private var isContextPreviewExpanded = false
 
     init(apiClient: any ChatAPIClientProtocol = OrbitAPIClient()) {
         _viewModel = StateObject(wrappedValue: AskViewModel(apiClient: apiClient))
@@ -102,9 +103,80 @@ struct AskScreen: View {
                     viewModel.draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                 )
             }
+
+            Section("Debug context") {
+                Button {
+                    Task { await viewModel.previewContext() }
+                } label: {
+                    Label("Preview context", systemImage: "doc.text.magnifyingglass")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.bordered)
+                .disabled(
+                    viewModel.isPreviewLoading ||
+                    viewModel.draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                )
+
+                if viewModel.isPreviewLoading {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                }
+
+                if let previewErrorMessage = viewModel.previewErrorMessage {
+                    Label(previewErrorMessage, systemImage: "exclamationmark.triangle")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+
+                if let preview = viewModel.contextPreview {
+                    if preview.contextSections.isEmpty {
+                        Text("No context sections")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        FlowLayout(spacing: 8) {
+                            ForEach(preview.contextSections, id: \.self) { section in
+                                Text(section)
+                                    .font(.caption.weight(.medium))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(Color(.secondarySystemGroupedBackground))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                    }
+
+                    DisclosureGroup("Raw context", isExpanded: $isContextPreviewExpanded) {
+                        Text(preview.context.isEmpty ? "Context disabled for this preview." : preview.context)
+                            .font(.footnote.monospaced())
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+                            .padding(.top, 6)
+                    }
+                }
+            }
         }
         .task {
             await viewModel.loadSessions()
+        }
+    }
+}
+
+private struct FlowLayout<Content: View>: View {
+    var spacing: CGFloat = 8
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: spacing) {
+                content
+            }
+            VStack(alignment: .leading, spacing: spacing) {
+                content
+            }
         }
     }
 }

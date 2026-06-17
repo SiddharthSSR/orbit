@@ -24,7 +24,7 @@ The first version focuses on structure:
 - Store projects as persistent backend records with status, area, and tags, editable from the Projects tab.
 - Show a Today view with plan, mood, and priority tasks.
 - Track projects and upcoming bills in dedicated tabs.
-- Provide an Ask tab connected to the backend mock AI provider for non-streaming chat over bounded, date-aware, keyword-relevant Orbit context.
+- Provide an Ask tab connected to the backend mock AI provider for non-streaming chat over bounded, date-aware, keyword-relevant Orbit context, with a lightweight context preview/debug panel.
 
 ## Non-Goals For Now
 

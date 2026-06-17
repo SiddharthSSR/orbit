@@ -27,3 +27,15 @@ struct AskResponse: Decodable, Sendable {
     var assistantMessage: ChatMessageDTO
     var answer: String
 }
+
+struct AskContextPreviewRequest: Encodable, Sendable {
+    var question: String
+    var includeContext: Bool = true
+}
+
+struct AskContextPreviewResponse: Decodable, Equatable, Sendable {
+    var question: String
+    var includeContext: Bool
+    var context: String
+    var contextSections: [String]
+}

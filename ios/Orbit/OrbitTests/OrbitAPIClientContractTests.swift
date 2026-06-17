@@ -179,6 +179,22 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(response.answer, "Based on available Orbit context...")
     }
 
+    func testDecodesAskContextPreviewResponseFromBackendJSON() throws {
+        let response = try decoder.decode(AskContextPreviewResponse.self, from: Data("""
+        {
+          "question": "What did I save about AI?",
+          "include_context": true,
+          "context": "Today:\\n- 2026-06-17\\n\\nRecent memory:\\n- AI retrieval notes",
+          "context_sections": ["Today", "Recent memory"]
+        }
+        """.utf8))
+
+        XCTAssertEqual(response.question, "What did I save about AI?")
+        XCTAssertTrue(response.includeContext)
+        XCTAssertTrue(response.context.contains("AI retrieval notes"))
+        XCTAssertEqual(response.contextSections, ["Today", "Recent memory"])
+    }
+
     func testEncodesTodoCreateRequestWithSnakeCaseAndDateOnly() throws {
         let payload = TodoCreateRequest(
             title: "Plan launch",
@@ -286,6 +302,18 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(json["question"] as? String, "What should I focus on today?")
         XCTAssertEqual(json["session_id"] as? String, "66666666-6666-6666-6666-666666666666")
         XCTAssertEqual(json["include_context"] as? Bool, true)
+    }
+
+    func testEncodesAskContextPreviewRequestWithSnakeCase() throws {
+        let payload = AskContextPreviewRequest(
+            question: "What did I save about AI?",
+            includeContext: false
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["question"] as? String, "What did I save about AI?")
+        XCTAssertEqual(json["include_context"] as? Bool, false)
     }
 
     func testNonSuccessAPIResponseMapsToReadableRequestFailedError() async throws {

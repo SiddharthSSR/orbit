@@ -98,7 +98,7 @@ Then run the iOS app from Xcode using an iPhone simulator. The iOS app's Todo AP
 http://127.0.0.1:8000
 ```
 
-That address lets the simulator reach the FastAPI server running on your Mac. The Today tab combines live Todos, Bills, Memory, and the latest Mood check-in into a dashboard. It also lets you submit a simple Mood check-in. The Bills tab uses the live Bill API to load, create, mark paid/unpaid, and delete bills. The Inbox tab uses the live Memory API to load, capture, archive, and delete memory items. The Projects tab uses the live Project API to load, create, update status, archive, filter, and delete projects. The Ask tab uses the backend `/ask` API with the deterministic mock AI provider.
+That address lets the simulator reach the FastAPI server running on your Mac. The Today tab combines live Todos, Bills, Memory, and the latest Mood check-in into a dashboard. It also lets you submit a simple Mood check-in. The Bills tab uses the live Bill API to load, create, mark paid/unpaid, and delete bills. The Inbox tab uses the live Memory API to load, capture, archive, and delete memory items. The Projects tab uses the live Project API to load, create, update status, archive, filter, and delete projects. The Ask tab uses the backend `/ask` API with the deterministic mock AI provider and includes a lightweight debug panel for previewing backend context.
 
 ## Backend API Notes
 

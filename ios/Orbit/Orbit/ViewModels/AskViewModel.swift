@@ -9,6 +9,9 @@ final class AskViewModel: ObservableObject {
     @Published var includeContext = true
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
+    @Published private(set) var contextPreview: AskContextPreviewResponse?
+    @Published private(set) var isPreviewLoading = false
+    @Published var previewErrorMessage: String?
 
     private let apiClient: any ChatAPIClientProtocol
 
@@ -67,11 +70,33 @@ final class AskViewModel: ObservableObject {
         }
     }
 
+    func previewContext() async {
+        let question = draftQuestion.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !question.isEmpty else { return }
+
+        isPreviewLoading = true
+        previewErrorMessage = nil
+        defer { isPreviewLoading = false }
+
+        do {
+            contextPreview = try await apiClient.previewAskContext(
+                AskContextPreviewRequest(
+                    question: question,
+                    includeContext: includeContext
+                )
+            )
+        } catch {
+            previewErrorMessage = readableMessage(for: error)
+        }
+    }
+
     func startNewSession() {
         selectedSession = nil
         messages = []
         draftQuestion = ""
         errorMessage = nil
+        contextPreview = nil
+        previewErrorMessage = nil
     }
 
     private func upsertSession(_ session: ChatSessionDTO) {

@@ -107,6 +107,70 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isLoading)
     }
 
+    func testPreviewContextLoadsPreview() async {
+        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        viewModel.draftQuestion = "What did I save about AI?"
+
+        await viewModel.previewContext()
+
+        XCTAssertEqual(viewModel.contextPreview?.question, "What did I save about AI?")
+        XCTAssertEqual(viewModel.contextPreview?.contextSections, ["Today", "Open todos", "Recent memory"])
+        XCTAssertTrue(viewModel.contextPreview?.context.contains("AI retrieval notes") == true)
+        XCTAssertFalse(viewModel.isPreviewLoading)
+        XCTAssertNil(viewModel.previewErrorMessage)
+    }
+
+    func testPreviewContextIgnoresBlankDraft() async {
+        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        viewModel.draftQuestion = "   \n\t "
+
+        await viewModel.previewContext()
+
+        XCTAssertNil(viewModel.contextPreview)
+        XCTAssertNil(viewModel.previewErrorMessage)
+    }
+
+    func testPreviewContextRespectsIncludeContextFalse() async {
+        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        viewModel.draftQuestion = "What should I focus on today?"
+        viewModel.includeContext = false
+
+        await viewModel.previewContext()
+
+        XCTAssertEqual(viewModel.contextPreview?.includeContext, false)
+        XCTAssertEqual(viewModel.contextPreview?.context, "")
+        XCTAssertEqual(viewModel.contextPreview?.contextSections, [])
+    }
+
+    func testPreviewContextDoesNotAppendMessages() async {
+        let session = makeSession(title: "Existing")
+        let messages = [makeMessage(sessionId: session.id)]
+        let viewModel = AskViewModel(
+            apiClient: MockChatAPIClient(
+                sessions: [session],
+                messagesBySession: [session.id: messages]
+            )
+        )
+        await viewModel.selectSession(session)
+        viewModel.draftQuestion = "What did I save about AI?"
+
+        await viewModel.previewContext()
+
+        XCTAssertEqual(viewModel.selectedSession?.id, session.id)
+        XCTAssertEqual(viewModel.messages.count, 1)
+        XCTAssertEqual(viewModel.messages.first?.content, "Question")
+    }
+
+    func testPreviewContextSetsPreviewErrorMessageOnFailure() async {
+        let viewModel = AskViewModel(apiClient: FailingChatAPIClient())
+        viewModel.draftQuestion = "What did I save about AI?"
+
+        await viewModel.previewContext()
+
+        XCTAssertEqual(viewModel.previewErrorMessage, "Expected chat API failure.")
+        XCTAssertFalse(viewModel.isPreviewLoading)
+    }
+
     private func makeSession(title: String) -> ChatSessionDTO {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         return ChatSessionDTO(id: UUID(), title: title, createdAt: now, updatedAt: now)
@@ -129,6 +193,10 @@ final class AskViewModelTests: XCTestCase {
 
 private struct FailingChatAPIClient: ChatAPIClientProtocol {
     func ask(_ payload: AskRequest) async throws -> AskResponse {
+        throw FailingChatAPIError.expectedFailure
+    }
+
+    func previewAskContext(_ payload: AskContextPreviewRequest) async throws -> AskContextPreviewResponse {
         throw FailingChatAPIError.expectedFailure
     }
 

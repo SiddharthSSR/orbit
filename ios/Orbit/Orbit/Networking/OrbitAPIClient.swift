@@ -122,6 +122,7 @@ protocol ProjectAPIClientProtocol: Sendable {
 
 protocol ChatAPIClientProtocol: Sendable {
     func ask(_ payload: AskRequest) async throws -> AskResponse
+    func previewAskContext(_ payload: AskContextPreviewRequest) async throws -> AskContextPreviewResponse
     func listChatSessions() async throws -> [ChatSessionDTO]
     func listMessages(sessionId: UUID) async throws -> [ChatMessageDTO]
 }
@@ -273,6 +274,10 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
 
     func ask(_ payload: AskRequest) async throws -> AskResponse {
         try await request(path: "/ask", method: "POST", body: payload)
+    }
+
+    func previewAskContext(_ payload: AskContextPreviewRequest) async throws -> AskContextPreviewResponse {
+        try await request(path: "/ask/context-preview", method: "POST", body: payload)
     }
 
     func listChatSessions() async throws -> [ChatSessionDTO] {

@@ -65,6 +65,36 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
         )
     }
 
+    func previewAskContext(_ payload: AskContextPreviewRequest) async throws -> AskContextPreviewResponse {
+        guard payload.includeContext else {
+            return AskContextPreviewResponse(
+                question: payload.question,
+                includeContext: false,
+                context: "",
+                contextSections: []
+            )
+        }
+
+        let sections = ["Today", "Open todos", "Recent memory"]
+        let context = """
+        Today:
+        - 2026-06-17
+
+        Open todos:
+        - [Due today] Review Orbit Ask context
+
+        Recent memory:
+        - AI retrieval notes (note) [ai]: Lightweight relevance before embeddings
+        """
+
+        return AskContextPreviewResponse(
+            question: payload.question,
+            includeContext: true,
+            context: context,
+            contextSections: sections
+        )
+    }
+
     func listChatSessions() async throws -> [ChatSessionDTO] {
         sessions.sorted { $0.updatedAt > $1.updatedAt }
     }
