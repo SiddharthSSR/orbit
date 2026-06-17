@@ -178,7 +178,15 @@ Run the manual Ask eval harness against a local backend:
 ```bash
 cd backend
 source .venv/bin/activate
+alembic upgrade head
+python scripts/seed_demo_data.py
 python scripts/run_ask_eval.py
+```
+
+`seed_demo_data.py` is an explicit local-development helper; it is never run during app startup or deployment. It creates realistic Orbit, WorldLens, AI, Furlenco, mood, and fallback records using today's date. Re-running it skips records with the same demo title/name. Preview writes with:
+
+```bash
+python scripts/seed_demo_data.py --dry-run
 ```
 
 By default, the eval harness only calls `POST /ask/context-preview`, prints returned context sections, and shows a truncated context preview. To also call `POST /ask` and print answers, run:

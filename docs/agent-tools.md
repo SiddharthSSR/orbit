@@ -19,6 +19,8 @@ The Ask backend foundation now stores chat sessions and messages, builds a bound
 
 Manual Ask evaluation uses `backend/evals/ask_eval_questions.json` and `backend/scripts/run_ask_eval.py`. The harness calls `/ask/context-preview` by default so context quality can be inspected repeatedly without creating chat messages or invoking any external model. Passing `--ask` also calls `/ask`; that mode may call OpenAI only when the running backend is explicitly configured for the OpenAI provider. Use `--output` with `--format json` or `--format jsonl` to save local run logs for comparison over time. Eval logs distinguish returned section headers from useful sections with real data, so sections containing only `- None` are tracked as empty rather than matched.
 
+`backend/scripts/seed_demo_data.py` provides explicit, idempotent-enough local demo records aligned to the Ask eval questions. It is a development command only, supports `--dry-run`, and is never invoked automatically by backend startup or deployment.
+
 Memory persistence stores user-supplied content and tags only. It does not summarize articles, fetch link metadata, or perform retrieval-augmented chat yet.
 
 Mood persistence stores user-supplied check-ins only. It does not generate coaching, playlists, or planning personalization yet.
