@@ -246,6 +246,8 @@ python scripts/seed_demo_data.py
 python scripts/run_ask_eval.py
 ```
 
+To verify the iOS Hybrid memory Ask flow end-to-end against the real backend (not `MockChatAPIClient`), follow the [Manual iOS Hybrid Ask checklist](docs/manual-ios-hybrid-ask-checklist.md).
+
 `seed_demo_data.py` is an explicit local-development helper; it is never run during app startup or deployment. It creates realistic Orbit, WorldLens, AI, Furlenco, mood, and fallback records using today's date. Re-running it skips records with the same demo title/name. Preview writes with:
 
 ```bash
