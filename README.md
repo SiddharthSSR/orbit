@@ -169,6 +169,21 @@ Ask/chat foundation endpoints:
 
 The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. They store chat sessions/messages and build a bounded, date-aware plain-text context from open todos, unpaid bills, recent memory, latest moods, and active projects. Ask applies lightweight keyword relevance from the user's question so matching memory, projects, todos, and bills surface before the default ordering. Todos and bills are labeled as overdue, due today, due soon, or no due date where applicable; memory and project bodies are included only as short previews. `POST /ask/context-preview` is a backend development/debug helper that returns the context string and section names without calling the AI provider or saving chat messages.
 
+Context preview defaults to the existing keyword behavior and optionally supports hybrid memory evaluation:
+
+```bash
+curl -X POST http://127.0.0.1:8000/ask/context-preview \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "question": "What did I save about AI?",
+    "retrieval_mode": "hybrid",
+    "memory_top_k": 5,
+    "min_vector_score": 0.0
+  }'
+```
+
+`retrieval_mode` is `keyword` or `hybrid` and defaults to `keyword`; `memory_top_k` accepts 1–20. Hybrid mode affects only the `Recent memory` section: current vector hits appear first with debug score annotations, followed by deduplicated keyword-only fallbacks. Missing, stale, failed, or temporarily unavailable embeddings degrade to keyword memory ordering. The production `/ask` route remains keyword-only; hybrid preview is an evaluation bridge before full Ask integration.
+
 Orbit includes an embeddings/RAG foundation for memory items only. Embeddings are stored as JSON vectors in SQLite and searched with cosine similarity in Python; there is no external vector database. This retrieval path is development-only and is not connected to `/ask`, which continues to use keyword-ranked context. Orbit does not yet include production authentication/security for these development endpoints, streaming, or tool execution.
 
 The default embedding provider is deterministic and local:

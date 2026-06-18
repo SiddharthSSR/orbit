@@ -98,11 +98,31 @@ def preview_ask_context(
     payload: AskContextPreviewRequest,
     session: Session = Depends(get_session),
 ) -> AskContextPreviewResponse:
-    context = (
-        OrbitContextBuilder(session, question=payload.question).build_context()
-        if payload.include_context
-        else ""
-    )
+    context = ""
+    if payload.include_context:
+        vector_memory_results = None
+        if payload.retrieval_mode == "hybrid":
+            try:
+                embedding_provider = build_embedding_provider(settings)
+            except EmbeddingProviderConfigurationError as exc:
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
+            try:
+                vector_memory_results = MemoryRetrievalService(
+                    session,
+                    embedding_provider,
+                ).search(
+                    payload.question,
+                    top_k=payload.memory_top_k,
+                    min_score=payload.min_vector_score,
+                )
+            except Exception:
+                vector_memory_results = []
+        context = OrbitContextBuilder(
+            session,
+            question=payload.question,
+            vector_memory_results=vector_memory_results,
+            memory_limit=payload.memory_top_k,
+        ).build_context()
     return AskContextPreviewResponse(
         question=payload.question,
         include_context=payload.include_context,

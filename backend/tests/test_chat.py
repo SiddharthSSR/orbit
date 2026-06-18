@@ -17,6 +17,7 @@ from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
 from app.services.context_builder import OrbitContextBuilder
+from app.services.memory_retrieval import MemoryRetrievalService
 
 
 def test_ask_creates_new_session_and_two_messages(client) -> None:
@@ -140,6 +141,152 @@ def test_ask_context_preview_reflects_relevance_ordering(client) -> None:
     assert response.status_code == 200
     context = response.json()["context"]
     assert context.index("AI retrieval notes (note) [ai]") < context.index("Weekend plan (note)")
+
+
+def test_context_preview_defaults_to_unchanged_keyword_mode(client) -> None:
+    client.post(
+        "/memory",
+        json={"title": "AI Notes", "body": "Agent retrieval", "tags": ["ai"]},
+    )
+    client.post(
+        "/memory",
+        json={"title": "Weekend Plan", "body": "Groceries and cleaning"},
+    )
+
+    default_response = client.post(
+        "/ask/context-preview",
+        json={"question": "What did I save about AI?"},
+    )
+    keyword_response = client.post(
+        "/ask/context-preview",
+        json={
+            "question": "What did I save about AI?",
+            "retrieval_mode": "keyword",
+            "memory_top_k": 1,
+            "min_vector_score": -1,
+        },
+    )
+
+    assert default_response.status_code == 200
+    assert keyword_response.status_code == 200
+    assert default_response.json()["context"] == keyword_response.json()["context"]
+    assert "vector_score=" not in default_response.json()["context"]
+    assert "Weekend Plan" in keyword_response.json()["context"]
+
+
+def test_hybrid_context_preview_prioritizes_ai_memory_and_dedupes(client) -> None:
+    client.post(
+        "/memory",
+        json={"title": "Weekend Grocery List", "body": "Coffee and vegetables"},
+    )
+    client.post(
+        "/memory",
+        json={
+            "title": "AI Agents Reading List",
+            "body": "Agent memory and retrieval",
+            "kind": "article",
+            "tags": ["ai", "agents"],
+        },
+    )
+
+    response = client.post(
+        "/ask/context-preview",
+        json={
+            "question": "What did I save about AI?",
+            "retrieval_mode": "hybrid",
+            "memory_top_k": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    context = response.json()["context"]
+    assert context.index("AI Agents Reading List") < context.index("Weekend Grocery List")
+    assert context.count("AI Agents Reading List") == 1
+    assert "vector_score=" in context
+
+
+def test_hybrid_context_preview_prioritizes_worldlens_memory(client) -> None:
+    client.post(
+        "/memory",
+        json={"title": "Orbit Design Notes", "body": "Navigation and visual polish"},
+    )
+    client.post(
+        "/memory",
+        json={
+            "title": "WorldLens Project Update",
+            "body": "Camera translation prototype",
+            "kind": "project_update",
+            "tags": ["worldlens", "ios"],
+        },
+    )
+
+    response = client.post(
+        "/ask/context-preview",
+        json={
+            "question": "How is WorldLens going?",
+            "retrieval_mode": "hybrid",
+            "memory_top_k": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    context = response.json()["context"]
+    assert context.index("WorldLens Project Update") < context.index("Orbit Design Notes")
+    assert "WorldLens Project Update (project_update)" in context
+    assert "vector_score=" in context
+
+
+def test_hybrid_context_preview_falls_back_when_embeddings_are_missing(client, db_session) -> None:
+    MemoryItemRepository(db_session).create(
+        MemoryCreate(title="AI Fallback Note", body="Keyword-only retrieval", tags=["ai"])
+    )
+    MemoryItemRepository(db_session).create(
+        MemoryCreate(title="Weekend Fallback", body="Groceries")
+    )
+
+    response = client.post(
+        "/ask/context-preview",
+        json={
+            "question": "What did I save about AI?",
+            "retrieval_mode": "hybrid",
+            "memory_top_k": 2,
+        },
+    )
+
+    assert response.status_code == 200
+    context = response.json()["context"]
+    assert context.index("AI Fallback Note") < context.index("Weekend Fallback")
+    assert "vector_score=" not in context
+
+
+def test_context_preview_validates_hybrid_controls(client) -> None:
+    invalid_mode = client.post(
+        "/ask/context-preview",
+        json={"question": "AI?", "retrieval_mode": "vector"},
+    )
+    too_small = client.post(
+        "/ask/context-preview",
+        json={"question": "AI?", "memory_top_k": 0},
+    )
+    too_large = client.post(
+        "/ask/context-preview",
+        json={"question": "AI?", "memory_top_k": 21},
+    )
+
+    assert invalid_mode.status_code == 422
+    assert too_small.status_code == 422
+    assert too_large.status_code == 422
+
+
+def test_ask_remains_keyword_only_and_does_not_call_vector_search(client, monkeypatch) -> None:
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("/ask must not call vector retrieval")
+
+    monkeypatch.setattr(MemoryRetrievalService, "search", fail_if_called)
+
+    response = client.post("/ask", json={"question": "What did I save about AI?"})
+
+    assert response.status_code == 200
 
 
 def test_ask_with_existing_session_appends_messages(client) -> None:

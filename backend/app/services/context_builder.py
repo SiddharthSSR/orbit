@@ -8,6 +8,7 @@ from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
 from app.services.relevance import score_text, tokenize_query
+from app.services.memory_retrieval import MemorySearchResult
 
 
 def extract_context_sections(context: str) -> list[str]:
@@ -29,6 +30,8 @@ class OrbitContextBuilder:
         section_limit: int = 5,
         mood_limit: int = 3,
         preview_length: int = 180,
+        vector_memory_results: list[MemorySearchResult] | None = None,
+        memory_limit: int | None = None,
     ) -> None:
         self.session = session
         self.query_tokens = tokenize_query(question or "")
@@ -36,6 +39,8 @@ class OrbitContextBuilder:
         self.section_limit = section_limit
         self.mood_limit = mood_limit
         self.preview_length = preview_length
+        self.vector_memory_results = vector_memory_results
+        self.memory_limit = memory_limit or section_limit
 
     def build_context(self) -> str:
         sections = [
@@ -87,7 +92,7 @@ class OrbitContextBuilder:
         return "Unpaid bills:\n" + "\n".join(lines)
 
     def _recent_memory_section(self) -> str:
-        memory_items = sorted(
+        keyword_memory_items = sorted(
             MemoryItemRepository(self.session).list(include_archived=False),
             key=lambda item: -score_text(
                 self.query_tokens,
@@ -97,7 +102,27 @@ class OrbitContextBuilder:
                 item.source_url,
                 " ".join(item.tags),
             ),
-        )[: self.section_limit]
+        )
+        vector_scores: dict[str, float] = {}
+        if self.vector_memory_results is None:
+            memory_items = keyword_memory_items[: self.section_limit]
+        else:
+            memory_items = []
+            seen_ids: set[str] = set()
+            for result in self.vector_memory_results:
+                memory_id = str(result.memory_item.id)
+                if memory_id in seen_ids:
+                    continue
+                memory_items.append(result.memory_item)
+                vector_scores[memory_id] = result.score
+                seen_ids.add(memory_id)
+            for item in keyword_memory_items:
+                memory_id = str(item.id)
+                if memory_id in seen_ids:
+                    continue
+                memory_items.append(item)
+                seen_ids.add(memory_id)
+            memory_items = memory_items[: self.memory_limit]
         if not memory_items:
             return "Recent memory:\n- None"
 
@@ -105,7 +130,11 @@ class OrbitContextBuilder:
         for item in memory_items:
             tags = f" [{', '.join(item.tags)}]" if item.tags else ""
             source_url = f" source: {item.source_url}" if item.source_url else ""
-            lines.append(f"- {item.title} ({item.kind}){tags}{source_url}: {self._preview(item.body)}")
+            vector_score = vector_scores.get(str(item.id))
+            score = f" [vector_score={vector_score:.3f}]" if vector_score is not None else ""
+            lines.append(
+                f"- {item.title} ({item.kind}){tags}{source_url}{score}: {self._preview(item.body)}"
+            )
         return "Recent memory:\n" + "\n".join(lines)
 
     def _latest_moods_section(self) -> str:
