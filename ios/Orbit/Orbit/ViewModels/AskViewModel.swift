@@ -17,6 +17,52 @@ enum AskContextConfidence: Equatable {
     }
 }
 
+/// Locally persisted Ask retrieval preferences, backed by `UserDefaults`.
+///
+/// Defaults match the backend keyword default for a fresh install:
+/// keyword mode (`useHybridRetrieval == false`), `memoryTopK == 5`,
+/// `minVectorScore == 0.0`. Only the retrieval preference is stored —
+/// diagnostics, drafts, and sessions are intentionally not persisted.
+struct AskRetrievalPreferences {
+    private enum Key {
+        static let useHybridRetrieval = "ask.retrieval.useHybridRetrieval"
+        static let memoryTopK = "ask.retrieval.memoryTopK"
+        static let minVectorScore = "ask.retrieval.minVectorScore"
+    }
+
+    static let defaultMemoryTopK = 5
+    static let defaultMinVectorScore = 0.0
+
+    private let defaults: UserDefaults
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+    }
+
+    var useHybridRetrieval: Bool {
+        get { defaults.bool(forKey: Key.useHybridRetrieval) }
+        nonmutating set { defaults.set(newValue, forKey: Key.useHybridRetrieval) }
+    }
+
+    var memoryTopK: Int {
+        get {
+            defaults.object(forKey: Key.memoryTopK) == nil
+                ? Self.defaultMemoryTopK
+                : defaults.integer(forKey: Key.memoryTopK)
+        }
+        nonmutating set { defaults.set(newValue, forKey: Key.memoryTopK) }
+    }
+
+    var minVectorScore: Double {
+        get {
+            defaults.object(forKey: Key.minVectorScore) == nil
+                ? Self.defaultMinVectorScore
+                : defaults.double(forKey: Key.minVectorScore)
+        }
+        nonmutating set { defaults.set(newValue, forKey: Key.minVectorScore) }
+    }
+}
+
 @MainActor
 final class AskViewModel: ObservableObject {
     @Published private(set) var sessions: [ChatSessionDTO] = []
@@ -24,9 +70,15 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var messages: [ChatMessageDTO] = []
     @Published var draftQuestion = ""
     @Published var includeContext = true
-    @Published var useHybridRetrieval = false
-    @Published var memoryTopK = 5
-    @Published var minVectorScore = 0.0
+    @Published var useHybridRetrieval: Bool {
+        didSet { preferences.useHybridRetrieval = useHybridRetrieval }
+    }
+    @Published var memoryTopK: Int {
+        didSet { preferences.memoryTopK = memoryTopK }
+    }
+    @Published var minVectorScore: Double {
+        didSet { preferences.minVectorScore = minVectorScore }
+    }
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
     @Published private(set) var contextPreview: AskContextPreviewResponse?
@@ -39,9 +91,19 @@ final class AskViewModel: ObservableObject {
     }
 
     private let apiClient: any ChatAPIClientProtocol
+    private let preferences: AskRetrievalPreferences
 
-    init(apiClient: any ChatAPIClientProtocol = OrbitAPIClient()) {
+    init(
+        apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
+        preferences: AskRetrievalPreferences = AskRetrievalPreferences()
+    ) {
         self.apiClient = apiClient
+        self.preferences = preferences
+        // `didSet` does not fire for assignments made during init, so loading
+        // the stored values here restores them without writing back.
+        self.useHybridRetrieval = preferences.useHybridRetrieval
+        self.memoryTopK = preferences.memoryTopK
+        self.minVectorScore = preferences.minVectorScore
     }
 
     func loadSessions() async {

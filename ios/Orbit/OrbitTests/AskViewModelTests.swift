@@ -4,7 +4,7 @@ import XCTest
 @MainActor
 final class AskViewModelTests: XCTestCase {
     func testDefaultsToKeywordRetrieval() {
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
 
         XCTAssertFalse(viewModel.useHybridRetrieval)
         XCTAssertEqual(viewModel.memoryTopK, 5)
@@ -14,7 +14,7 @@ final class AskViewModelTests: XCTestCase {
 
     func testLoadSessionsLoadsMockSessions() async {
         let sessions = [makeSession(title: "Focus today"), makeSession(title: "Bills")]
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: sessions, messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: sessions, messagesBySession: [:]))
 
         await viewModel.loadSessions()
 
@@ -24,7 +24,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testSendQuestionCreatesNewSessionWhenNoneSelected() async {
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = " What should I focus on today? "
 
         await viewModel.sendQuestion()
@@ -36,7 +36,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testSendQuestionAppendsUserAndAssistantMessages() async {
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "What bills are coming up?"
 
         await viewModel.sendQuestion()
@@ -48,7 +48,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testSendQuestionClearsDraft() async {
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "How are my projects going?"
 
         await viewModel.sendQuestion()
@@ -58,7 +58,7 @@ final class AskViewModelTests: XCTestCase {
 
     func testSendQuestionUsesKeywordRetrievalByDefault() async {
         let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
-        let viewModel = AskViewModel(apiClient: client)
+        let viewModel = makeViewModel(client)
         viewModel.draftQuestion = "What did I save about AI?"
 
         await viewModel.sendQuestion()
@@ -72,7 +72,7 @@ final class AskViewModelTests: XCTestCase {
 
     func testSendQuestionUsesConfiguredHybridRetrieval() async {
         let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
-        let viewModel = AskViewModel(apiClient: client)
+        let viewModel = makeViewModel(client)
         viewModel.draftQuestion = "What did I save about AI?"
         viewModel.useHybridRetrieval = true
         viewModel.memoryTopK = 8
@@ -94,8 +94,8 @@ final class AskViewModelTests: XCTestCase {
             makeMessage(sessionId: session.id, role: "user", content: "Question"),
             makeMessage(sessionId: session.id, role: "assistant", content: "Answer")
         ]
-        let viewModel = AskViewModel(
-            apiClient: MockChatAPIClient(
+        let viewModel = makeViewModel(
+            MockChatAPIClient(
                 sessions: [session],
                 messagesBySession: [session.id: messages]
             )
@@ -110,8 +110,8 @@ final class AskViewModelTests: XCTestCase {
 
     func testStartNewSessionClearsSelectionAndMessages() async {
         let session = makeSession(title: "Existing")
-        let viewModel = AskViewModel(
-            apiClient: MockChatAPIClient(
+        let viewModel = makeViewModel(
+            MockChatAPIClient(
                 sessions: [session],
                 messagesBySession: [session.id: [makeMessage(sessionId: session.id)]]
             )
@@ -128,7 +128,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testBlankQuestionIsIgnored() async {
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "   \n\t "
 
         await viewModel.sendQuestion()
@@ -140,7 +140,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testErrorStateIsSetWhenAPIThrows() async {
-        let viewModel = AskViewModel(apiClient: FailingChatAPIClient())
+        let viewModel = makeViewModel(FailingChatAPIClient())
 
         await viewModel.loadSessions()
 
@@ -149,7 +149,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testPreviewContextLoadsPreview() async {
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "What did I save about AI?"
 
         await viewModel.previewContext()
@@ -163,7 +163,7 @@ final class AskViewModelTests: XCTestCase {
 
     func testPreviewContextUsesSameHybridRetrievalSettings() async {
         let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
-        let viewModel = AskViewModel(apiClient: client)
+        let viewModel = makeViewModel(client)
         viewModel.draftQuestion = "What did I save about AI?"
         viewModel.useHybridRetrieval = true
         viewModel.memoryTopK = 7
@@ -179,7 +179,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testPreviewContextIgnoresBlankDraft() async {
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "   \n\t "
 
         await viewModel.previewContext()
@@ -189,7 +189,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testPreviewContextRespectsIncludeContextFalse() async {
-        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "What should I focus on today?"
         viewModel.includeContext = false
 
@@ -203,8 +203,8 @@ final class AskViewModelTests: XCTestCase {
     func testPreviewContextDoesNotAppendMessages() async {
         let session = makeSession(title: "Existing")
         let messages = [makeMessage(sessionId: session.id)]
-        let viewModel = AskViewModel(
-            apiClient: MockChatAPIClient(
+        let viewModel = makeViewModel(
+            MockChatAPIClient(
                 sessions: [session],
                 messagesBySession: [session.id: messages]
             )
@@ -220,7 +220,7 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testPreviewContextSetsPreviewErrorMessageOnFailure() async {
-        let viewModel = AskViewModel(apiClient: FailingChatAPIClient())
+        let viewModel = makeViewModel(FailingChatAPIClient())
         viewModel.draftQuestion = "What did I save about AI?"
 
         await viewModel.previewContext()
@@ -295,6 +295,109 @@ final class AskViewModelTests: XCTestCase {
         )
 
         XCTAssertEqual(confidence, .noContext)
+    }
+
+    // MARK: - Persistence
+
+    func testDefaultPreferencesAreKeywordOffWhenNoSavedValuesExist() {
+        let defaults = makeIsolatedDefaults()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            defaults: defaults
+        )
+
+        XCTAssertFalse(viewModel.useHybridRetrieval)
+        XCTAssertEqual(viewModel.memoryTopK, 5)
+        XCTAssertEqual(viewModel.minVectorScore, 0.0)
+    }
+
+    func testTogglingHybridPersistsTrue() {
+        let defaults = makeIsolatedDefaults()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            defaults: defaults
+        )
+
+        viewModel.useHybridRetrieval = true
+
+        XCTAssertTrue(AskRetrievalPreferences(defaults: defaults).useHybridRetrieval)
+    }
+
+    func testRecreatedViewModelRestoresSavedHybridPreference() {
+        let defaults = makeIsolatedDefaults()
+        let first = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            defaults: defaults
+        )
+        first.useHybridRetrieval = true
+
+        let restored = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            defaults: defaults
+        )
+
+        XCTAssertTrue(restored.useHybridRetrieval)
+    }
+
+    func testMemoryTopKAndMinVectorScorePersistWhenSetProgrammatically() {
+        let defaults = makeIsolatedDefaults()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            defaults: defaults
+        )
+
+        viewModel.memoryTopK = 8
+        viewModel.minVectorScore = 0.25
+
+        let restored = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            defaults: defaults
+        )
+
+        XCTAssertEqual(restored.memoryTopK, 8)
+        XCTAssertEqual(restored.minVectorScore, 0.25)
+    }
+
+    func testDiagnosticsAreNotPersisted() async {
+        let defaults = makeIsolatedDefaults()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            defaults: defaults
+        )
+        viewModel.draftQuestion = "What did I save about AI?"
+        viewModel.useHybridRetrieval = true
+
+        await viewModel.sendQuestion()
+        XCTAssertNotNil(viewModel.latestRetrievalDiagnostics)
+
+        let restored = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            defaults: defaults
+        )
+
+        XCTAssertNil(restored.latestRetrievalDiagnostics)
+    }
+
+    // MARK: - Helpers
+
+    /// Creates an `AskViewModel` with an isolated `UserDefaults` suite so tests
+    /// never read from or write to the real app defaults. Pass a shared
+    /// `defaults` to exercise persistence across recreated view models.
+    private func makeViewModel(
+        _ apiClient: any ChatAPIClientProtocol,
+        defaults: UserDefaults? = nil
+    ) -> AskViewModel {
+        AskViewModel(
+            apiClient: apiClient,
+            preferences: AskRetrievalPreferences(defaults: defaults ?? makeIsolatedDefaults())
+        )
+    }
+
+    private func makeIsolatedDefaults() -> UserDefaults {
+        let suiteName = "AskViewModelTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 
     private func makeSession(title: String) -> ChatSessionDTO {
