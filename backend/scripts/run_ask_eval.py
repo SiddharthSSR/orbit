@@ -5,6 +5,7 @@ import argparse
 import json
 import sys
 import textwrap
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -76,6 +77,7 @@ def main() -> int:
     timestamp = utc_timestamp()
     mode = "ask" if args.ask else "context_preview"
     results: list[dict[str, Any]] = []
+    created_session_ids: list[str] = []
     had_error = False
 
     print(f"Loaded {len(questions)} Ask eval question(s).")
@@ -190,6 +192,11 @@ def main() -> int:
                 print(f"ERROR: {error}", file=sys.stderr)
             else:
                 answer = str(ask_response.get("answer", ""))
+                session = ask_response.get("session")
+                if isinstance(session, dict):
+                    session_id = session.get("id")
+                    if isinstance(session_id, str) and session_id:
+                        created_session_ids.append(session_id)
                 retrieval_diagnostics = ask_response.get(
                     "retrieval_diagnostics",
                     retrieval_diagnostics,
@@ -236,12 +243,25 @@ def main() -> int:
             )
         )
 
-    eval_summary = summarize_results(results)
+    cleanup_requested = bool(args.cleanup_sessions and args.ask)
+    if args.cleanup_sessions and not args.ask:
+        print("Note: --cleanup-sessions is ignored without --ask (no sessions created).")
+
+    eval_summary = summarize_results(results, empty_cleanup_summary(requested=cleanup_requested))
     print_eval_summary(eval_summary)
 
+    # Write output before cleanup so debugging results are preserved even if
+    # cleanup encounters errors.
     if args.output:
-        write_results(results, args.output, args.format)
+        write_results(results, args.output, args.format, empty_cleanup_summary(requested=cleanup_requested))
         print(f"\nWrote {len(results)} result(s) to {args.output}")
+
+    if cleanup_requested:
+        cleanup = perform_session_cleanup(args.base_url, created_session_ids)
+        print_cleanup_summary(cleanup)
+        # Re-write with final cleanup counts now that results are safely persisted.
+        if args.output:
+            write_results(results, args.output, args.format, cleanup)
 
     return 1 if had_error else 0
 
@@ -268,6 +288,14 @@ def build_argument_parser() -> argparse.ArgumentParser:
         type=float,
         default=0.0,
         help="Minimum hybrid vector score. Default: 0.0.",
+    )
+    parser.add_argument(
+        "--cleanup-sessions",
+        action="store_true",
+        help=(
+            "After the run, delete the chat sessions this run created via /ask "
+            "(requires --ask). Opt-in; only deletes sessions returned by this run."
+        ),
     )
     return parser
 
@@ -322,6 +350,74 @@ def post_json(base_url: str, path: str, payload: dict[str, Any]) -> dict[str, An
         raise RuntimeError(f"{path} failed with HTTP {exc.code}: {body}") from exc
     except URLError as exc:
         raise RuntimeError(f"Could not connect to {url}: {exc.reason}") from exc
+
+
+def delete_session(base_url: str, session_id: str) -> None:
+    url = f"{base_url.rstrip('/')}/chat/sessions/{session_id}"
+    request = Request(url, headers={"Accept": "application/json"}, method="DELETE")
+    try:
+        with urlopen(request, timeout=30) as response:
+            response.read()
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(
+            f"DELETE /chat/sessions/{session_id} failed with HTTP {exc.code}: {body}"
+        ) from exc
+    except URLError as exc:
+        raise RuntimeError(f"Could not connect to {url}: {exc.reason}") from exc
+
+
+def empty_cleanup_summary(*, requested: bool = False) -> dict[str, Any]:
+    return {
+        "cleanup_sessions_requested": requested,
+        "cleanup_sessions_attempted_count": 0,
+        "cleanup_sessions_deleted_count": 0,
+        "cleanup_sessions_failed_count": 0,
+        "cleanup_session_errors": [],
+    }
+
+
+def perform_session_cleanup(
+    base_url: str,
+    session_ids: list[str],
+    *,
+    deleter: Callable[[str, str], None] | None = None,
+) -> dict[str, Any]:
+    """Delete each unique session id created by this run.
+
+    Each deletion is isolated: a failure is recorded but never raises, so eval
+    results are preserved even when cleanup partially fails.
+    """
+    delete = deleter or delete_session
+    unique_ids = list(dict.fromkeys(session_ids))
+    deleted_count = 0
+    failed_count = 0
+    errors: list[dict[str, str]] = []
+    for session_id in unique_ids:
+        try:
+            delete(base_url, session_id)
+            deleted_count += 1
+        except RuntimeError as exc:
+            failed_count += 1
+            errors.append({"session_id": session_id, "error": str(exc)})
+    return {
+        "cleanup_sessions_requested": True,
+        "cleanup_sessions_attempted_count": len(unique_ids),
+        "cleanup_sessions_deleted_count": deleted_count,
+        "cleanup_sessions_failed_count": failed_count,
+        "cleanup_session_errors": errors,
+    }
+
+
+def print_cleanup_summary(cleanup: dict[str, Any]) -> None:
+    print(
+        "* Session cleanup: "
+        f"{cleanup['cleanup_sessions_deleted_count']}/"
+        f"{cleanup['cleanup_sessions_attempted_count']} deleted, "
+        f"{cleanup['cleanup_sessions_failed_count']} failed"
+    )
+    for error in cleanup["cleanup_session_errors"]:
+        print(f"  - {error['session_id']}: {error['error']}", file=sys.stderr)
 
 
 def build_eval_result(
@@ -408,9 +504,14 @@ def build_eval_result(
     }
 
 
-def write_results(results: list[dict[str, Any]], output_path: Path, output_format: str) -> None:
+def write_results(
+    results: list[dict[str, Any]],
+    output_path: Path,
+    output_format: str,
+    cleanup: dict[str, Any] | None = None,
+) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    summary = summarize_results(results)
+    summary = summarize_results(results, cleanup)
     if output_format == "json":
         output_path.write_text(
             json.dumps({"summary": summary, "results": results}, indent=2, ensure_ascii=False) + "\n",
@@ -427,7 +528,10 @@ def write_results(results: list[dict[str, Any]], output_path: Path, output_forma
     raise ValueError(f"Unsupported output format: {output_format}")
 
 
-def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize_results(
+    results: list[dict[str, Any]],
+    cleanup: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     total_questions = len(results)
     questions_with_errors = sum(result.get("error") is not None for result in results)
     first_result = results[0] if results else {}
@@ -527,6 +631,7 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         "answer_quality_pass_rate": _pass_rate(
             answer_quality_pass_count, answer_quality_evaluated_count
         ),
+        **(cleanup or empty_cleanup_summary(requested=False)),
     }
 
 

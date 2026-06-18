@@ -71,6 +71,14 @@ def build_argument_parser() -> argparse.ArgumentParser:
             "thresholds from repeated smoke results."
         ),
     )
+    parser.add_argument(
+        "--cleanup-sessions",
+        action="store_true",
+        help=(
+            "Forward --cleanup-sessions to each /ask eval run so the chat "
+            "sessions created during sampling are deleted afterward. Requires --ask."
+        ),
+    )
     return parser
 
 
@@ -194,6 +202,19 @@ def aggregate_sample_results(
     )
     min_hybrid_answer_quality_pass_rate_value = min(hybrid_answer_quality_pass_rate_values)
 
+    total_cleanup_attempted = sum(
+        _cleanup_count(run["summary"], "cleanup_sessions_attempted_count")
+        for run in (*keyword_runs, *hybrid_runs)
+    )
+    total_cleanup_deleted = sum(
+        _cleanup_count(run["summary"], "cleanup_sessions_deleted_count")
+        for run in (*keyword_runs, *hybrid_runs)
+    )
+    total_cleanup_failed = sum(
+        _cleanup_count(run["summary"], "cleanup_sessions_failed_count")
+        for run in (*keyword_runs, *hybrid_runs)
+    )
+
     failed_thresholds: list[str] = []
     if hybrid_fallback_rate > max_hybrid_fallback_rate:
         failed_thresholds.append("hybrid_fallback_rate")
@@ -227,6 +248,9 @@ def aggregate_sample_results(
         "min_hybrid_answer_quality_pass_rate": min_hybrid_answer_quality_pass_rate_value,
         "total_keyword_answer_quality_failures": total_keyword_answer_quality_failures,
         "total_hybrid_answer_quality_failures": total_hybrid_answer_quality_failures,
+        "total_cleanup_sessions_attempted_count": total_cleanup_attempted,
+        "total_cleanup_sessions_deleted_count": total_cleanup_deleted,
+        "total_cleanup_sessions_failed_count": total_cleanup_failed,
         "pass": not failed_thresholds,
         "failed_thresholds": failed_thresholds,
     }
@@ -256,6 +280,12 @@ def print_sample_report(summary: dict[str, Any]) -> None:
     print(
         "* Hybrid answer-quality failures: "
         f"{summary['total_hybrid_answer_quality_failures']}"
+    )
+    print(
+        "* Session cleanup: "
+        f"{summary['total_cleanup_sessions_deleted_count']}/"
+        f"{summary['total_cleanup_sessions_attempted_count']} deleted, "
+        f"{summary['total_cleanup_sessions_failed_count']} failed"
     )
     print(f"* Result: {'PASS' if summary['pass'] else 'FAIL'}")
     if summary["failed_thresholds"]:
@@ -288,6 +318,8 @@ def _run_eval(
     ]
     if args.ask:
         command.append("--ask")
+    if getattr(args, "cleanup_sessions", False) and args.ask:
+        command.append("--cleanup-sessions")
     completed = runner(command, capture_output=True, text=True, check=False)
     if completed.returncode != 0:
         detail = (completed.stderr or completed.stdout or "unknown eval error").strip()
@@ -308,6 +340,16 @@ def _answer_quality_rate(summary: dict[str, Any]) -> float:
 
 def _answer_quality_failures(summary: dict[str, Any]) -> int:
     value = summary.get("answer_quality_fail_count")
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, (int, float)):
+        return int(value)
+    return 0
+
+
+def _cleanup_count(summary: dict[str, Any], key: str) -> int:
+    """Per-run cleanup count, defaulting to 0 when the field is absent."""
+    value = summary.get(key)
     if isinstance(value, bool):
         return 0
     if isinstance(value, (int, float)):

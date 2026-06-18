@@ -12,10 +12,12 @@ from scripts.run_ask_eval import (
     build_context_preview_payload,
     build_eval_result,
     context_summary,
+    empty_cleanup_summary,
     find_item_positions,
     find_item_positions_by_section,
     load_eval_questions,
     parse_context_sections,
+    perform_session_cleanup,
     section_top_item_matches,
     summarize_results,
     useful_context_sections,
@@ -938,6 +940,190 @@ def test_hybrid_ask_run_sends_retrieval_fields_to_ask(
     assert saved_result["retrieval_vector_result_count"] == 1
     assert saved_result["retrieval_fallback_used"] is False
     assert saved_result["retrieval_context_build_ms"] == 7.5
+
+
+def test_perform_session_cleanup_deletes_unique_ids_and_reports_counts() -> None:
+    deleted: list[str] = []
+
+    def fake_deleter(base_url: str, session_id: str) -> None:
+        deleted.append(session_id)
+
+    cleanup = perform_session_cleanup(
+        "http://127.0.0.1:8000",
+        ["s1", "s2", "s1", "s3", "s2"],
+        deleter=fake_deleter,
+    )
+
+    # Duplicates collapse to a single DELETE per unique session id, order preserved.
+    assert deleted == ["s1", "s2", "s3"]
+    assert cleanup["cleanup_sessions_requested"] is True
+    assert cleanup["cleanup_sessions_attempted_count"] == 3
+    assert cleanup["cleanup_sessions_deleted_count"] == 3
+    assert cleanup["cleanup_sessions_failed_count"] == 0
+    assert cleanup["cleanup_session_errors"] == []
+
+
+def test_perform_session_cleanup_records_failures_without_raising() -> None:
+    def flaky_deleter(base_url: str, session_id: str) -> None:
+        if session_id == "bad":
+            raise RuntimeError("DELETE /chat/sessions/bad failed with HTTP 500: boom")
+
+    cleanup = perform_session_cleanup(
+        "http://127.0.0.1:8000",
+        ["ok1", "bad", "ok2"],
+        deleter=flaky_deleter,
+    )
+
+    assert cleanup["cleanup_sessions_attempted_count"] == 3
+    assert cleanup["cleanup_sessions_deleted_count"] == 2
+    assert cleanup["cleanup_sessions_failed_count"] == 1
+    assert cleanup["cleanup_session_errors"] == [
+        {"session_id": "bad", "error": "DELETE /chat/sessions/bad failed with HTTP 500: boom"}
+    ]
+
+
+def test_summarize_results_defaults_cleanup_fields_when_not_requested() -> None:
+    summary = summarize_results([make_summary_result()])
+
+    assert summary["cleanup_sessions_requested"] is False
+    assert summary["cleanup_sessions_attempted_count"] == 0
+    assert summary["cleanup_sessions_deleted_count"] == 0
+    assert summary["cleanup_sessions_failed_count"] == 0
+    assert summary["cleanup_session_errors"] == []
+
+
+def test_summarize_results_merges_cleanup_summary() -> None:
+    cleanup = {
+        "cleanup_sessions_requested": True,
+        "cleanup_sessions_attempted_count": 2,
+        "cleanup_sessions_deleted_count": 1,
+        "cleanup_sessions_failed_count": 1,
+        "cleanup_session_errors": [{"session_id": "x", "error": "boom"}],
+    }
+
+    summary = summarize_results([make_summary_result()], cleanup)
+
+    assert summary["cleanup_sessions_requested"] is True
+    assert summary["cleanup_sessions_deleted_count"] == 1
+    assert summary["cleanup_sessions_failed_count"] == 1
+    assert summary["cleanup_session_errors"] == [{"session_id": "x", "error": "boom"}]
+
+
+def test_cleanup_run_deletes_sessions_returned_by_ask(tmp_path, monkeypatch) -> None:
+    questions_file = _two_question_file(tmp_path)
+    output_file = tmp_path / "results.json"
+    deleted: list[str] = []
+
+    def fake_post_json(base_url: str, path: str, payload: dict) -> dict:
+        if path == "/ask/context-preview":
+            return {"include_context": True, "context_sections": ["Recent memory"], "context": "Recent memory:\n- AI"}
+        # Both questions reuse one session id to prove dedupe collapses it to one DELETE.
+        return {"answer": "Mock", "session": {"id": "session-A"}}
+
+    def fake_delete(base_url: str, session_id: str) -> None:
+        deleted.append(session_id)
+
+    monkeypatch.setattr(ask_eval, "post_json", fake_post_json)
+    monkeypatch.setattr(ask_eval, "delete_session", fake_delete)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_ask_eval.py", "--questions-file", str(questions_file), "--ask",
+         "--cleanup-sessions", "--output", str(output_file)],
+    )
+
+    assert ask_eval.main() == 0
+
+    assert deleted == ["session-A"]
+    summary = json.loads(output_file.read_text(encoding="utf-8"))["summary"]
+    assert summary["cleanup_sessions_requested"] is True
+    assert summary["cleanup_sessions_attempted_count"] == 1
+    assert summary["cleanup_sessions_deleted_count"] == 1
+    assert summary["cleanup_sessions_failed_count"] == 0
+
+
+def test_cleanup_run_records_failure_without_failing_eval(tmp_path, monkeypatch) -> None:
+    questions_file = _two_question_file(tmp_path)
+    output_file = tmp_path / "results.json"
+
+    def fake_post_json(base_url: str, path: str, payload: dict) -> dict:
+        if path == "/ask/context-preview":
+            return {"include_context": True, "context_sections": ["Recent memory"], "context": "Recent memory:\n- AI"}
+        return {"answer": "Mock", "session": {"id": "session-Z"}}
+
+    def failing_delete(base_url: str, session_id: str) -> None:
+        raise RuntimeError("DELETE /chat/sessions/session-Z failed with HTTP 500: boom")
+
+    monkeypatch.setattr(ask_eval, "post_json", fake_post_json)
+    monkeypatch.setattr(ask_eval, "delete_session", failing_delete)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_ask_eval.py", "--questions-file", str(questions_file), "--ask",
+         "--cleanup-sessions", "--output", str(output_file)],
+    )
+
+    # Eval still succeeds even though cleanup fails.
+    assert ask_eval.main() == 0
+    summary = json.loads(output_file.read_text(encoding="utf-8"))["summary"]
+    assert summary["cleanup_sessions_failed_count"] == 1
+    assert summary["cleanup_sessions_deleted_count"] == 0
+    assert summary["cleanup_session_errors"][0]["session_id"] == "session-Z"
+
+
+def test_cleanup_is_noop_without_ask(tmp_path, monkeypatch) -> None:
+    questions_file = _two_question_file(tmp_path)
+    output_file = tmp_path / "results.json"
+    deleted: list = []
+
+    def fake_post_json(base_url: str, path: str, payload: dict) -> dict:
+        return {"include_context": True, "context_sections": ["Recent memory"], "context": "Recent memory:\n- AI"}
+
+    monkeypatch.setattr(ask_eval, "post_json", fake_post_json)
+    monkeypatch.setattr(ask_eval, "delete_session", lambda *a, **k: deleted.append(a))
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run_ask_eval.py", "--questions-file", str(questions_file),
+         "--cleanup-sessions", "--output", str(output_file)],
+    )
+
+    assert ask_eval.main() == 0
+    assert deleted == []
+    summary = json.loads(output_file.read_text(encoding="utf-8"))["summary"]
+    assert summary["cleanup_sessions_requested"] is False
+    assert summary["cleanup_sessions_attempted_count"] == 0
+
+
+def test_cli_parses_cleanup_sessions_flag() -> None:
+    assert build_argument_parser().parse_args([]).cleanup_sessions is False
+    assert build_argument_parser().parse_args(["--cleanup-sessions"]).cleanup_sessions is True
+
+
+def _two_question_file(tmp_path):
+    questions_file = tmp_path / "questions.json"
+    questions_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "saved_ai",
+                    "question": "What did I save about AI?",
+                    "intent": "memory_recall",
+                    "expected_context_sections": ["Recent memory"],
+                    "notes": "Cleanup smoke.",
+                },
+                {
+                    "id": "recent_saves",
+                    "question": "What did I save recently?",
+                    "intent": "memory_review",
+                    "expected_context_sections": ["Recent memory"],
+                    "notes": "Cleanup smoke.",
+                },
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return questions_file
 
 
 def make_result(question_id: str = "saved_ai") -> dict:

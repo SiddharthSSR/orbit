@@ -2,6 +2,7 @@ from pathlib import Path
 
 import pytest
 
+import scripts.run_ask_eval_samples as sample_samples
 from scripts.run_ask_eval import DEFAULT_BASE_URL, DEFAULT_QUESTIONS_PATH
 from scripts.run_ask_eval_samples import (
     DEFAULT_OUTPUT_DIR,
@@ -44,6 +45,9 @@ def test_aggregate_summary_calculation() -> None:
         "min_hybrid_answer_quality_pass_rate": 0.0,
         "total_keyword_answer_quality_failures": 0,
         "total_hybrid_answer_quality_failures": 0,
+        "total_cleanup_sessions_attempted_count": 0,
+        "total_cleanup_sessions_deleted_count": 0,
+        "total_cleanup_sessions_failed_count": 0,
         "pass": True,
         "failed_thresholds": [],
     }
@@ -184,6 +188,7 @@ def test_cli_argument_defaults_and_overrides() -> None:
     assert defaults.max_hybrid_fallback_rate == 0.0
     assert defaults.max_avg_latency_delta_ms == 25.0
     assert defaults.min_hybrid_answer_quality_pass_rate == 0.0
+    assert defaults.cleanup_sessions is False
 
     configured = parser.parse_args(
         [
@@ -207,6 +212,7 @@ def test_cli_argument_defaults_and_overrides() -> None:
             "10",
             "--min-hybrid-answer-quality-pass-rate",
             "1.0",
+            "--cleanup-sessions",
         ]
     )
 
@@ -220,6 +226,7 @@ def test_cli_argument_defaults_and_overrides() -> None:
     assert configured.max_hybrid_fallback_rate == 0.1
     assert configured.max_avg_latency_delta_ms == 10.0
     assert configured.min_hybrid_answer_quality_pass_rate == 1.0
+    assert configured.cleanup_sessions is True
 
 
 def test_cli_rejects_out_of_range_answer_quality_threshold() -> None:
@@ -233,6 +240,71 @@ def test_cli_rejects_invalid_integer_controls(flag, value) -> None:
         build_argument_parser().parse_args([flag, value])
 
 
+def test_aggregate_summary_includes_cleanup_totals() -> None:
+    summary = aggregate_sample_results(
+        [make_eval(1.0, cleanup_attempted=10, cleanup_deleted=10, cleanup_failed=0)],
+        [make_eval(2.0, attempts=10, cleanup_attempted=10, cleanup_deleted=9, cleanup_failed=1)],
+        [make_comparison()],
+        max_hybrid_fallback_rate=0.0,
+        max_avg_latency_delta_ms=25.0,
+        fail_on_degraded=False,
+    )
+
+    assert summary["total_cleanup_sessions_attempted_count"] == 20
+    assert summary["total_cleanup_sessions_deleted_count"] == 19
+    assert summary["total_cleanup_sessions_failed_count"] == 1
+
+
+def test_aggregate_summary_defaults_cleanup_totals_to_zero() -> None:
+    summary = aggregate_sample_results(
+        [make_eval(1.0)],
+        [make_eval(2.0, attempts=10)],
+        [make_comparison()],
+        max_hybrid_fallback_rate=0.0,
+        max_avg_latency_delta_ms=25.0,
+        fail_on_degraded=False,
+    )
+
+    assert summary["total_cleanup_sessions_attempted_count"] == 0
+    assert summary["total_cleanup_sessions_deleted_count"] == 0
+    assert summary["total_cleanup_sessions_failed_count"] == 0
+
+
+def test_run_eval_forwards_cleanup_sessions_flag_with_ask() -> None:
+    captured: list[list[str]] = []
+
+    def fake_runner(command, **kwargs):
+        captured.append(command)
+        return _completed(0)
+
+    args = build_argument_parser().parse_args(
+        ["--ask", "--cleanup-sessions", "--base-url", "http://127.0.0.1:8011"]
+    )
+    sample_samples._run_eval(args, "hybrid", Path("/tmp/out.json"), fake_runner)
+
+    assert "--cleanup-sessions" in captured[0]
+    assert "--ask" in captured[0]
+
+
+def test_run_eval_omits_cleanup_sessions_without_ask() -> None:
+    captured: list[list[str]] = []
+
+    def fake_runner(command, **kwargs):
+        captured.append(command)
+        return _completed(0)
+
+    args = build_argument_parser().parse_args(["--cleanup-sessions"])
+    sample_samples._run_eval(args, "keyword", Path("/tmp/out.json"), fake_runner)
+
+    assert "--cleanup-sessions" not in captured[0]
+
+
+def _completed(return_code: int):
+    import subprocess
+
+    return subprocess.CompletedProcess(args=[], returncode=return_code, stdout="", stderr="")
+
+
 def make_eval(
     latency: float,
     *,
@@ -240,6 +312,9 @@ def make_eval(
     attempts: int = 0,
     answer_quality_pass_rate: float | None = None,
     answer_quality_fail_count: int | None = None,
+    cleanup_attempted: int | None = None,
+    cleanup_deleted: int | None = None,
+    cleanup_failed: int | None = None,
 ) -> dict:
     summary = {
         "avg_context_build_ms": latency,
@@ -252,6 +327,12 @@ def make_eval(
         summary["answer_quality_pass_rate"] = answer_quality_pass_rate
     if answer_quality_fail_count is not None:
         summary["answer_quality_fail_count"] = answer_quality_fail_count
+    if cleanup_attempted is not None:
+        summary["cleanup_sessions_attempted_count"] = cleanup_attempted
+    if cleanup_deleted is not None:
+        summary["cleanup_sessions_deleted_count"] = cleanup_deleted
+    if cleanup_failed is not None:
+        summary["cleanup_sessions_failed_count"] = cleanup_failed
     return {"summary": summary}
 
 

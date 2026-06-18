@@ -260,6 +260,15 @@ By default, the eval harness only calls `POST /ask/context-preview`, prints retu
 python scripts/run_ask_eval.py --ask
 ```
 
+`--ask` creates real chat sessions in the dev database (one per question), which accumulate in `GET /chat/sessions` and the iOS Ask chat list. For throwaway smoke runs, add `--cleanup-sessions` to delete the sessions this run created once it finishes:
+
+```bash
+python scripts/run_ask_eval.py --ask --retrieval-mode hybrid --cleanup-sessions
+python scripts/run_ask_eval_samples.py --runs 3 --ask --cleanup-sessions
+```
+
+Cleanup is **opt-in and not used by default**. It only deletes the session ids returned by `POST /ask` during that run — never arbitrary or pre-existing sessions — and only runs when `--ask` is also passed (it is a no-op otherwise). Cleanup happens after results are written, so debugging output is preserved even if a deletion fails; per-session failures are recorded in the summary (`cleanup_sessions_requested`, `cleanup_sessions_attempted_count`, `cleanup_sessions_deleted_count`, `cleanup_sessions_failed_count`, `cleanup_session_errors`) without failing the eval. The sampling script forwards `--cleanup-sessions` to each keyword/hybrid run and aggregates `total_cleanup_sessions_attempted_count`, `total_cleanup_sessions_deleted_count`, and `total_cleanup_sessions_failed_count`.
+
 Save structured eval results locally:
 
 ```bash
