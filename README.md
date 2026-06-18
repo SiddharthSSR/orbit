@@ -269,6 +269,30 @@ python scripts/run_ask_eval_samples.py --runs 3 --ask --cleanup-sessions
 
 Cleanup is **opt-in and not used by default**. It only deletes the session ids returned by `POST /ask` during that run — never arbitrary or pre-existing sessions — and only runs when `--ask` is also passed (it is a no-op otherwise). Cleanup happens after results are written, so debugging output is preserved even if a deletion fails; per-session failures are recorded in the summary (`cleanup_sessions_requested`, `cleanup_sessions_attempted_count`, `cleanup_sessions_deleted_count`, `cleanup_sessions_failed_count`, `cleanup_session_errors`) without failing the eval. The sampling script forwards `--cleanup-sessions` to each keyword/hybrid run and aggregates `total_cleanup_sessions_attempted_count`, `total_cleanup_sessions_deleted_count`, and `total_cleanup_sessions_failed_count`.
 
+### Dev chat-session maintenance
+
+Legacy sessions created before eval cleanup existed can be reviewed and removed manually with the dev-only maintenance script. It defaults to a dry run, requires at least one selector, and only deletes when `--confirm-delete` is explicitly passed. Deleting a chat session also deletes its messages; it does not delete todos, bills, memory, moods, projects, or embeddings.
+
+Dry-run the first 20 sessions returned by the backend:
+
+```bash
+python scripts/cleanup_chat_sessions.py --all --limit 20
+```
+
+Delete that explicit selection after reviewing the dry run:
+
+```bash
+python scripts/cleanup_chat_sessions.py --all --limit 20 --confirm-delete
+```
+
+Filter by title without deleting:
+
+```bash
+python scripts/cleanup_chat_sessions.py --title-contains eval
+```
+
+No cleanup runs automatically during app startup, tests, or normal evals. This script is intended only for manual local development maintenance.
+
 Save structured eval results locally:
 
 ```bash
