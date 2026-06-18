@@ -6,6 +6,7 @@ import scripts.run_ask_eval as ask_eval
 
 from scripts.run_ask_eval import (
     AskEvalQuestion,
+    answer_quality_details,
     build_argument_parser,
     build_ask_payload,
     build_context_preview_payload,
@@ -547,6 +548,121 @@ def test_build_eval_result_includes_item_ranking_fields() -> None:
     assert result["item_ranking_summary"] == (
         "1/2 expected top item(s) in first 5; 1 unexpected absent item hit(s)"
     )
+
+
+def test_answer_quality_details_matches_expected_and_absent_terms() -> None:
+    question = AskEvalQuestion(
+        id="upcoming_bills",
+        question="What bills are coming up?",
+        intent="bill_review",
+        expected_context_sections=["Unpaid bills"],
+        notes="Bills answer quality.",
+        expected_answer_terms=["unpaid bill", "Credit Card Payment"],
+        absent_answer_terms=["Internet Bill Paid"],
+    )
+
+    quality = answer_quality_details(
+        question,
+        "You have 2 unpaid bill(s) coming up, most urgent first.\n- Credit Card Payment: due 2026-06-14",
+    )
+
+    assert quality["answer_quality_evaluated"] is True
+    assert quality["answer_term_matches"] == ["unpaid bill", "Credit Card Payment"]
+    assert quality["missing_answer_terms"] == []
+    assert quality["unexpected_answer_terms"] == []
+    assert quality["answer_quality_pass"] is True
+
+
+def test_answer_quality_details_flags_missing_and_unexpected_terms() -> None:
+    question = AskEvalQuestion(
+        id="upcoming_bills",
+        question="What bills are coming up?",
+        intent="bill_review",
+        expected_context_sections=["Unpaid bills"],
+        notes="Bills answer quality.",
+        expected_answer_terms=["Credit Card Payment"],
+        absent_answer_terms=["Internet Bill Paid"],
+    )
+
+    quality = answer_quality_details(
+        question,
+        "Here is a paid bill: Internet Bill Paid.",
+    )
+
+    assert quality["answer_quality_evaluated"] is True
+    assert quality["missing_answer_terms"] == ["Credit Card Payment"]
+    assert quality["unexpected_answer_terms"] == ["Internet Bill Paid"]
+    assert quality["answer_quality_pass"] is False
+
+
+def test_answer_quality_details_not_evaluated_without_answer_or_terms() -> None:
+    no_terms = answer_quality_details(make_question(), "Some answer")
+    no_answer = answer_quality_details(
+        AskEvalQuestion(
+            id="saved_ai",
+            question="What did I save about AI?",
+            intent="memory_recall",
+            expected_context_sections=["Recent memory"],
+            notes="No answer requested.",
+            expected_answer_terms=["AI Agents Reading List"],
+        ),
+        None,
+    )
+
+    assert no_terms["answer_quality_evaluated"] is False
+    assert no_terms["answer_quality_pass"] is False
+    assert no_answer["answer_quality_evaluated"] is False
+    assert no_answer["answer_quality_pass"] is False
+
+
+def test_build_eval_result_includes_answer_quality_fields() -> None:
+    question = AskEvalQuestion(
+        id="saved_ai",
+        question="What did I save about AI?",
+        intent="memory_recall",
+        expected_context_sections=["Recent memory"],
+        notes="AI memory answer quality.",
+        expected_answer_terms=["AI Agents Reading List"],
+        absent_answer_terms=["Weekend Grocery List"],
+    )
+
+    result = build_eval_result(
+        run_id="run-1",
+        run_label=None,
+        timestamp="2026-06-18T00:00:00+00:00",
+        base_url="http://127.0.0.1:8000",
+        mode="ask",
+        question=question,
+        preview={
+            "include_context": True,
+            "context_sections": ["Recent memory"],
+            "context": "Recent memory:\n- AI Agents Reading List (article) [ai]: Agent notes",
+        },
+        answer='The most relevant save is "AI Agents Reading List".',
+    )
+
+    assert result["expected_answer_terms"] == ["AI Agents Reading List"]
+    assert result["absent_answer_terms"] == ["Weekend Grocery List"]
+    assert result["answer_quality_evaluated"] is True
+    assert result["answer_term_matches"] == ["AI Agents Reading List"]
+    assert result["missing_answer_terms"] == []
+    assert result["unexpected_answer_terms"] == []
+    assert result["answer_quality_pass"] is True
+
+
+def test_summarize_results_computes_answer_quality_pass_rate() -> None:
+    results = [
+        make_summary_result(answer_quality_evaluated=True, answer_quality_pass=True),
+        make_summary_result(answer_quality_evaluated=True, answer_quality_pass=False),
+        make_summary_result(answer_quality_evaluated=False, answer_quality_pass=False),
+    ]
+
+    summary = summarize_results(results)
+
+    assert summary["answer_quality_evaluated_count"] == 2
+    assert summary["answer_quality_pass_count"] == 1
+    assert summary["answer_quality_fail_count"] == 1
+    assert summary["answer_quality_pass_rate"] == 0.5
 
 
 def test_build_eval_result_includes_retrieval_metadata_and_vector_annotations() -> None:

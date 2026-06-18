@@ -29,6 +29,8 @@ class AskEvalQuestion:
     expected_top_items: list[str] = field(default_factory=list)
     expected_top_items_by_section: dict[str, list[str]] = field(default_factory=dict)
     expected_absent_items: list[str] = field(default_factory=list)
+    expected_answer_terms: list[str] = field(default_factory=list)
+    absent_answer_terms: list[str] = field(default_factory=list)
 
 
 def load_eval_questions(path: Path = DEFAULT_QUESTIONS_PATH) -> list[AskEvalQuestion]:
@@ -54,6 +56,8 @@ def load_eval_questions(path: Path = DEFAULT_QUESTIONS_PATH) -> list[AskEvalQues
                     item, "expected_top_items_by_section", index
                 ),
                 expected_absent_items=_optional_string_list(item, "expected_absent_items", index),
+                expected_answer_terms=_optional_string_list(item, "expected_answer_terms", index),
+                absent_answer_terms=_optional_string_list(item, "absent_answer_terms", index),
             )
         )
     return questions
@@ -188,6 +192,20 @@ def main() -> int:
                 )
                 print("Answer:")
                 print(indent_block(answer or "(empty)"))
+                quality = answer_quality_details(question, answer)
+                if quality["answer_quality_evaluated"]:
+                    print(
+                        "Answer quality: "
+                        f"{'PASS' if quality['answer_quality_pass'] else 'FAIL'} - "
+                        f"{quality['answer_quality_summary']}"
+                    )
+                    if quality["missing_answer_terms"]:
+                        print(f"Missing answer terms: {', '.join(quality['missing_answer_terms'])}")
+                    if quality["unexpected_answer_terms"]:
+                        print(
+                            "Unexpected answer terms: "
+                            f"{', '.join(quality['unexpected_answer_terms'])}"
+                        )
 
         results.append(
             build_eval_result(
@@ -319,6 +337,7 @@ def build_eval_result(
         preview.get("context_sections", []),
     )
     ranking = item_ranking_details(question, context)
+    answer_quality = answer_quality_details(question, answer)
     vector_score_count = context.count(VECTOR_SCORE_ANNOTATION)
     if retrieval_diagnostics is None:
         retrieval_diagnostics = preview.get("retrieval_diagnostics")
@@ -363,6 +382,14 @@ def build_eval_result(
         "context_summary": context_summary(preview) if preview else "No context",
         "context": context,
         "answer": answer,
+        "expected_answer_terms": question.expected_answer_terms,
+        "absent_answer_terms": question.absent_answer_terms,
+        "answer_quality_evaluated": answer_quality["answer_quality_evaluated"],
+        "answer_term_matches": answer_quality["answer_term_matches"],
+        "missing_answer_terms": answer_quality["missing_answer_terms"],
+        "unexpected_answer_terms": answer_quality["unexpected_answer_terms"],
+        "answer_quality_pass": answer_quality["answer_quality_pass"],
+        "answer_quality_summary": answer_quality["answer_quality_summary"],
         "error": error,
     }
 
@@ -425,6 +452,17 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         and not isinstance(result.get("retrieval_context_build_ms"), bool)
     ]
 
+    answer_quality_results = [
+        result for result in results if result.get("answer_quality_evaluated")
+    ]
+    answer_quality_evaluated_count = len(answer_quality_results)
+    answer_quality_pass_count = sum(
+        result.get("answer_quality_pass") is True for result in answer_quality_results
+    )
+    answer_quality_fail_count = (
+        answer_quality_evaluated_count - answer_quality_pass_count
+    )
+
     return {
         "retrieval_mode": first_result.get("retrieval_mode", "keyword"),
         "memory_top_k": first_result.get("memory_top_k", 5),
@@ -469,6 +507,12 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         "unexpected_absent_item_hit_count": sum(
             len(result.get("unexpected_absent_item_hits", [])) for result in results
         ),
+        "answer_quality_evaluated_count": answer_quality_evaluated_count,
+        "answer_quality_pass_count": answer_quality_pass_count,
+        "answer_quality_fail_count": answer_quality_fail_count,
+        "answer_quality_pass_rate": _pass_rate(
+            answer_quality_pass_count, answer_quality_evaluated_count
+        ),
     }
 
 
@@ -497,6 +541,12 @@ def print_eval_summary(summary: dict[str, Any]) -> None:
         f"{summary['global_item_ranking_evaluated_count']} passed"
     )
     print(f"* Unexpected absent hits: {summary['unexpected_absent_item_hit_count']}")
+    print(
+        "* Answer quality: "
+        f"{summary['answer_quality_pass_count']}/"
+        f"{summary['answer_quality_evaluated_count']} passed"
+        f" (rate {summary['answer_quality_pass_rate']:.2f})"
+    )
     print(
         "* Vector score annotations: "
         f"{summary['vector_score_annotation_result_count']} result(s), "
@@ -693,6 +743,41 @@ def item_ranking_details(question: AskEvalQuestion, context: str, *, top_n: int 
         "section_item_ranking_summary": section_summary,
         "unexpected_absent_item_hits": absent_hits,
         "item_ranking_summary": summary,
+    }
+
+
+def answer_quality_details(question: AskEvalQuestion, answer: str | None) -> dict[str, Any]:
+    """Check an answer against the question's expected/absent answer terms.
+
+    Matching is case-insensitive substring matching. A question is only
+    evaluated when it declares answer-quality terms and an answer is present
+    (i.e. the run used ``--ask``); otherwise it is reported as not evaluated.
+    """
+    expected = question.expected_answer_terms
+    absent = question.absent_answer_terms
+    evaluated = bool(expected or absent) and answer is not None
+    answer_text = (answer or "").lower()
+
+    matches = [term for term in expected if term.lower() in answer_text] if evaluated else []
+    missing = [term for term in expected if term.lower() not in answer_text] if evaluated else []
+    unexpected = [term for term in absent if term.lower() in answer_text] if evaluated else []
+    passed = evaluated and not missing and not unexpected
+
+    if not evaluated:
+        summary = "No answer quality expectations" if not (expected or absent) else "Answer not requested"
+    else:
+        summary = (
+            f"{len(matches)}/{len(expected)} expected term(s) present; "
+            f"{len(unexpected)} unexpected term(s)"
+        )
+
+    return {
+        "answer_quality_evaluated": evaluated,
+        "answer_term_matches": matches,
+        "missing_answer_terms": missing,
+        "unexpected_answer_terms": unexpected,
+        "answer_quality_pass": passed,
+        "answer_quality_summary": summary,
     }
 
 

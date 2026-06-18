@@ -51,14 +51,15 @@ def test_ask_creates_new_session_and_two_messages(client) -> None:
     assert data["user_message"]["content"] == "What should I focus on today?"
     assert data["assistant_message"]["role"] == "assistant"
     assert data["answer"] == data["assistant_message"]["content"]
-    assert "available Orbit context" in data["answer"]
+    # With an empty database the mock provider has no useful context to summarize.
+    assert "Orbit context" in data["answer"]
 
     messages_response = client.get(f"/chat/sessions/{data['session']['id']}/messages")
     assert messages_response.status_code == 200
     assert [message["role"] for message in messages_response.json()] == ["user", "assistant"]
 
 
-def test_ask_with_mock_provider_includes_relevant_context_section_names(client) -> None:
+def test_ask_with_mock_provider_cites_relevant_memory_title(client) -> None:
     client.post(
         "/memory",
         json={
@@ -72,7 +73,9 @@ def test_ask_with_mock_provider_includes_relevant_context_section_names(client) 
     response = client.post("/ask", json={"question": "What did I save about AI?"})
 
     assert response.status_code == 200
-    assert "Context sections: Today, Open todos, Unpaid bills, Recent memory" in response.json()["answer"]
+    answer = response.json()["answer"]
+    assert "AI retrieval notes" in answer
+    assert answer.startswith("The most relevant save is")
 
 
 def test_ask_context_preview_returns_context_for_question(client) -> None:

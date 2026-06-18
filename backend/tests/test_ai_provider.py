@@ -1,7 +1,29 @@
 import pytest
 
 from app.core.config import Settings
-from app.services.ai_provider import AIProviderConfigurationError, MockAIProvider, OpenAIProvider, build_ai_provider
+from app.services.ai_provider import (
+    SYSTEM_PROMPT,
+    AIProviderConfigurationError,
+    MockAIProvider,
+    OpenAIProvider,
+    build_ai_provider,
+)
+
+
+FOCUS_CONTEXT = (
+    "Today:\n- 2026-06-18\n\n"
+    "Open todos:\n"
+    "- [Overdue] Ship Orbit Ask eval improvements (due 2026-06-16)\n"
+    "- [Due today] Review WorldLens prototype (due 2026-06-18)\n\n"
+    "Unpaid bills:\n"
+    "- [Overdue] Credit Card Payment: due 2026-06-14 (8500 INR)\n"
+    "- [Due soon] Furlenco Furniture Rent: due 2026-06-21 (12000 INR)\n\n"
+    "Recent memory:\n"
+    "- AI Agents Reading List (article) [ai, agents]: Agent memory and retrieval\n"
+    "- Weekend Grocery List (note): Coffee and oats\n\n"
+    "Latest mood:\n- 2026-06-17: focused, energy 4/5\n\n"
+    "Active projects:\n- Orbit (personal) [app]: Personal second brain"
+)
 
 
 def test_default_provider_is_mock_when_env_unset(monkeypatch) -> None:
@@ -54,20 +76,73 @@ def test_openai_provider_uses_fake_client_without_network() -> None:
     assert request["messages"][-1] == {"role": "user", "content": "What should I focus on today?"}
 
 
-def test_mock_provider_mentions_context_sections() -> None:
+def test_system_prompt_contains_answer_quality_instructions() -> None:
+    lowered = SYSTEM_PROMPT.lower()
+
+    assert "start with the direct answer" in lowered
+    assert "bullet" in lowered
+    assert "overdue" in lowered and "due today" in lowered
+    assert "next step" in lowered
+    assert "do not invent" in lowered
+    assert "cite the memory item" in lowered
+
+
+def test_mock_provider_returns_direct_answer_for_ai_memory_question() -> None:
     provider = MockAIProvider()
 
     answer = provider.generate_answer(
-        question="What should I do today?",
-        context=(
-            "Today:\n- 2026-06-16\n\n"
-            "Open todos:\n- [Due today] Plan day\n\n"
-            "Unpaid bills:\n- [Due soon] Credit card"
-        ),
+        question="What did I save about AI?",
+        context=FOCUS_CONTEXT,
         history=[],
     )
 
-    assert "Context sections: Today, Open todos, Unpaid bills." in answer
+    # Direct opening that cites the memory title naturally.
+    assert answer.startswith("The most relevant save is")
+    assert "AI Agents Reading List" in answer
+
+
+def test_mock_provider_returns_useful_answer_for_bills_question() -> None:
+    provider = MockAIProvider()
+
+    answer = provider.generate_answer(
+        question="What bills are coming up?",
+        context=FOCUS_CONTEXT,
+        history=[],
+    )
+
+    assert "unpaid bill" in answer.lower()
+    assert "Credit Card Payment" in answer
+    # Overdue bill is surfaced ahead of the due-soon bill.
+    assert answer.index("Credit Card Payment") < answer.index("Furlenco Furniture Rent")
+    assert "Next step:" in answer
+
+
+def test_mock_provider_returns_useful_answer_for_overdue_question() -> None:
+    provider = MockAIProvider()
+
+    answer = provider.generate_answer(
+        question="What is overdue or due today?",
+        context=FOCUS_CONTEXT,
+        history=[],
+    )
+
+    assert "overdue or due today" in answer.lower()
+    assert "Ship Orbit Ask eval improvements" in answer
+    assert "Credit Card Payment" in answer
+    # The due-soon bill is not urgent and should be excluded.
+    assert "Furlenco Furniture Rent" not in answer
+
+
+def test_mock_provider_falls_back_when_no_useful_context() -> None:
+    provider = MockAIProvider()
+
+    answer = provider.generate_answer(
+        question="What should I focus on today?",
+        context="Today:\n- 2026-06-18\n\nOpen todos:\n- None\n\nUnpaid bills:\n- None",
+        history=[],
+    )
+
+    assert "Orbit context" in answer
 
 
 def test_ask_uses_mock_provider_by_default_without_network(client, monkeypatch) -> None:
@@ -77,7 +152,8 @@ def test_ask_uses_mock_provider_by_default_without_network(client, monkeypatch) 
     response = client.post("/ask", json={"question": "What should I focus on today?"})
 
     assert response.status_code == 200
-    assert "available Orbit context" in response.json()["answer"]
+    # Empty test database -> mock provider returns its no-context fallback.
+    assert "Orbit context" in response.json()["answer"]
 
 
 class FakeOpenAIClient:

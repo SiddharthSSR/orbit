@@ -4,6 +4,7 @@
     "question": "What should I focus on today?",
     "intent": "daily_planning",
     "expected_context_sections": ["Today", "Open todos", "Unpaid bills", "Latest mood", "Active projects"],
+    "expected_answer_terms": ["focus today", "Next step"],
     "notes": "Should surface urgent todos, unpaid bills, latest mood, and active projects."
   },
   {
@@ -13,6 +14,8 @@
     "expected_context_sections": ["Today", "Unpaid bills"],
     "expected_top_items": ["Credit Card Payment", "Furlenco"],
     "expected_absent_items": ["Internet Bill Paid"],
+    "expected_answer_terms": ["unpaid bill", "Credit Card Payment"],
+    "absent_answer_terms": ["Internet Bill Paid"],
     "notes": "Should prioritize unpaid bills by overdue/today/upcoming due dates."
   },
   {
@@ -24,6 +27,7 @@
     "expected_top_items_by_section": {
       "Recent memory": ["AI Agents Reading List"]
     },
+    "expected_answer_terms": ["AI Agents Reading List"],
     "notes": "Should prioritize memory items with AI in title, body, kind, tags, or source URL."
   },
   {
@@ -37,6 +41,7 @@
       "Recent memory": ["WorldLens Project Update"],
       "Active projects": ["WorldLens"]
     },
+    "expected_answer_terms": ["WorldLens"],
     "notes": "Should prioritize WorldLens project records and related project updates or todos."
   },
   {
@@ -48,6 +53,7 @@
     "expected_top_items_by_section": {
       "Unpaid bills": ["Furlenco"]
     },
+    "expected_answer_terms": ["Furlenco"],
     "notes": "Should prioritize bills whose name, notes, recurrence, or currency mention Furlenco."
   },
   {
@@ -56,6 +62,8 @@
     "intent": "project_planning",
     "expected_context_sections": ["Active projects", "Open todos", "Recent memory"],
     "expected_absent_items": ["SwiftUI Learning Sprint"],
+    "expected_answer_terms": ["active project"],
+    "absent_answer_terms": ["SwiftUI Learning Sprint"],
     "notes": "Should summarize active projects and any related open tasks or recent updates."
   },
   {
@@ -63,6 +71,7 @@
     "question": "What did I save recently?",
     "intent": "memory_review",
     "expected_context_sections": ["Recent memory"],
+    "expected_answer_terms": ["most relevant save"],
     "notes": "Should show recent non-archived memory captures."
   },
   {
@@ -70,6 +79,7 @@
     "question": "Based on my mood, what should I do next?",
     "intent": "mood_guidance",
     "expected_context_sections": ["Latest mood", "Open todos", "Active projects"],
+    "expected_answer_terms": ["mood check-in", "Next step"],
     "notes": "Should use latest mood alongside practical todos/projects without inventing coaching details."
   },
   {
@@ -82,6 +92,7 @@
       "Open todos": ["Ship Orbit Ask eval improvements"],
       "Unpaid bills": ["Credit Card Payment"]
     },
+    "expected_answer_terms": ["overdue or due today", "Credit Card Payment"],
     "notes": "Should emphasize overdue and due-today todos and bills."
   },
   {
@@ -95,6 +106,7 @@
       "Recent memory": ["Orbit iOS Design Notes"],
       "Active projects": ["Orbit"]
     },
+    "expected_answer_terms": ["Orbit"],
     "notes": "Should prioritize Orbit project records, captures, and open todos."
   }
 ]
