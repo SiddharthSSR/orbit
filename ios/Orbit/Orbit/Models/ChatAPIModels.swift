@@ -262,10 +262,34 @@ struct EditableSuggestedActionDraft: Identifiable, Equatable, Sendable {
         if !isValid {
             return "Fix required fields before this can be saved in a future MVP."
         }
+        if actionType == "save_memory" {
+            return "Draft looks valid and ready to save to memory."
+        }
         if actionType == "unknown" || !Self.supportedActionTypes.contains(actionType) {
             return "Draft is valid for preview, but this action type is not executable."
         }
         return "Draft looks valid. Execution coming soon."
+    }
+
+    /// Only `save_memory` is executable in this MVP, and only once it validates.
+    var canExecute: Bool {
+        actionType == "save_memory" && isValid
+    }
+
+    /// Primary button label: an action verb for the one executable type,
+    /// "Coming soon" for the preview-only types.
+    var executionButtonTitle: String {
+        actionType == "save_memory" ? "Save to memory" : "Coming soon"
+    }
+
+    /// Confirmation copy shown above the primary button for executable actions.
+    var executionSafetyText: String? {
+        actionType == "save_memory" ? "This will save the draft as a memory." : nil
+    }
+
+    /// Trimmed memory text to persist, or nil when not a valid memory draft.
+    var trimmedMemoryText: String? {
+        actionType == "save_memory" ? requiredEditableValue : nil
     }
 
     mutating func updateField(id: String, value: String) {

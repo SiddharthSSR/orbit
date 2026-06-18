@@ -253,6 +253,137 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(deletedSessions.isEmpty)
     }
 
+    func testValidSaveMemoryDraftIsExecutable() {
+        let draft = makeEditableDraft(type: "save_memory", value: "I like quiet cafes")
+
+        XCTAssertTrue(draft.canExecute)
+        XCTAssertEqual(draft.executionButtonTitle, "Save to memory")
+        XCTAssertEqual(draft.executionSafetyText, "This will save the draft as a memory.")
+    }
+
+    func testInvalidSaveMemoryDraftIsNotExecutable() {
+        var draft = makeEditableDraft(type: "save_memory", value: "I like quiet cafes")
+
+        draft.updateField(id: "Memory text", value: "   ")
+
+        XCTAssertFalse(draft.canExecute)
+    }
+
+    func testCreateTodoAndReviewBillsAreNotExecutable() {
+        let todo = makeEditableDraft(type: "create_todo", value: "Call the dentist")
+        let bills = EditableSuggestedActionDraft(
+            source: SuggestedActionDraft(
+                action: makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Bills", payload: nil)
+            )
+        )
+
+        XCTAssertFalse(todo.canExecute)
+        XCTAssertEqual(todo.executionButtonTitle, "Coming soon")
+        XCTAssertNil(todo.executionSafetyText)
+        XCTAssertFalse(bills.canExecute)
+        XCTAssertEqual(bills.executionButtonTitle, "Coming soon")
+    }
+
+    func testExecuteSaveMemoryCallsCreateOnceWithTrimmedTextAndClearsDraft() async throws {
+        let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: memoryClient
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "Draft text", payload: nil)
+        )
+        var draft = try XCTUnwrap(viewModel.editableSuggestedActionDraft)
+        draft.updateField(id: "Memory text", value: "  I like quiet cafes  ")
+        viewModel.updateEditableSuggestedActionDraft(draft)
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        let requests = await memoryClient.recordedCreateRequests()
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(requests.first?.body, "I like quiet cafes")
+        XCTAssertEqual(requests.first?.kind, "note")
+        XCTAssertFalse(requests.first?.title.isEmpty ?? true)
+        XCTAssertEqual(viewModel.suggestedActionSuccessMessage, "Saved to memory")
+        XCTAssertNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.editableSuggestedActionDraft)
+        XCTAssertNil(viewModel.suggestedActionErrorMessage)
+        XCTAssertFalse(viewModel.isExecutingSuggestedAction)
+    }
+
+    func testExecuteSaveMemoryFailureKeepsDraftAndShowsError() async throws {
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: FailingMemoryAPIClient()
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "I like quiet cafes", payload: nil)
+        )
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
+        XCTAssertNotNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.suggestedActionSuccessMessage)
+        XCTAssertEqual(viewModel.suggestedActionErrorMessage, "Expected memory API failure.")
+        XCTAssertFalse(viewModel.isExecutingSuggestedAction)
+    }
+
+    func testExecuteDoesNotCreateMemoryForCreateTodoDraft() async {
+        let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: memoryClient
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Call the dentist", payload: nil)
+        )
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        let requests = await memoryClient.recordedCreateRequests()
+        XCTAssertTrue(requests.isEmpty)
+        XCTAssertNil(viewModel.suggestedActionSuccessMessage)
+        XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
+    }
+
+    func testExecuteDoesNotCreateMemoryForInvalidSaveMemoryDraft() async throws {
+        let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: memoryClient
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "Draft", payload: nil)
+        )
+        var draft = try XCTUnwrap(viewModel.editableSuggestedActionDraft)
+        draft.updateField(id: "Memory text", value: "   ")
+        viewModel.updateEditableSuggestedActionDraft(draft)
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        let requests = await memoryClient.recordedCreateRequests()
+        XCTAssertTrue(requests.isEmpty)
+    }
+
+    func testRepeatedExecuteDoesNotCreateDuplicateMemory() async throws {
+        let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: memoryClient
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "I like quiet cafes", payload: nil)
+        )
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+        // Second call has no draft (cleared on success), so it must be a no-op.
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        let requests = await memoryClient.recordedCreateRequests()
+        XCTAssertEqual(requests.count, 1)
+    }
+
     func testUnknownSuggestedActionUsesGenericPreviewCopy() {
         let action = makeSuggestedAction(type: "future_action", title: "Future action")
 
@@ -729,10 +860,12 @@ final class AskViewModelTests: XCTestCase {
     /// `defaults` to exercise persistence across recreated view models.
     private func makeViewModel(
         _ apiClient: any ChatAPIClientProtocol,
+        memoryClient: (any MemoryAPIClientProtocol)? = nil,
         defaults: UserDefaults? = nil
     ) -> AskViewModel {
         AskViewModel(
             apiClient: apiClient,
+            memoryClient: memoryClient ?? MockMemoryAPIClient(memoryItems: []),
             preferences: AskRetrievalPreferences(defaults: defaults ?? makeIsolatedDefaults())
         )
     }
@@ -880,5 +1013,31 @@ private enum FailingChatAPIError: LocalizedError {
 
     var errorDescription: String? {
         "Expected chat API failure."
+    }
+}
+
+private struct FailingMemoryAPIClient: MemoryAPIClientProtocol {
+    func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO] {
+        throw FailingMemoryAPIError.expectedFailure
+    }
+
+    func createMemory(_ payload: MemoryCreateRequest) async throws -> MemoryDTO {
+        throw FailingMemoryAPIError.expectedFailure
+    }
+
+    func updateMemory(id: UUID, payload: MemoryUpdateRequest) async throws -> MemoryDTO {
+        throw FailingMemoryAPIError.expectedFailure
+    }
+
+    func deleteMemory(id: UUID) async throws {
+        throw FailingMemoryAPIError.expectedFailure
+    }
+}
+
+private enum FailingMemoryAPIError: LocalizedError {
+    case expectedFailure
+
+    var errorDescription: String? {
+        "Expected memory API failure."
     }
 }

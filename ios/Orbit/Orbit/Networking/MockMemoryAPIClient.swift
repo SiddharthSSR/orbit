@@ -2,9 +2,14 @@ import Foundation
 
 actor MockMemoryAPIClient: MemoryAPIClientProtocol {
     private var memoryItems: [MemoryDTO]
+    private var createRequests: [MemoryCreateRequest] = []
 
     init(memoryItems: [MemoryDTO] = MockMemoryAPIClient.previewMemoryItems) {
         self.memoryItems = memoryItems
+    }
+
+    func recordedCreateRequests() -> [MemoryCreateRequest] {
+        createRequests
     }
 
     func listMemory(includeArchived: Bool = false, kind: String? = nil, tag: String? = nil) async throws -> [MemoryDTO] {
@@ -23,6 +28,7 @@ actor MockMemoryAPIClient: MemoryAPIClientProtocol {
     }
 
     func createMemory(_ payload: MemoryCreateRequest) async throws -> MemoryDTO {
+        createRequests.append(payload)
         let now = Date()
         let memory = MemoryDTO(
             id: UUID(),

@@ -89,6 +89,9 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var answerSuggestedActions: [UUID: [SuggestedActionDTO]] = [:]
     @Published private(set) var selectedSuggestedAction: SuggestedActionDTO?
     @Published private(set) var editableSuggestedActionDraft: EditableSuggestedActionDraft?
+    @Published private(set) var isExecutingSuggestedAction = false
+    @Published private(set) var suggestedActionSuccessMessage: String?
+    @Published var suggestedActionErrorMessage: String?
 
     var contextConfidence: AskContextConfidence {
         Self.contextConfidence(for: contextPreview)
@@ -99,13 +102,16 @@ final class AskViewModel: ObservableObject {
     }
 
     private let apiClient: any ChatAPIClientProtocol
+    private let memoryClient: any MemoryAPIClientProtocol
     private let preferences: AskRetrievalPreferences
 
     init(
         apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
+        memoryClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
         preferences: AskRetrievalPreferences = AskRetrievalPreferences()
     ) {
         self.apiClient = apiClient
+        self.memoryClient = memoryClient
         self.preferences = preferences
         // `didSet` does not fire for assignments made during init, so loading
         // the stored values here restores them without writing back.
@@ -130,6 +136,7 @@ final class AskViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         clearSuggestedActionPreview()
+        suggestedActionSuccessMessage = nil
         defer { isLoading = false }
 
         do {
@@ -148,6 +155,7 @@ final class AskViewModel: ObservableObject {
 
         isLoading = true
         errorMessage = nil
+        suggestedActionSuccessMessage = nil
         defer { isLoading = false }
 
         do {
@@ -212,6 +220,7 @@ final class AskViewModel: ObservableObject {
         answerContextSummaries = [:]
         answerSuggestedActions = [:]
         clearSuggestedActionPreview()
+        suggestedActionSuccessMessage = nil
         previewErrorMessage = nil
     }
 
@@ -230,6 +239,7 @@ final class AskViewModel: ObservableObject {
                 answerContextSummaries = [:]
                 answerSuggestedActions = [:]
                 clearSuggestedActionPreview()
+                suggestedActionSuccessMessage = nil
                 previewErrorMessage = nil
             }
         } catch {
@@ -253,6 +263,7 @@ final class AskViewModel: ObservableObject {
     }
 
     func selectSuggestedAction(_ action: SuggestedActionDTO) {
+        suggestedActionSuccessMessage = nil
         selectedSuggestedAction = action
         editableSuggestedActionDraft = EditableSuggestedActionDraft(
             source: SuggestedActionDraft(action: action)
@@ -264,6 +275,37 @@ final class AskViewModel: ObservableObject {
         editableSuggestedActionDraft = draft
     }
 
+    /// Executes the one currently supported suggested action: save_memory.
+    /// Requires an explicit user tap, a valid draft, and is a no-op for any
+    /// other action type. Reuses the existing memory create endpoint.
+    func executeSelectedSuggestedActionDraft() async {
+        guard !isExecutingSuggestedAction,
+              let draft = editableSuggestedActionDraft,
+              draft.actionType == "save_memory",
+              draft.canExecute,
+              let memoryText = draft.trimmedMemoryText else {
+            return
+        }
+
+        isExecutingSuggestedAction = true
+        suggestedActionErrorMessage = nil
+        defer { isExecutingSuggestedAction = false }
+
+        do {
+            _ = try await memoryClient.createMemory(
+                MemoryCreateRequest(
+                    title: Self.memoryTitle(from: memoryText),
+                    body: memoryText,
+                    kind: "note"
+                )
+            )
+            clearSuggestedActionPreview()
+            suggestedActionSuccessMessage = "Saved to memory"
+        } catch {
+            suggestedActionErrorMessage = readableMessage(for: error)
+        }
+    }
+
     func dismissSuggestedActionPreview() {
         clearSuggestedActionPreview()
     }
@@ -271,6 +313,19 @@ final class AskViewModel: ObservableObject {
     private func clearSuggestedActionPreview() {
         selectedSuggestedAction = nil
         editableSuggestedActionDraft = nil
+        suggestedActionErrorMessage = nil
+    }
+
+    /// Derives a short, non-empty memory title from the saved text.
+    static func memoryTitle(from text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        let firstLine = trimmed.split(separator: "\n", maxSplits: 1).first.map(String.init) ?? trimmed
+        let maxLength = 80
+        if firstLine.count <= maxLength {
+            return firstLine
+        }
+        let endIndex = firstLine.index(firstLine.startIndex, offsetBy: maxLength)
+        return String(firstLine[..<endIndex]).trimmingCharacters(in: .whitespaces) + "…"
     }
 
     private var retrievalMode: RetrievalMode {

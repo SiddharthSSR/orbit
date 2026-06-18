@@ -107,6 +107,14 @@ struct AskScreen: View {
                 }
             }
 
+            if let successMessage = viewModel.suggestedActionSuccessMessage {
+                Section {
+                    Label(successMessage, systemImage: "checkmark.circle.fill")
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(.green)
+                }
+            }
+
             Section("Ask") {
                 TextField("Ask about your day, memory, or projects", text: $viewModel.draftQuestion, axis: .vertical)
                     .lineLimit(3...8)
@@ -269,6 +277,7 @@ struct AskScreen: View {
             )
         ) { presentedDraft in
             SuggestedActionPreviewSheet(
+                viewModel: viewModel,
                 draft: Binding(
                     get: { viewModel.editableSuggestedActionDraft ?? presentedDraft },
                     set: { updatedDraft in
@@ -497,6 +506,7 @@ private struct ChatMessageRow: View {
 private struct SuggestedActionPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
 
+    @ObservedObject var viewModel: AskViewModel
     @Binding var draft: EditableSuggestedActionDraft
 
     var body: some View {
@@ -560,10 +570,31 @@ private struct SuggestedActionPreviewSheet: View {
                 }
 
                 Section {
-                    Button(draft.confirmationTitle) {}
+                    if let safetyText = draft.executionSafetyText {
+                        Text(safetyText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let errorMessage = viewModel.suggestedActionErrorMessage {
+                        Label(errorMessage, systemImage: "exclamationmark.triangle")
+                            .font(.footnote)
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Button {
+                        Task { await viewModel.executeSelectedSuggestedActionDraft() }
+                    } label: {
+                        HStack {
+                            if viewModel.isExecutingSuggestedAction {
+                                ProgressView()
+                            }
+                            Text(draft.executionButtonTitle)
+                        }
                         .frame(maxWidth: .infinity)
-                        .buttonStyle(.borderedProminent)
-                        .disabled(true)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .disabled(!draft.canExecute || viewModel.isExecutingSuggestedAction)
                 }
                 .listRowBackground(Color.clear)
             }
