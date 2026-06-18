@@ -47,12 +47,37 @@ struct AskScreen: View {
                                 Button {
                                     Task { await viewModel.selectSession(session) }
                                 } label: {
-                                    Text(session.title ?? "Untitled")
+                                    Text(session.displayTitle())
                                         .lineLimit(1)
                                         .font(.subheadline.weight(.medium))
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .background(
+                                            viewModel.selectedSession?.id == session.id
+                                                ? Color.accentColor
+                                                : Color(.secondarySystemGroupedBackground)
+                                        )
+                                        .foregroundStyle(
+                                            viewModel.selectedSession?.id == session.id
+                                                ? Color.white
+                                                : Color.primary
+                                        )
+                                        .clipShape(Capsule())
+                                        .overlay {
+                                            Capsule()
+                                                .stroke(
+                                                    viewModel.selectedSession?.id == session.id
+                                                        ? Color.accentColor
+                                                        : Color.secondary.opacity(0.35),
+                                                    lineWidth: 1
+                                                )
+                                        }
                                 }
-                                .buttonStyle(.bordered)
-                                .tint(viewModel.selectedSession?.id == session.id ? .accentColor : .secondary)
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Chat: \(session.readableTitle)")
+                                .accessibilityAddTraits(
+                                    viewModel.selectedSession?.id == session.id ? .isSelected : []
+                                )
                                 .contextMenu {
                                     Button(role: .destructive) {
                                         Task { await viewModel.deleteSession(session) }

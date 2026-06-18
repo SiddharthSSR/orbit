@@ -146,9 +146,22 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
     }
 
     private func makeTitle(from question: String) -> String {
-        let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard trimmed.count > 80 else { return trimmed }
-        return "\(String(trimmed.prefix(77)).trimmingCharacters(in: .whitespacesAndNewlines))..."
+        var normalized = question
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        let quotePairs: Set<String> = ["\"\"", "''", "“”", "‘’"]
+        if let first = normalized.first,
+           let last = normalized.last,
+           quotePairs.contains("\(first)\(last)") {
+            normalized = String(normalized.dropFirst().dropLast())
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !normalized.isEmpty else { return "New Ask" }
+        guard normalized.count > 60 else { return normalized }
+        let prefix = String(normalized.prefix(59))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(prefix)…"
     }
 
     private func diagnostics(

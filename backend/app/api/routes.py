@@ -51,6 +51,9 @@ from app.services.memory_retrieval import (
 
 router = APIRouter()
 
+ASK_SESSION_FALLBACK_TITLE = "New Ask"
+ASK_SESSION_TITLE_MAX_LENGTH = 60
+
 
 def get_ai_provider() -> AIProvider:
     try:
@@ -84,10 +87,15 @@ def _auto_index_memory_item(session: Session, memory_item: MemoryRecord) -> None
 
 
 def _chat_title_from_question(question: str) -> str:
-    title = question.strip()
-    if len(title) <= 80:
+    title = " ".join(question.split())
+    quote_pairs = {('"', '"'), ("'", "'"), ("“", "”"), ("‘", "’")}
+    if len(title) >= 2 and (title[0], title[-1]) in quote_pairs:
+        title = " ".join(title[1:-1].split())
+    if not title:
+        return ASK_SESSION_FALLBACK_TITLE
+    if len(title) <= ASK_SESSION_TITLE_MAX_LENGTH:
         return title
-    return f"{title[:77].rstrip()}..."
+    return f"{title[: ASK_SESSION_TITLE_MAX_LENGTH - 1].rstrip()}…"
 
 
 def build_orbit_context_for_question(

@@ -5,6 +5,27 @@ struct ChatSessionDTO: Decodable, Identifiable, Hashable, Sendable {
     var title: String?
     var createdAt: Date
     var updatedAt: Date
+
+    var readableTitle: String {
+        Self.normalizedTitle(title)
+    }
+
+    func displayTitle(maxLength: Int = 40) -> String {
+        let normalized = readableTitle
+        guard maxLength > 1, normalized.count > maxLength else { return normalized }
+        let prefix = String(normalized.prefix(maxLength - 1))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return "\(prefix)…"
+    }
+
+    private static func normalizedTitle(_ title: String?) -> String {
+        guard let title else { return "New Ask" }
+        let normalized = title
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+        return normalized.isEmpty ? "New Ask" : normalized
+    }
 }
 
 struct ChatMessageDTO: Decodable, Identifiable, Hashable, Sendable {

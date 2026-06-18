@@ -119,12 +119,30 @@ final class AskViewModelTests: XCTestCase {
 
         await viewModel.selectSession(session)
         viewModel.draftQuestion = "Draft"
+        viewModel.useHybridRetrieval = true
+        viewModel.includeContext = false
         viewModel.startNewSession()
 
         XCTAssertNil(viewModel.selectedSession)
         XCTAssertTrue(viewModel.messages.isEmpty)
         XCTAssertEqual(viewModel.draftQuestion, "")
         XCTAssertNil(viewModel.errorMessage)
+        XCTAssertNil(viewModel.contextPreview)
+        XCTAssertNil(viewModel.latestRetrievalDiagnostics)
+        XCTAssertTrue(viewModel.useHybridRetrieval)
+        XCTAssertFalse(viewModel.includeContext)
+    }
+
+    func testSessionDisplayTitleFallsBackForMissingOrBlankTitle() {
+        XCTAssertEqual(makeSession(title: nil).displayTitle(), "New Ask")
+        XCTAssertEqual(makeSession(title: "  \n ").displayTitle(), "New Ask")
+    }
+
+    func testSessionDisplayTitleCollapsesWhitespaceAndTruncatesCleanly() {
+        let session = makeSession(title: "  A   readable\nchat title that is deliberately long  ")
+
+        XCTAssertEqual(session.displayTitle(maxLength: 24), "A readable chat title t…")
+        XCTAssertEqual(session.displayTitle(maxLength: 24).count, 24)
     }
 
     func testDeleteSessionRemovesItFromListAndRecordsOnClient() async {
@@ -486,7 +504,7 @@ final class AskViewModelTests: XCTestCase {
         return defaults
     }
 
-    private func makeSession(title: String) -> ChatSessionDTO {
+    private func makeSession(title: String?) -> ChatSessionDTO {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         return ChatSessionDTO(id: UUID(), title: title, createdAt: now, updatedAt: now)
     }

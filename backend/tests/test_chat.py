@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.api.routes import get_ai_provider
+from app.api.routes import _chat_title_from_question, get_ai_provider
 from app.db.session import Base
 from app.main import app
 from app.models.bill import BillCreate, BillRecord
@@ -57,6 +57,31 @@ def test_ask_creates_new_session_and_two_messages(client) -> None:
     messages_response = client.get(f"/chat/sessions/{data['session']['id']}/messages")
     assert messages_response.status_code == 200
     assert [message["role"] for message in messages_response.json()] == ["user", "assistant"]
+
+
+def test_ask_session_title_collapses_whitespace_and_strips_quotes(client) -> None:
+    response = client.post(
+        "/ask",
+        json={"question": '  "What   should I\nfocus on today?"  '},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["session"]["title"] == "What should I focus on today?"
+
+
+def test_ask_session_title_truncates_with_ellipsis(client) -> None:
+    question = "Explain the most important priorities across all of my active projects this week"
+
+    response = client.post("/ask", json={"question": question})
+
+    assert response.status_code == 200
+    title = response.json()["session"]["title"]
+    assert title == f"{question[:59]}…"
+    assert len(title) == 60
+
+
+def test_ask_session_title_uses_fallback_for_blank_source() -> None:
+    assert _chat_title_from_question("  \n\t ") == "New Ask"
 
 
 def test_ask_with_mock_provider_cites_relevant_memory_title(client) -> None:
@@ -505,6 +530,7 @@ def test_ask_with_existing_session_appends_messages(client) -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["session"]["id"] == first["session"]["id"]
+    assert data["session"]["title"] == "What bills are coming up?"
 
     messages = client.get(f"/chat/sessions/{first['session']['id']}/messages").json()
     assert [message["role"] for message in messages] == ["user", "assistant", "user", "assistant"]
