@@ -24,6 +24,18 @@ struct AskScreen: View {
                 }
 
                 Toggle("Use Orbit context", isOn: $viewModel.includeContext)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Toggle("Hybrid memory", isOn: $viewModel.useHybridRetrieval)
+                    Text("Uses vector memory retrieval for Recent memory.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .disabled(!viewModel.includeContext)
+
+                if let diagnostics = viewModel.latestRetrievalDiagnostics {
+                    RetrievalDiagnosticsLine(diagnostics: diagnostics)
+                }
             }
 
             if !viewModel.sessions.isEmpty {
@@ -209,6 +221,27 @@ struct AskScreen: View {
         }
         let count = preview.contextSections.count
         return "\(count) context \(count == 1 ? "section" : "sections") available"
+    }
+}
+
+private struct RetrievalDiagnosticsLine: View {
+    let diagnostics: RetrievalDiagnostics
+
+    var body: some View {
+        Text(
+            "\(diagnostics.retrievalMode.rawValue.capitalized) • " +
+            "\(diagnostics.vectorResultCount) vectors • " +
+            "fallback \(diagnostics.fallbackUsed ? "yes" : "no") • " +
+            "\(diagnostics.contextBuildMs.formatted(.number.precision(.fractionLength(2)))) ms"
+        )
+        .font(.caption.monospacedDigit())
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(
+            "Retrieval mode \(diagnostics.retrievalMode.rawValue), " +
+            "\(diagnostics.vectorResultCount) vector results, " +
+            "fallback \(diagnostics.fallbackUsed ? "used" : "not used"), " +
+            "context build \(diagnostics.contextBuildMs) milliseconds"
+        )
     }
 }
 

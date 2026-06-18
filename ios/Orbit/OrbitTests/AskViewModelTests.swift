@@ -3,6 +3,15 @@ import XCTest
 
 @MainActor
 final class AskViewModelTests: XCTestCase {
+    func testDefaultsToKeywordRetrieval() {
+        let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: [], messagesBySession: [:]))
+
+        XCTAssertFalse(viewModel.useHybridRetrieval)
+        XCTAssertEqual(viewModel.memoryTopK, 5)
+        XCTAssertEqual(viewModel.minVectorScore, 0.0)
+        XCTAssertNil(viewModel.latestRetrievalDiagnostics)
+    }
+
     func testLoadSessionsLoadsMockSessions() async {
         let sessions = [makeSession(title: "Focus today"), makeSession(title: "Bills")]
         let viewModel = AskViewModel(apiClient: MockChatAPIClient(sessions: sessions, messagesBySession: [:]))
@@ -45,6 +54,38 @@ final class AskViewModelTests: XCTestCase {
         await viewModel.sendQuestion()
 
         XCTAssertEqual(viewModel.draftQuestion, "")
+    }
+
+    func testSendQuestionUsesKeywordRetrievalByDefault() async {
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = AskViewModel(apiClient: client)
+        viewModel.draftQuestion = "What did I save about AI?"
+
+        await viewModel.sendQuestion()
+
+        let request = await client.lastAskRequest()
+        XCTAssertEqual(request?.retrievalMode, .keyword)
+        XCTAssertEqual(request?.memoryTopK, 5)
+        XCTAssertEqual(request?.minVectorScore, 0.0)
+        XCTAssertEqual(viewModel.latestRetrievalDiagnostics?.retrievalMode, .keyword)
+    }
+
+    func testSendQuestionUsesConfiguredHybridRetrieval() async {
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = AskViewModel(apiClient: client)
+        viewModel.draftQuestion = "What did I save about AI?"
+        viewModel.useHybridRetrieval = true
+        viewModel.memoryTopK = 8
+        viewModel.minVectorScore = 0.25
+
+        await viewModel.sendQuestion()
+
+        let request = await client.lastAskRequest()
+        XCTAssertEqual(request?.retrievalMode, .hybrid)
+        XCTAssertEqual(request?.memoryTopK, 8)
+        XCTAssertEqual(request?.minVectorScore, 0.25)
+        XCTAssertEqual(viewModel.latestRetrievalDiagnostics?.retrievalMode, .hybrid)
+        XCTAssertEqual(viewModel.latestRetrievalDiagnostics?.vectorResultCount, 2)
     }
 
     func testSelectSessionLoadsMessages() async {
@@ -118,6 +159,23 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.contextPreview?.context.contains("AI retrieval notes") == true)
         XCTAssertFalse(viewModel.isPreviewLoading)
         XCTAssertNil(viewModel.previewErrorMessage)
+    }
+
+    func testPreviewContextUsesSameHybridRetrievalSettings() async {
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = AskViewModel(apiClient: client)
+        viewModel.draftQuestion = "What did I save about AI?"
+        viewModel.useHybridRetrieval = true
+        viewModel.memoryTopK = 7
+        viewModel.minVectorScore = 0.15
+
+        await viewModel.previewContext()
+
+        let request = await client.lastPreviewRequest()
+        XCTAssertEqual(request?.retrievalMode, .hybrid)
+        XCTAssertEqual(request?.memoryTopK, 7)
+        XCTAssertEqual(request?.minVectorScore, 0.15)
+        XCTAssertEqual(viewModel.latestRetrievalDiagnostics?.retrievalMode, .hybrid)
     }
 
     func testPreviewContextIgnoresBlankDraft() async {

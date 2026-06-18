@@ -24,11 +24,15 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var messages: [ChatMessageDTO] = []
     @Published var draftQuestion = ""
     @Published var includeContext = true
+    @Published var useHybridRetrieval = false
+    @Published var memoryTopK = 5
+    @Published var minVectorScore = 0.0
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
     @Published private(set) var contextPreview: AskContextPreviewResponse?
     @Published private(set) var isPreviewLoading = false
     @Published var previewErrorMessage: String?
+    @Published private(set) var latestRetrievalDiagnostics: RetrievalDiagnostics?
 
     var contextConfidence: AskContextConfidence {
         Self.contextConfidence(for: contextPreview)
@@ -78,12 +82,16 @@ final class AskViewModel: ObservableObject {
                 AskRequest(
                     question: question,
                     sessionId: selectedSession?.id,
-                    includeContext: includeContext
+                    includeContext: includeContext,
+                    retrievalMode: retrievalMode,
+                    memoryTopK: memoryTopK,
+                    minVectorScore: minVectorScore
                 )
             )
             selectedSession = response.session
             messages.append(response.userMessage)
             messages.append(response.assistantMessage)
+            latestRetrievalDiagnostics = response.retrievalDiagnostics
             draftQuestion = ""
             upsertSession(response.session)
         } catch {
@@ -103,9 +111,13 @@ final class AskViewModel: ObservableObject {
             contextPreview = try await apiClient.previewAskContext(
                 AskContextPreviewRequest(
                     question: question,
-                    includeContext: includeContext
+                    includeContext: includeContext,
+                    retrievalMode: retrievalMode,
+                    memoryTopK: memoryTopK,
+                    minVectorScore: minVectorScore
                 )
             )
+            latestRetrievalDiagnostics = contextPreview?.retrievalDiagnostics
         } catch {
             previewErrorMessage = readableMessage(for: error)
         }
@@ -117,7 +129,12 @@ final class AskViewModel: ObservableObject {
         draftQuestion = ""
         errorMessage = nil
         contextPreview = nil
+        latestRetrievalDiagnostics = nil
         previewErrorMessage = nil
+    }
+
+    private var retrievalMode: RetrievalMode {
+        useHybridRetrieval ? .hybrid : .keyword
     }
 
     private func upsertSession(_ session: ChatSessionDTO) {

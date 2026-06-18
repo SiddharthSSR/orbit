@@ -177,6 +177,7 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(response.userMessage.role, "user")
         XCTAssertEqual(response.assistantMessage.role, "assistant")
         XCTAssertEqual(response.answer, "Based on available Orbit context...")
+        XCTAssertNil(response.retrievalDiagnostics)
     }
 
     func testDecodesAskContextPreviewResponseFromBackendJSON() throws {
@@ -185,7 +186,17 @@ final class OrbitAPIClientContractTests: XCTestCase {
           "question": "What did I save about AI?",
           "include_context": true,
           "context": "Today:\\n- 2026-06-17\\n\\nRecent memory:\\n- AI retrieval notes",
-          "context_sections": ["Today", "Recent memory"]
+          "context_sections": ["Today", "Recent memory"],
+          "retrieval_diagnostics": {
+            "retrieval_mode": "hybrid",
+            "memory_top_k": 8,
+            "min_vector_score": 0.25,
+            "vector_attempted": true,
+            "vector_result_count": 3,
+            "vector_error": null,
+            "fallback_used": false,
+            "context_build_ms": 2.75
+          }
         }
         """.utf8))
 
@@ -193,6 +204,14 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertTrue(response.includeContext)
         XCTAssertTrue(response.context.contains("AI retrieval notes"))
         XCTAssertEqual(response.contextSections, ["Today", "Recent memory"])
+        XCTAssertEqual(response.retrievalDiagnostics?.retrievalMode, .hybrid)
+        XCTAssertEqual(response.retrievalDiagnostics?.memoryTopK, 8)
+        XCTAssertEqual(response.retrievalDiagnostics?.minVectorScore, 0.25)
+        XCTAssertEqual(response.retrievalDiagnostics?.vectorAttempted, true)
+        XCTAssertEqual(response.retrievalDiagnostics?.vectorResultCount, 3)
+        XCTAssertNil(response.retrievalDiagnostics?.vectorError)
+        XCTAssertEqual(response.retrievalDiagnostics?.fallbackUsed, false)
+        XCTAssertEqual(response.retrievalDiagnostics?.contextBuildMs, 2.75)
     }
 
     func testEncodesTodoCreateRequestWithSnakeCaseAndDateOnly() throws {
@@ -302,6 +321,26 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(json["question"] as? String, "What should I focus on today?")
         XCTAssertEqual(json["session_id"] as? String, "66666666-6666-6666-6666-666666666666")
         XCTAssertEqual(json["include_context"] as? Bool, true)
+        XCTAssertEqual(json["retrieval_mode"] as? String, "keyword")
+        XCTAssertEqual(json["memory_top_k"] as? Int, 5)
+        XCTAssertEqual(json["min_vector_score"] as? Double, 0.0)
+    }
+
+    func testEncodesHybridAskRequestControls() throws {
+        let payload = AskRequest(
+            question: "What did I save about AI?",
+            sessionId: nil,
+            includeContext: true,
+            retrievalMode: .hybrid,
+            memoryTopK: 8,
+            minVectorScore: 0.25
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["retrieval_mode"] as? String, "hybrid")
+        XCTAssertEqual(json["memory_top_k"] as? Int, 8)
+        XCTAssertEqual(json["min_vector_score"] as? Double, 0.25)
     }
 
     func testEncodesAskContextPreviewRequestWithSnakeCase() throws {
@@ -314,6 +353,9 @@ final class OrbitAPIClientContractTests: XCTestCase {
 
         XCTAssertEqual(json["question"] as? String, "What did I save about AI?")
         XCTAssertEqual(json["include_context"] as? Bool, false)
+        XCTAssertEqual(json["retrieval_mode"] as? String, "keyword")
+        XCTAssertEqual(json["memory_top_k"] as? Int, 5)
+        XCTAssertEqual(json["min_vector_score"] as? Double, 0.0)
     }
 
     func testNonSuccessAPIResponseMapsToReadableRequestFailedError() async throws {

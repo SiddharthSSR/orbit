@@ -3,6 +3,8 @@ import Foundation
 actor MockChatAPIClient: ChatAPIClientProtocol {
     private var sessions: [ChatSessionDTO]
     private var messagesBySession: [UUID: [ChatMessageDTO]]
+    private var askRequests: [AskRequest] = []
+    private var previewRequests: [AskContextPreviewRequest] = []
 
     init(
         sessions: [ChatSessionDTO] = MockChatAPIClient.previewSessions,
@@ -21,6 +23,7 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
     }
 
     func ask(_ payload: AskRequest) async throws -> AskResponse {
+        askRequests.append(payload)
         let now = Date()
         let session: ChatSessionDTO
 
@@ -61,17 +64,25 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
             session: session,
             userMessage: userMessage,
             assistantMessage: assistantMessage,
-            answer: assistantContent
+            answer: assistantContent,
+            retrievalDiagnostics: diagnostics(
+                mode: payload.retrievalMode,
+                memoryTopK: payload.memoryTopK,
+                minVectorScore: payload.minVectorScore,
+                includeContext: payload.includeContext
+            )
         )
     }
 
     func previewAskContext(_ payload: AskContextPreviewRequest) async throws -> AskContextPreviewResponse {
+        previewRequests.append(payload)
         guard payload.includeContext else {
             return AskContextPreviewResponse(
                 question: payload.question,
                 includeContext: false,
                 context: "",
-                contextSections: []
+                contextSections: [],
+                retrievalDiagnostics: nil
             )
         }
 
@@ -91,8 +102,22 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
             question: payload.question,
             includeContext: true,
             context: context,
-            contextSections: sections
+            contextSections: sections,
+            retrievalDiagnostics: diagnostics(
+                mode: payload.retrievalMode,
+                memoryTopK: payload.memoryTopK,
+                minVectorScore: payload.minVectorScore,
+                includeContext: true
+            )
         )
+    }
+
+    func lastAskRequest() -> AskRequest? {
+        askRequests.last
+    }
+
+    func lastPreviewRequest() -> AskContextPreviewRequest? {
+        previewRequests.last
     }
 
     func listChatSessions() async throws -> [ChatSessionDTO] {
@@ -110,6 +135,26 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
         let trimmed = question.trimmingCharacters(in: .whitespacesAndNewlines)
         guard trimmed.count > 80 else { return trimmed }
         return "\(String(trimmed.prefix(77)).trimmingCharacters(in: .whitespacesAndNewlines))..."
+    }
+
+    private func diagnostics(
+        mode: RetrievalMode,
+        memoryTopK: Int,
+        minVectorScore: Double,
+        includeContext: Bool
+    ) -> RetrievalDiagnostics? {
+        guard includeContext else { return nil }
+        let isHybrid = mode == .hybrid
+        return RetrievalDiagnostics(
+            retrievalMode: mode,
+            memoryTopK: memoryTopK,
+            minVectorScore: minVectorScore,
+            vectorAttempted: isHybrid,
+            vectorResultCount: isHybrid ? 2 : 0,
+            vectorError: nil,
+            fallbackUsed: false,
+            contextBuildMs: isHybrid ? 2.4 : 1.2
+        )
     }
 
     private static let previewSessions: [ChatSessionDTO] = {
