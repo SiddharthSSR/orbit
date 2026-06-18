@@ -334,6 +334,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(requests.first?.kind, "note")
         XCTAssertFalse(requests.first?.title.isEmpty ?? true)
         XCTAssertEqual(viewModel.suggestedActionSuccessMessage, "Saved to memory")
+        XCTAssertEqual(viewModel.pendingTabNavigation, .inbox)
         XCTAssertNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.editableSuggestedActionDraft)
         XCTAssertNil(viewModel.suggestedActionErrorMessage)
@@ -355,6 +356,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.suggestedActionSuccessMessage)
         XCTAssertEqual(viewModel.suggestedActionErrorMessage, "Expected memory API failure.")
+        XCTAssertNil(viewModel.pendingTabNavigation)
         XCTAssertFalse(viewModel.isExecutingSuggestedAction)
     }
 
@@ -381,6 +383,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(todoRequests.first?.title, "Call the dentist")
         XCTAssertTrue(memoryRequests.isEmpty, "create_todo must not create a memory")
         XCTAssertEqual(viewModel.suggestedActionSuccessMessage, "Todo created")
+        XCTAssertEqual(viewModel.pendingTabNavigation, .today)
         XCTAssertNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.editableSuggestedActionDraft)
         XCTAssertNil(viewModel.suggestedActionErrorMessage)
@@ -402,6 +405,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.suggestedActionSuccessMessage)
         XCTAssertEqual(viewModel.suggestedActionErrorMessage, "Expected todo API failure.")
+        XCTAssertNil(viewModel.pendingTabNavigation)
         XCTAssertFalse(viewModel.isExecutingSuggestedAction)
     }
 
@@ -423,6 +427,7 @@ final class AskViewModelTests: XCTestCase {
         let requests = await todoClient.recordedCreateRequests()
         XCTAssertTrue(requests.isEmpty)
         XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
+        XCTAssertNil(viewModel.pendingTabNavigation)
     }
 
     func testRepeatedExecuteDoesNotCreateDuplicateTodo() async {
@@ -500,6 +505,20 @@ final class AskViewModelTests: XCTestCase {
         viewModel.clearPendingTabNavigation()
 
         XCTAssertNil(viewModel.pendingTabNavigation)
+    }
+
+    func testUnknownActionExecutionDoesNotNavigate() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "future_action", title: "Future", subtitle: "x", payload: nil)
+        )
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        XCTAssertNil(viewModel.pendingTabNavigation)
+        XCTAssertNil(viewModel.suggestedActionSuccessMessage)
+        // Non-executable action leaves the draft preview untouched.
+        XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
     }
 
     func testExecuteSaveMemorySuccessEmitsMemoryRefreshEvent() async {
@@ -591,6 +610,7 @@ final class AskViewModelTests: XCTestCase {
 
         let requests = await memoryClient.recordedCreateRequests()
         XCTAssertTrue(requests.isEmpty)
+        XCTAssertNil(viewModel.pendingTabNavigation)
     }
 
     func testRepeatedExecuteDoesNotCreateDuplicateMemory() async throws {

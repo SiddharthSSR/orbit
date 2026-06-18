@@ -315,12 +315,16 @@ final class AskViewModel: ObservableObject {
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Saved to memory"
                 OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
+                // Open Inbox so the user sees the new memory immediately.
+                pendingTabNavigation = .inbox
             case "create_todo":
                 guard let title = draft.trimmedTodoTitle else { return }
                 _ = try await todoClient.createTodo(TodoCreateRequest(title: title))
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Todo created"
                 OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
+                // Open Today so the user sees the new todo immediately.
+                pendingTabNavigation = .today
             case "review_bills":
                 // Safe navigation only — no API call and no data mutation.
                 clearSuggestedActionPreview()
