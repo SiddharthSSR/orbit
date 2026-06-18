@@ -258,15 +258,24 @@ struct AskScreen: View {
         }
         .sheet(
             item: Binding(
-                get: { viewModel.selectedSuggestedActionDraft },
+                get: { viewModel.editableSuggestedActionDraft },
                 set: { draft in
-                    if draft == nil {
+                    if let draft {
+                        viewModel.updateEditableSuggestedActionDraft(draft)
+                    } else {
                         viewModel.dismissSuggestedActionPreview()
                     }
                 }
             )
-        ) { draft in
-            SuggestedActionPreviewSheet(draft: draft)
+        ) { presentedDraft in
+            SuggestedActionPreviewSheet(
+                draft: Binding(
+                    get: { viewModel.editableSuggestedActionDraft ?? presentedDraft },
+                    set: { updatedDraft in
+                        viewModel.updateEditableSuggestedActionDraft(updatedDraft)
+                    }
+                )
+            )
         }
     }
 
@@ -488,13 +497,13 @@ private struct ChatMessageRow: View {
 private struct SuggestedActionPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    let draft: SuggestedActionDraft
+    @Binding var draft: EditableSuggestedActionDraft
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    Label("Draft preview only — nothing will be saved yet.", systemImage: "eye")
+                    Label("Local draft only — nothing will be saved yet.", systemImage: "eye")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
@@ -517,17 +526,37 @@ private struct SuggestedActionPreviewSheet: View {
                             Text(field.label)
                                 .font(.caption.weight(.semibold))
                                 .foregroundStyle(.secondary)
-                            Text(field.value)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .textSelection(.enabled)
                             if field.futureEditable {
-                                Text("Editable in a future MVP.")
-                                    .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                TextField(
+                                    field.label,
+                                    text: fieldBinding(for: field),
+                                    axis: .vertical
+                                )
+                                .lineLimit(1...5)
+                                .textInputAutocapitalization(.sentences)
+                                if let validationError = draft.validationError {
+                                    Text(validationError)
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                }
+                            } else {
+                                Text(field.value)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
                             }
                         }
                         .padding(.vertical, 2)
                     }
+                }
+
+                Section("Validation") {
+                    Label(
+                        draft.validationStatus,
+                        systemImage: draft.isValid ? "checkmark.circle" : "exclamationmark.circle"
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(draft.isValid ? Color.secondary : Color.red)
+                    .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Section {
@@ -549,6 +578,17 @@ private struct SuggestedActionPreviewSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
+    }
+
+    private func fieldBinding(for field: SuggestedActionDraftField) -> Binding<String> {
+        Binding(
+            get: {
+                draft.fields.first(where: { $0.id == field.id })?.value ?? field.value
+            },
+            set: { value in
+                draft.updateField(id: field.id, value: value)
+            }
+        )
     }
 }
 

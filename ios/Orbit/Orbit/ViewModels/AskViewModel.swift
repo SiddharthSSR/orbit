@@ -88,6 +88,7 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var answerContextSummaries: [UUID: String] = [:]
     @Published private(set) var answerSuggestedActions: [UUID: [SuggestedActionDTO]] = [:]
     @Published private(set) var selectedSuggestedAction: SuggestedActionDTO?
+    @Published private(set) var editableSuggestedActionDraft: EditableSuggestedActionDraft?
 
     var contextConfidence: AskContextConfidence {
         Self.contextConfidence(for: contextPreview)
@@ -128,7 +129,7 @@ final class AskViewModel: ObservableObject {
     func selectSession(_ session: ChatSessionDTO) async {
         isLoading = true
         errorMessage = nil
-        selectedSuggestedAction = nil
+        clearSuggestedActionPreview()
         defer { isLoading = false }
 
         do {
@@ -210,7 +211,7 @@ final class AskViewModel: ObservableObject {
         latestRetrievalDiagnostics = nil
         answerContextSummaries = [:]
         answerSuggestedActions = [:]
-        selectedSuggestedAction = nil
+        clearSuggestedActionPreview()
         previewErrorMessage = nil
     }
 
@@ -228,7 +229,7 @@ final class AskViewModel: ObservableObject {
                 latestRetrievalDiagnostics = nil
                 answerContextSummaries = [:]
                 answerSuggestedActions = [:]
-                selectedSuggestedAction = nil
+                clearSuggestedActionPreview()
                 previewErrorMessage = nil
             }
         } catch {
@@ -253,10 +254,23 @@ final class AskViewModel: ObservableObject {
 
     func selectSuggestedAction(_ action: SuggestedActionDTO) {
         selectedSuggestedAction = action
+        editableSuggestedActionDraft = EditableSuggestedActionDraft(
+            source: SuggestedActionDraft(action: action)
+        )
+    }
+
+    func updateEditableSuggestedActionDraft(_ draft: EditableSuggestedActionDraft) {
+        guard editableSuggestedActionDraft?.id == draft.id else { return }
+        editableSuggestedActionDraft = draft
     }
 
     func dismissSuggestedActionPreview() {
+        clearSuggestedActionPreview()
+    }
+
+    private func clearSuggestedActionPreview() {
         selectedSuggestedAction = nil
+        editableSuggestedActionDraft = nil
     }
 
     private var retrievalMode: RetrievalMode {

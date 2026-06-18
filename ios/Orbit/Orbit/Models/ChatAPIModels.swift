@@ -133,7 +133,7 @@ struct SuggestedActionDraft: Identifiable, Equatable, Sendable {
         case "create_todo":
             title = "Create todo draft"
             primaryText = "Review the suggested todo title before creating it in a future MVP."
-            secondaryText = "The title will be editable when confirmation is implemented."
+            secondaryText = "You can edit the title locally before closing this preview."
             fields = [
                 SuggestedActionDraftField(
                     label: "Todo title",
@@ -148,7 +148,7 @@ struct SuggestedActionDraft: Identifiable, Equatable, Sendable {
         case "save_memory":
             title = "Save memory draft"
             primaryText = "Review the suggested memory text before saving it in a future MVP."
-            secondaryText = "The memory text will be editable when confirmation is implemented."
+            secondaryText = "You can edit the memory text locally before closing this preview."
             fields = [
                 SuggestedActionDraftField(
                     label: "Memory text",
@@ -220,6 +220,71 @@ struct SuggestedActionDraftField: Identifiable, Equatable, Sendable {
     let futureEditable: Bool
 
     var id: String { label }
+}
+
+/// Temporary editable copy used only while a suggested-action sheet is open.
+/// It has no persistence or API representation.
+struct EditableSuggestedActionDraft: Identifiable, Equatable, Sendable {
+    let source: SuggestedActionDraft
+    var fields: [SuggestedActionDraftField]
+
+    var id: String { source.id }
+    var actionType: String { source.actionType }
+    var title: String { source.title }
+    var primaryText: String { source.primaryText }
+    var secondaryText: String? { source.secondaryText }
+    var confirmationTitle: String { source.confirmationTitle }
+    var isReadOnly: Bool { fields.allSatisfy { !$0.futureEditable } }
+
+    init(source: SuggestedActionDraft) {
+        self.source = source
+        self.fields = source.fields
+    }
+
+    var isValid: Bool {
+        validationError == nil
+    }
+
+    var validationError: String? {
+        switch actionType {
+        case "create_todo":
+            requiredEditableValue == nil ? "Title is required." : nil
+        case "save_memory":
+            requiredEditableValue == nil ? "Memory text is required." : nil
+        case "review_bills":
+            nil
+        default:
+            nil
+        }
+    }
+
+    var validationStatus: String {
+        if !isValid {
+            return "Fix required fields before this can be saved in a future MVP."
+        }
+        if actionType == "unknown" || !Self.supportedActionTypes.contains(actionType) {
+            return "Draft is valid for preview, but this action type is not executable."
+        }
+        return "Draft looks valid. Execution coming soon."
+    }
+
+    mutating func updateField(id: String, value: String) {
+        guard let index = fields.firstIndex(where: { $0.id == id }),
+              fields[index].futureEditable else {
+            return
+        }
+        fields[index] = SuggestedActionDraftField(
+            label: fields[index].label,
+            value: value,
+            futureEditable: true
+        )
+    }
+
+    private var requiredEditableValue: String? {
+        fields.first(where: \.futureEditable)?.value.trimmedNonEmpty
+    }
+
+    private static let supportedActionTypes = ["review_bills", "create_todo", "save_memory"]
 }
 
 private extension String {

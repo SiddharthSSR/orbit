@@ -90,9 +90,11 @@ final class AskViewModelTests: XCTestCase {
 
         XCTAssertEqual(viewModel.selectedSuggestedAction, action)
         XCTAssertEqual(viewModel.selectedSuggestedActionDraft, SuggestedActionDraft(action: action))
+        XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
         viewModel.dismissSuggestedActionPreview()
         XCTAssertNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.selectedSuggestedActionDraft)
+        XCTAssertNil(viewModel.editableSuggestedActionDraft)
     }
 
     func testCreateTodoActionMapsToTodoDraft() {
@@ -167,17 +169,85 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(draft.primaryText.contains("future confirmation"))
     }
 
-    func testDraftPreviewSelectionDoesNotMakeAPIRequests() async {
+    func testCreateTodoDraftIsInvalidWhenTitleIsEmpty() {
+        var draft = makeEditableDraft(type: "create_todo", value: "Call the dentist")
+
+        draft.updateField(id: "Todo title", value: "  \n ")
+
+        XCTAssertFalse(draft.isValid)
+        XCTAssertEqual(draft.validationError, "Title is required.")
+        XCTAssertEqual(
+            draft.validationStatus,
+            "Fix required fields before this can be saved in a future MVP."
+        )
+    }
+
+    func testCreateTodoDraftIsValidWhenTitleIsNonEmpty() {
+        let draft = makeEditableDraft(type: "create_todo", value: "Call the dentist")
+
+        XCTAssertTrue(draft.isValid)
+        XCTAssertNil(draft.validationError)
+        XCTAssertEqual(draft.validationStatus, "Draft looks valid. Execution coming soon.")
+    }
+
+    func testSaveMemoryDraftIsInvalidWhenTextIsEmpty() {
+        var draft = makeEditableDraft(type: "save_memory", value: "I like quiet cafes")
+
+        draft.updateField(id: "Memory text", value: "   ")
+
+        XCTAssertFalse(draft.isValid)
+        XCTAssertEqual(draft.validationError, "Memory text is required.")
+    }
+
+    func testSaveMemoryDraftIsValidWhenTextIsNonEmpty() {
+        let draft = makeEditableDraft(type: "save_memory", value: "I like quiet cafes")
+
+        XCTAssertTrue(draft.isValid)
+        XCTAssertNil(draft.validationError)
+    }
+
+    func testReviewBillsDraftIsReadOnlyAndValid() {
+        var draft = EditableSuggestedActionDraft(
+            source: SuggestedActionDraft(
+                action: makeSuggestedAction(
+                    type: "review_bills",
+                    title: "Review bills",
+                    subtitle: "Upcoming payments",
+                    payload: nil
+                )
+            )
+        )
+        let originalFields = draft.fields
+
+        draft.updateField(id: "Scope", value: "Attempted change")
+
+        XCTAssertTrue(draft.isReadOnly)
+        XCTAssertTrue(draft.isValid)
+        XCTAssertNil(draft.validationError)
+        XCTAssertEqual(draft.fields, originalFields)
+    }
+
+    func testLocalDraftEditsDoNotChangeSourceOrMakeAPIRequests() async throws {
         let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
         let viewModel = makeViewModel(client)
+        let action = makeSuggestedAction(
+            type: "save_memory",
+            title: "Save to memory",
+            subtitle: "I like quiet cafes",
+            payload: nil
+        )
 
-        viewModel.selectSuggestedAction(makeSuggestedAction())
-        _ = viewModel.selectedSuggestedActionDraft
-        viewModel.dismissSuggestedActionPreview()
+        viewModel.selectSuggestedAction(action)
+        var editedDraft = try XCTUnwrap(viewModel.editableSuggestedActionDraft)
+        editedDraft.updateField(id: "Memory text", value: "Edited only in this sheet")
+        viewModel.updateEditableSuggestedActionDraft(editedDraft)
 
         let askRequest = await client.lastAskRequest()
         let previewRequest = await client.lastPreviewRequest()
         let deletedSessions = await client.deletedSessions()
+        XCTAssertEqual(viewModel.editableSuggestedActionDraft?.fields.first?.value, "Edited only in this sheet")
+        XCTAssertEqual(viewModel.selectedSuggestedAction, action)
+        XCTAssertEqual(viewModel.selectedSuggestedActionDraft?.fields.first?.value, "I like quiet cafes")
         XCTAssertNil(askRequest)
         XCTAssertNil(previewRequest)
         XCTAssertTrue(deletedSessions.isEmpty)
@@ -263,6 +333,7 @@ final class AskViewModelTests: XCTestCase {
 
         XCTAssertNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.selectedSuggestedActionDraft)
+        XCTAssertNil(viewModel.editableSuggestedActionDraft)
     }
 
     func testStartNewSessionClearsSelectionAndMessages() async {
@@ -290,6 +361,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.answerContextSummaries.isEmpty)
         XCTAssertTrue(viewModel.answerSuggestedActions.isEmpty)
         XCTAssertNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.editableSuggestedActionDraft)
         XCTAssertTrue(viewModel.useHybridRetrieval)
         XCTAssertFalse(viewModel.includeContext)
     }
@@ -345,6 +417,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.sessions.isEmpty)
         XCTAssertNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.selectedSuggestedActionDraft)
+        XCTAssertNil(viewModel.editableSuggestedActionDraft)
         XCTAssertNil(viewModel.errorMessage)
     }
 
@@ -386,6 +459,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.selectedSession)
         XCTAssertTrue(viewModel.messages.isEmpty)
         XCTAssertNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.editableSuggestedActionDraft)
     }
 
     func testDeleteSessionSetsErrorMessageOnFailure() async {
@@ -702,6 +776,27 @@ final class AskViewModelTests: XCTestCase {
             subtitle: subtitle,
             payload: payload
         )
+    }
+
+    private func makeEditableDraft(type: String, value: String) -> EditableSuggestedActionDraft {
+        let action: SuggestedActionDTO
+        switch type {
+        case "save_memory":
+            action = makeSuggestedAction(
+                type: type,
+                title: "Save to memory",
+                subtitle: value,
+                payload: nil
+            )
+        default:
+            action = makeSuggestedAction(
+                type: type,
+                title: "Create a todo",
+                subtitle: value,
+                payload: nil
+            )
+        }
+        return EditableSuggestedActionDraft(source: SuggestedActionDraft(action: action))
     }
 }
 
