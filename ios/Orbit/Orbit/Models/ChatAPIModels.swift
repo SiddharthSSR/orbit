@@ -58,6 +58,49 @@ struct SuggestedActionDTO: Decodable, Identifiable, Hashable, Sendable {
     var title: String
     var subtitle: String?
     var payload: [String: String]?
+
+    var previewTitle: String {
+        switch type {
+        case "review_bills":
+            "Review bills"
+        case "create_todo":
+            "Create todo"
+        case "save_memory":
+            "Save to memory"
+        default:
+            title.isEmpty ? "Suggested action" : title
+        }
+    }
+
+    var typeLabel: String {
+        switch type {
+        case "review_bills":
+            "Review bills"
+        case "create_todo":
+            "Create todo"
+        case "save_memory":
+            "Save to memory"
+        default:
+            "Suggested action"
+        }
+    }
+
+    var previewDescription: String {
+        switch type {
+        case "review_bills":
+            "A future version would take you to Bills to review overdue and upcoming payments."
+        case "create_todo":
+            "A future version would prepare a todo draft for you to review before creating it."
+        case "save_memory":
+            "A future version would prepare a memory draft for you to review before saving it."
+        default:
+            "A future version would prepare this suggested action for your review."
+        }
+    }
+
+    var sortedPayload: [(key: String, value: String)] {
+        (payload ?? [:]).sorted { $0.key.localizedCaseInsensitiveCompare($1.key) == .orderedAscending }
+    }
 }
 
 struct AskRequest: Encodable, Sendable {

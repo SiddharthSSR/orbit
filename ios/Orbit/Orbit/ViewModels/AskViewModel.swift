@@ -87,6 +87,7 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var latestRetrievalDiagnostics: RetrievalDiagnostics?
     @Published private(set) var answerContextSummaries: [UUID: String] = [:]
     @Published private(set) var answerSuggestedActions: [UUID: [SuggestedActionDTO]] = [:]
+    @Published private(set) var selectedSuggestedAction: SuggestedActionDTO?
 
     var contextConfidence: AskContextConfidence {
         Self.contextConfidence(for: contextPreview)
@@ -130,6 +131,7 @@ final class AskViewModel: ObservableObject {
             messages = try await apiClient.listMessages(sessionId: session.id)
             answerContextSummaries = [:]
             answerSuggestedActions = [:]
+            selectedSuggestedAction = nil
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -204,6 +206,7 @@ final class AskViewModel: ObservableObject {
         latestRetrievalDiagnostics = nil
         answerContextSummaries = [:]
         answerSuggestedActions = [:]
+        selectedSuggestedAction = nil
         previewErrorMessage = nil
     }
 
@@ -221,6 +224,7 @@ final class AskViewModel: ObservableObject {
                 latestRetrievalDiagnostics = nil
                 answerContextSummaries = [:]
                 answerSuggestedActions = [:]
+                selectedSuggestedAction = nil
                 previewErrorMessage = nil
             }
         } catch {
@@ -241,6 +245,14 @@ final class AskViewModel: ObservableObject {
     func suggestedActions(for message: ChatMessageDTO) -> [SuggestedActionDTO] {
         guard message.role == "assistant" else { return [] }
         return answerSuggestedActions[message.id, default: []]
+    }
+
+    func selectSuggestedAction(_ action: SuggestedActionDTO) {
+        selectedSuggestedAction = action
+    }
+
+    func dismissSuggestedActionPreview() {
+        selectedSuggestedAction = nil
     }
 
     private var retrievalMode: RetrievalMode {

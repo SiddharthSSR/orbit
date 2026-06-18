@@ -153,7 +153,8 @@ struct AskScreen: View {
                         ChatMessageRow(
                             message: message,
                             contextSummary: viewModel.contextSummary(for: message),
-                            suggestedActions: viewModel.suggestedActions(for: message)
+                            suggestedActions: viewModel.suggestedActions(for: message),
+                            onSuggestedActionTapped: viewModel.selectSuggestedAction
                         )
                     }
                 }
@@ -254,6 +255,18 @@ struct AskScreen: View {
         }
         .task {
             await viewModel.loadSessions()
+        }
+        .sheet(
+            item: Binding(
+                get: { viewModel.selectedSuggestedAction },
+                set: { action in
+                    if action == nil {
+                        viewModel.dismissSuggestedActionPreview()
+                    }
+                }
+            )
+        ) { action in
+            SuggestedActionPreviewSheet(action: action)
         }
     }
 
@@ -373,7 +386,7 @@ private struct ChatMessageRow: View {
     let message: ChatMessageDTO
     let contextSummary: String?
     let suggestedActions: [SuggestedActionDTO]
-    @State private var selectedSuggestedAction: SuggestedActionDTO?
+    let onSuggestedActionTapped: (SuggestedActionDTO) -> Void
 
     var body: some View {
         bubble
@@ -403,7 +416,7 @@ private struct ChatMessageRow: View {
                     FlowLayout(spacing: 6) {
                         ForEach(suggestedActions) { action in
                             Button {
-                                selectedSuggestedAction = action
+                                onSuggestedActionTapped(action)
                             } label: {
                                 Label(action.title, systemImage: actionIcon(for: action))
                                     .font(.caption.weight(.medium))
@@ -424,13 +437,6 @@ private struct ChatMessageRow: View {
                 .stroke(isAssistant ? Color(.separator).opacity(0.4) : Color.accentColor.opacity(0.18))
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-        .alert(item: $selectedSuggestedAction) { action in
-            Alert(
-                title: Text(action.title),
-                message: Text("Action execution is coming soon. Nothing was changed."),
-                dismissButton: .default(Text("OK"))
-            )
-        }
     }
 
     @ViewBuilder
@@ -476,6 +482,67 @@ private struct ChatMessageRow: View {
         default:
             "sparkles"
         }
+    }
+}
+
+private struct SuggestedActionPreviewSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    let action: SuggestedActionDTO
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Label("Preview only — nothing will be changed yet.", systemImage: "eye")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Action") {
+                    LabeledContent("Type", value: action.typeLabel)
+                    if let subtitle = action.subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("What this would do") {
+                    Text(action.previewDescription)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if !action.sortedPayload.isEmpty {
+                    Section("Draft details") {
+                        ForEach(action.sortedPayload, id: \.key) { item in
+                            LabeledContent(payloadLabel(item.key), value: item.value)
+                        }
+                    }
+                }
+
+                Section {
+                    Button("Execution coming soon") {}
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderedProminent)
+                        .disabled(true)
+                }
+                .listRowBackground(Color.clear)
+            }
+            .navigationTitle(action.previewTitle)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    private func payloadLabel(_ key: String) -> String {
+        key.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
 

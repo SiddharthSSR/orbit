@@ -82,6 +82,25 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.suggestedActions(for: viewModel.messages[1]).map(\.type), ["review_bills"])
     }
 
+    func testSelectingAndDismissingSuggestedActionUpdatesPreviewState() {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let action = makeSuggestedAction(type: "review_bills", title: "Review bills")
+
+        viewModel.selectSuggestedAction(action)
+
+        XCTAssertEqual(viewModel.selectedSuggestedAction, action)
+        viewModel.dismissSuggestedActionPreview()
+        XCTAssertNil(viewModel.selectedSuggestedAction)
+    }
+
+    func testUnknownSuggestedActionUsesGenericPreviewCopy() {
+        let action = makeSuggestedAction(type: "future_action", title: "Future action")
+
+        XCTAssertEqual(action.typeLabel, "Suggested action")
+        XCTAssertEqual(action.previewTitle, "Future action")
+        XCTAssertTrue(action.previewDescription.contains("suggested action"))
+    }
+
     func testSendQuestionClearsDraft() async {
         let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "How are my projects going?"
@@ -156,6 +175,7 @@ final class AskViewModelTests: XCTestCase {
         viewModel.draftQuestion = "Draft"
         viewModel.useHybridRetrieval = true
         viewModel.includeContext = false
+        viewModel.selectSuggestedAction(makeSuggestedAction())
         viewModel.startNewSession()
 
         XCTAssertNil(viewModel.selectedSession)
@@ -166,6 +186,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.latestRetrievalDiagnostics)
         XCTAssertTrue(viewModel.answerContextSummaries.isEmpty)
         XCTAssertTrue(viewModel.answerSuggestedActions.isEmpty)
+        XCTAssertNil(viewModel.selectedSuggestedAction)
         XCTAssertTrue(viewModel.useHybridRetrieval)
         XCTAssertFalse(viewModel.includeContext)
     }
@@ -250,6 +271,7 @@ final class AskViewModelTests: XCTestCase {
         )
         let viewModel = makeViewModel(client)
         await viewModel.selectSession(session)
+        viewModel.selectSuggestedAction(makeSuggestedAction())
 
         await viewModel.clearCurrentSession()
 
@@ -257,6 +279,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(deleted, [session.id])
         XCTAssertNil(viewModel.selectedSession)
         XCTAssertTrue(viewModel.messages.isEmpty)
+        XCTAssertNil(viewModel.selectedSuggestedAction)
     }
 
     func testDeleteSessionSetsErrorMessageOnFailure() async {
@@ -557,6 +580,19 @@ final class AskViewModelTests: XCTestCase {
             role: role,
             content: content,
             createdAt: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+    }
+
+    private func makeSuggestedAction(
+        type: String = "create_todo",
+        title: String = "Create a todo"
+    ) -> SuggestedActionDTO {
+        SuggestedActionDTO(
+            id: type,
+            type: type,
+            title: title,
+            subtitle: "Preview details",
+            payload: ["draft_title": "Follow up"]
         )
     }
 }
