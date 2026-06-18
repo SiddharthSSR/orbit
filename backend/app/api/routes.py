@@ -16,15 +16,21 @@ from app.models.chat import (
     ChatSessionCreate,
     ChatSessionRead,
 )
-from app.models.memory import MemoryCreate, MemoryRead, MemoryUpdate
-from app.models.embedding import MemoryEmbeddingReindexResponse, MemorySearchResultRead
+from app.models.embedding import (
+    MemoryEmbeddingFailedItemRead,
+    MemoryEmbeddingReindexResponse,
+    MemoryEmbeddingRetryResponse,
+    MemoryEmbeddingStatusResponse,
+    MemorySearchResultRead,
+)
+from app.models.memory import MemoryCreate, MemoryRead, MemoryRecord, MemoryUpdate
 from app.models.mood import MoodCreate, MoodRead, MoodUpdate
 from app.models.project import ProjectCreate, ProjectRead, ProjectUpdate
 from app.models.todo import TodoCreate, TodoRead, TodoUpdate
 from app.repositories.bill_repository import BillRepository
 from app.repositories.chat_repository import ChatRepository
-from app.repositories.memory_item_repository import MemoryItemRepository
 from app.repositories.memory_embedding_repository import MemoryEmbeddingRepository
+from app.repositories.memory_item_repository import MemoryItemRepository
 from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
@@ -34,8 +40,12 @@ from app.services.embedding_provider import (
     EmbeddingProvider,
     EmbeddingProviderConfigurationError,
     build_embedding_provider,
+    configured_embedding_provider_identity,
 )
-from app.services.memory_retrieval import MemoryRetrievalService
+from app.services.memory_retrieval import (
+    MemoryRetrievalService,
+    memory_content_hash,
+)
 
 router = APIRouter()
 
@@ -52,6 +62,23 @@ def get_embedding_provider() -> EmbeddingProvider:
         return build_embedding_provider(settings)
     except EmbeddingProviderConfigurationError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+def _auto_index_memory_item(session: Session, memory_item: MemoryRecord) -> None:
+    try:
+        embedding_provider = build_embedding_provider(settings)
+    except Exception as exc:
+        provider, model = configured_embedding_provider_identity(settings)
+        error_message = str(exc).strip() or exc.__class__.__name__
+        MemoryEmbeddingRepository(session).mark_failed(
+            memory_item_id=memory_item.id,
+            provider=provider,
+            model=model,
+            content_hash=memory_content_hash(memory_item),
+            error_message=error_message,
+        )
+        return
+    MemoryRetrievalService(session, embedding_provider).index_memory_item(memory_item)
 
 
 def _chat_title_from_question(question: str) -> str:
@@ -155,11 +182,10 @@ def list_memory_items(
 def create_memory_item(
     item: MemoryCreate,
     session: Session = Depends(get_session),
-    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
 ) -> MemoryRead:
     memory_item = MemoryItemRepository(session).create(item)
     if not memory_item.is_archived:
-        MemoryRetrievalService(session, embedding_provider).index_memory_item(memory_item)
+        _auto_index_memory_item(session, memory_item)
     return memory_item
 
 
@@ -174,7 +200,7 @@ def reindex_memory_embeddings(
 ) -> MemoryEmbeddingReindexResponse:
     indexed = MemoryRetrievalService(session, embedding_provider).index_all_memory_items()
     return MemoryEmbeddingReindexResponse(
-        indexed_count=len(indexed),
+        indexed_count=sum(record.status == "indexed" for record in indexed),
         provider=embedding_provider.provider_name,
         model=embedding_provider.model,
     )
@@ -202,6 +228,75 @@ def search_memory_embeddings(
     ]
 
 
+@router.get(
+    "/memory/embeddings/status",
+    response_model=MemoryEmbeddingStatusResponse,
+    tags=["memory-dev"],
+)
+def memory_embedding_status(
+    session: Session = Depends(get_session),
+) -> MemoryEmbeddingStatusResponse:
+    provider, model = configured_embedding_provider_identity(settings)
+    embedding_repository = MemoryEmbeddingRepository(session)
+    indexed_count = 0
+    failed_count = 0
+    stale_count = 0
+    missing_count = 0
+    failed_items: list[MemoryEmbeddingFailedItemRead] = []
+
+    for memory_item in MemoryItemRepository(session).list():
+        record = embedding_repository.get(
+            memory_item_id=memory_item.id,
+            provider=provider,
+            model=model,
+        )
+        if record is None:
+            missing_count += 1
+        elif record.status == "failed":
+            failed_count += 1
+            failed_items.append(
+                MemoryEmbeddingFailedItemRead(
+                    memory_item_id=memory_item.id,
+                    title=memory_item.title,
+                    error_message=record.error_message,
+                )
+            )
+        elif record.status == "stale" or record.content_hash != memory_content_hash(memory_item):
+            stale_count += 1
+        elif record.status == "indexed":
+            indexed_count += 1
+
+    return MemoryEmbeddingStatusResponse(
+        provider=provider,
+        model=model,
+        indexed_count=indexed_count,
+        failed_count=failed_count,
+        stale_count=stale_count,
+        missing_count=missing_count,
+        failed_items=failed_items,
+    )
+
+
+@router.post(
+    "/memory/embeddings/retry-failed",
+    response_model=MemoryEmbeddingRetryResponse,
+    tags=["memory-dev"],
+)
+def retry_failed_memory_embeddings(
+    session: Session = Depends(get_session),
+    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
+) -> MemoryEmbeddingRetryResponse:
+    results = MemoryRetrievalService(
+        session,
+        embedding_provider,
+    ).retry_incomplete_memory_items()
+    return MemoryEmbeddingRetryResponse(
+        retried=len(results),
+        indexed=sum(record.status == "indexed" for record in results),
+        failed=sum(record.status == "failed" for record in results),
+    )
+
+
 @router.get("/memory/{memory_id}", response_model=MemoryRead, tags=["memory"])
 def get_memory_item(memory_id: UUID, session: Session = Depends(get_session)) -> MemoryRead:
     memory_item = MemoryItemRepository(session).get(memory_id)
@@ -215,7 +310,6 @@ def update_memory_item(
     memory_id: UUID,
     payload: MemoryUpdate,
     session: Session = Depends(get_session),
-    embedding_provider: EmbeddingProvider = Depends(get_embedding_provider),
 ) -> MemoryRead:
     memory_repository = MemoryItemRepository(session)
     memory_item = memory_repository.get(memory_id)
@@ -225,7 +319,7 @@ def update_memory_item(
     if updated_memory_item.is_archived:
         MemoryEmbeddingRepository(session).delete_for_memory_item(updated_memory_item.id)
     else:
-        MemoryRetrievalService(session, embedding_provider).index_memory_item(updated_memory_item)
+        _auto_index_memory_item(session, updated_memory_item)
     return updated_memory_item
 
 

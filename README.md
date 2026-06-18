@@ -134,6 +134,8 @@ Memory CRUD endpoints:
 Memory embedding development endpoints:
 
 - `POST /memory/embeddings/reindex`
+- `POST /memory/embeddings/retry-failed`
+- `GET /memory/embeddings/status`
 - `GET /memory/search?query=AI&top_k=5&min_score=0`
 
 Mood CRUD endpoints:
@@ -178,7 +180,16 @@ curl --get http://127.0.0.1:8000/memory/search \
   --data-urlencode 'top_k=5'
 ```
 
-Memory embeddings are maintained automatically for API mutations: active items are indexed after creation, content changes refresh the configured provider's embedding, archiving removes all embeddings for the item, and deletion cleans embeddings before removing the memory row. Non-content updates reuse the existing content hash and do not create duplicate embeddings. `POST /memory/embeddings/reindex` remains available for backfills and local repair; it skips provider work for current hashes and removes embeddings from archived items.
+Memory embeddings are maintained automatically for API mutations: active items are indexed after creation, content changes refresh the configured provider's embedding, archiving removes all embeddings for the item, and deletion cleans embeddings before removing the memory row. Non-content updates reuse the existing content hash and do not create duplicate embeddings. Automatic indexing is best-effort: memory create/update still succeeds if provider construction or embedding generation fails, and the embedding row records `failed` status, the error, and the attempt time. Each attempt is durably marked `stale` before provider work and transitions to `indexed` or `failed`; search uses only current `indexed` rows.
+
+Inspect embedding health and retry incomplete active items locally:
+
+```bash
+curl http://127.0.0.1:8000/memory/embeddings/status
+curl -X POST http://127.0.0.1:8000/memory/embeddings/retry-failed
+```
+
+The status response reports indexed, failed, stale, and missing counts for the configured provider/model, plus failed item details. Retry processes failed, stale, missing, and hash-mismatched active items. `POST /memory/embeddings/reindex` remains available for full backfills and local repair; it skips provider work for current hashes and removes embeddings from archived items.
 
 Search embeds the query and compares it only with current, non-archived embeddings for the active provider/model. Results must have `score > min_score`; the default `min_score=0` excludes zero-score results. Use a negative value for debugging when zero-score candidates are useful:
 
@@ -197,7 +208,7 @@ export OPENAI_API_KEY=<your-openai-api-key>
 export ORBIT_OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-The OpenAI embedding client is constructed only for explicit embedding endpoint requests when `ORBIT_EMBEDDING_PROVIDER=openai`. Missing credentials produce a configuration error. Tests and CI remain mock-only and make no external embedding calls.
+The OpenAI embedding client is constructed only when embedding work is requested and `ORBIT_EMBEDDING_PROVIDER=openai`. During automatic memory mutations, missing credentials or provider failures are recorded without failing the memory response. Explicit search, reindex, and retry requests still return a configuration error when the configured provider cannot be constructed. Tests and CI remain mock-only and make no external embedding calls.
 
 To enable the experimental OpenAI-backed provider locally, set environment variables before starting the backend:
 

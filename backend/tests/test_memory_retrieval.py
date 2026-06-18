@@ -84,12 +84,65 @@ def test_index_all_memory_items_creates_embeddings() -> None:
         indexed = service.index_all_memory_items()
 
         assert len(indexed) == 2
+        assert all(record.status == "indexed" for record in indexed)
+        assert all(record.error_message is None for record in indexed)
+        assert all(record.last_attempted_at is not None for record in indexed)
+        assert all(record.indexed_at is not None for record in indexed)
         assert len(
             MemoryEmbeddingRepository(session).list_for_provider_model(
                 provider=provider.provider_name,
                 model=provider.model,
             )
         ) == 2
+    engine.dispose()
+
+
+def test_provider_failure_is_stored_and_search_ignores_failed_embedding() -> None:
+    engine, session_local = make_retrieval_test_session()
+    with session_local() as session:
+        memory_item = MemoryItemRepository(session).create(
+            MemoryCreate(title="AI notes", body="Agent retrieval", tags=["ai"])
+        )
+        failing_service = MemoryRetrievalService(session, FailingMockEmbeddingProvider())
+
+        failed = failing_service.index_memory_item(memory_item)
+        results = MemoryRetrievalService(
+            session,
+            MockEmbeddingProvider(),
+        ).search("AI")
+
+        assert failed.status == "failed"
+        assert failed.error_message == "mock embedding outage"
+        assert failed.last_attempted_at is not None
+        assert results == []
+    engine.dispose()
+
+
+def test_search_ignores_stale_embedding() -> None:
+    engine, session_local = make_retrieval_test_session()
+    with session_local() as session:
+        memory_item = MemoryItemRepository(session).create(
+            MemoryCreate(title="AI notes", body="Agent retrieval", tags=["ai"])
+        )
+        provider = MockEmbeddingProvider()
+        service = MemoryRetrievalService(session, provider)
+        service.index_memory_item(memory_item)
+        MemoryEmbeddingRepository(session).mark_stale(
+            memory_item_id=memory_item.id,
+            provider=provider.provider_name,
+            model=provider.model,
+            content_hash=memory_content_hash(memory_item),
+        )
+        stale = MemoryEmbeddingRepository(session).get(
+            memory_item_id=memory_item.id,
+            provider=provider.provider_name,
+            model=provider.model,
+        )
+
+        assert stale is not None
+        assert stale.status == "stale"
+        assert stale.last_attempted_at is not None
+        assert service.search("AI") == []
     engine.dispose()
 
 
@@ -163,3 +216,11 @@ def make_retrieval_test_session():
         tables=[MemoryRecord.__table__, MemoryEmbeddingRecord.__table__],
     )
     return engine, sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+class FailingMockEmbeddingProvider:
+    provider_name = "mock"
+    model = "mock-token-hash-v1-64d"
+
+    def embed(self, text: str) -> list[float]:
+        raise RuntimeError("mock embedding outage")

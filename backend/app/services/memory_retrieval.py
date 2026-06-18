@@ -61,17 +61,38 @@ class MemoryRetrievalService:
             provider=self.provider.provider_name,
             model=self.provider.model,
         )
-        if existing is not None and existing.content_hash == content_hash:
+        if (
+            existing is not None
+            and existing.status == "indexed"
+            and existing.content_hash == content_hash
+        ):
             return existing
 
-        embedding = self.provider.embed(memory_text(memory_item))
-        return self.embedding_repository.upsert(
+        self.embedding_repository.mark_stale(
             memory_item_id=memory_item.id,
             provider=self.provider.provider_name,
             model=self.provider.model,
-            embedding=embedding,
             content_hash=content_hash,
         )
+        try:
+            embedding = self.provider.embed(memory_text(memory_item))
+        except Exception as exc:
+            error_message = str(exc).strip() or exc.__class__.__name__
+            return self.embedding_repository.mark_failed(
+                memory_item_id=memory_item.id,
+                provider=self.provider.provider_name,
+                model=self.provider.model,
+                content_hash=content_hash,
+                error_message=error_message,
+            )
+        else:
+            return self.embedding_repository.upsert(
+                memory_item_id=memory_item.id,
+                provider=self.provider.provider_name,
+                model=self.provider.model,
+                embedding=embedding,
+                content_hash=content_hash,
+            )
 
     def index_all_memory_items(self) -> list[MemoryEmbeddingRecord]:
         indexed: list[MemoryEmbeddingRecord] = []
@@ -81,6 +102,23 @@ class MemoryRetrievalService:
             else:
                 indexed.append(self.index_memory_item(memory_item))
         return indexed
+
+    def retry_incomplete_memory_items(self) -> list[MemoryEmbeddingRecord]:
+        retried: list[MemoryEmbeddingRecord] = []
+        for memory_item in self.memory_repository.list():
+            content_hash = memory_content_hash(memory_item)
+            existing = self.embedding_repository.get(
+                memory_item_id=memory_item.id,
+                provider=self.provider.provider_name,
+                model=self.provider.model,
+            )
+            if (
+                existing is None
+                or existing.status in {"failed", "stale"}
+                or existing.content_hash != content_hash
+            ):
+                retried.append(self.index_memory_item(memory_item))
+        return retried
 
     def search(
         self,
@@ -102,6 +140,8 @@ class MemoryRetrievalService:
         ):
             memory_item = self.memory_repository.get(embedding_record.memory_item_id)
             if memory_item is None or memory_item.is_archived:
+                continue
+            if embedding_record.status != "indexed":
                 continue
             if embedding_record.content_hash != memory_content_hash(memory_item):
                 continue

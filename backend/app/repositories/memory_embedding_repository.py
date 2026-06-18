@@ -20,6 +20,7 @@ class MemoryEmbeddingRepository:
         embedding: list[float],
         content_hash: str,
     ) -> MemoryEmbeddingRecord:
+        now = utc_now()
         record = self.get(memory_item_id=memory_item_id, provider=provider, model=model)
         if record is None:
             record = MemoryEmbeddingRecord(
@@ -30,8 +31,71 @@ class MemoryEmbeddingRepository:
             )
         else:
             record.content_hash = content_hash
-            record.updated_at = utc_now()
+            record.updated_at = now
         record.embedding = embedding
+        record.status = "indexed"
+        record.error_message = None
+        record.last_attempted_at = now
+        record.indexed_at = now
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        return record
+
+    def mark_stale(
+        self,
+        *,
+        memory_item_id: UUID | str,
+        provider: str,
+        model: str,
+        content_hash: str,
+    ) -> MemoryEmbeddingRecord:
+        now = utc_now()
+        record = self.get(memory_item_id=memory_item_id, provider=provider, model=model)
+        if record is None:
+            record = MemoryEmbeddingRecord(
+                memory_item_id=str(memory_item_id),
+                provider=provider,
+                model=model,
+                embedding_json="[]",
+                content_hash=content_hash,
+            )
+        else:
+            record.content_hash = content_hash
+            record.updated_at = now
+        record.status = "stale"
+        record.error_message = None
+        record.last_attempted_at = now
+        self.session.add(record)
+        self.session.commit()
+        self.session.refresh(record)
+        return record
+
+    def mark_failed(
+        self,
+        *,
+        memory_item_id: UUID | str,
+        provider: str,
+        model: str,
+        content_hash: str,
+        error_message: str,
+    ) -> MemoryEmbeddingRecord:
+        now = utc_now()
+        record = self.get(memory_item_id=memory_item_id, provider=provider, model=model)
+        if record is None:
+            record = MemoryEmbeddingRecord(
+                memory_item_id=str(memory_item_id),
+                provider=provider,
+                model=model,
+                embedding_json="[]",
+                content_hash=content_hash,
+            )
+        else:
+            record.content_hash = content_hash
+            record.updated_at = now
+        record.status = "failed"
+        record.error_message = error_message
+        record.last_attempted_at = now
         self.session.add(record)
         self.session.commit()
         self.session.refresh(record)

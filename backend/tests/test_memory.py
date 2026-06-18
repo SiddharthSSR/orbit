@@ -1,7 +1,8 @@
 from uuid import uuid4
 
-from app.repositories.memory_embedding_repository import MemoryEmbeddingRepository
+import app.api.routes as routes
 from app.core.config import settings
+from app.repositories.memory_embedding_repository import MemoryEmbeddingRepository
 from app.services.embedding_provider import MockEmbeddingProvider
 
 
@@ -231,6 +232,8 @@ def test_update_content_refreshes_hash_and_embedding_without_duplicate(client, d
     assert response.status_code == 200
     assert updated is not None
     assert updated.id == original_id
+    assert updated.status == "indexed"
+    assert updated.error_message is None
     assert updated.content_hash != original_hash
     assert updated.embedding != original_embedding
     assert len(
@@ -322,19 +325,67 @@ def test_search_tracks_memory_create_update_and_delete_without_reindex(client) -
     assert after_delete == []
 
 
-def test_memory_create_returns_clear_error_when_embedding_provider_is_misconfigured(
+def test_memory_create_tracks_failure_when_embedding_provider_is_misconfigured(
     client,
+    db_session,
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(settings, "embedding_provider", "openai")
     monkeypatch.setattr(settings, "openai_api_key", None)
 
     response = client.post("/memory", json={"title": "AI Note", "body": "Not persisted"})
+    created = response.json()
+    record = MemoryEmbeddingRepository(db_session).get(
+        memory_item_id=created["id"],
+        provider="openai",
+        model=settings.openai_embedding_model,
+    )
 
-    assert response.status_code == 500
-    assert response.json()["detail"] == (
+    assert response.status_code == 201
+    assert record is not None
+    assert record.status == "failed"
+    assert record.error_message == (
         "OPENAI_API_KEY is required when ORBIT_EMBEDDING_PROVIDER=openai"
     )
+
+
+def test_status_and_retry_endpoints_repair_failed_mock_embedding(
+    client,
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        routes,
+        "build_embedding_provider",
+        lambda _settings: FailingMockEmbeddingProvider(),
+    )
+    created_response = client.post(
+        "/memory",
+        json={"title": "AI Notes", "body": "Agent retrieval", "tags": ["ai"]},
+    )
+    failed_status = client.get("/memory/embeddings/status")
+
+    monkeypatch.setattr(
+        routes,
+        "build_embedding_provider",
+        lambda _settings: MockEmbeddingProvider(),
+    )
+    failed_search = client.get("/memory/search", params={"query": "AI"})
+    retry_response = client.post("/memory/embeddings/retry-failed")
+    repaired_status = client.get("/memory/embeddings/status")
+    repaired_search = client.get("/memory/search", params={"query": "AI"})
+
+    assert created_response.status_code == 201
+    assert failed_status.json()["indexed_count"] == 0
+    assert failed_status.json()["failed_count"] == 1
+    assert failed_status.json()["stale_count"] == 0
+    assert failed_status.json()["missing_count"] == 0
+    assert failed_status.json()["failed_items"][0]["title"] == "AI Notes"
+    assert failed_status.json()["failed_items"][0]["error_message"] == "mock embedding outage"
+    assert failed_search.json() == []
+    assert retry_response.json() == {"retried": 1, "indexed": 1, "failed": 0}
+    assert repaired_status.json()["indexed_count"] == 1
+    assert repaired_status.json()["failed_count"] == 0
+    assert repaired_search.json()[0]["memory_item"]["title"] == "AI Notes"
 
 
 def test_memory_validation_fails_for_blank_title_or_body(client) -> None:
@@ -349,3 +400,11 @@ def test_memory_validation_fails_for_invalid_kind(client) -> None:
     response = client.post("/memory", json={"title": "Bad kind", "body": "Body", "kind": "chat"})
 
     assert response.status_code == 422
+
+
+class FailingMockEmbeddingProvider:
+    provider_name = "mock"
+    model = "mock-token-hash-v1-64d"
+
+    def embed(self, text: str) -> list[float]:
+        raise RuntimeError("mock embedding outage")

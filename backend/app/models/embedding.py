@@ -33,6 +33,10 @@ class MemoryEmbeddingRecord(Base):
     model: Mapped[str] = mapped_column(String(120), nullable=False)
     embedding_json: Mapped[str] = mapped_column(Text, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="indexed")
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_attempted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -61,6 +65,10 @@ class MemoryEmbeddingRead(BaseModel):
     provider: str
     model: str
     content_hash: str
+    status: str
+    error_message: str | None = None
+    last_attempted_at: datetime | None = None
+    indexed_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -74,3 +82,25 @@ class MemoryEmbeddingReindexResponse(BaseModel):
 class MemorySearchResultRead(BaseModel):
     score: float
     memory_item: MemoryRead
+
+
+class MemoryEmbeddingFailedItemRead(BaseModel):
+    memory_item_id: UUID
+    title: str
+    error_message: str | None = None
+
+
+class MemoryEmbeddingStatusResponse(BaseModel):
+    provider: str
+    model: str
+    indexed_count: int
+    failed_count: int
+    stale_count: int
+    missing_count: int
+    failed_items: list[MemoryEmbeddingFailedItemRead]
+
+
+class MemoryEmbeddingRetryResponse(BaseModel):
+    retried: int
+    indexed: int
+    failed: int

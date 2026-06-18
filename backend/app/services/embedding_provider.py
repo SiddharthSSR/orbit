@@ -6,6 +6,7 @@ from app.core.config import Settings
 
 
 DEFAULT_MOCK_EMBEDDING_DIMENSIONS = 64
+DEFAULT_MOCK_EMBEDDING_MODEL = f"mock-token-hash-v1-{DEFAULT_MOCK_EMBEDDING_DIMENSIONS}d"
 
 
 class EmbeddingProvider(Protocol):
@@ -79,3 +80,12 @@ def build_embedding_provider(settings: Settings) -> EmbeddingProvider:
     raise EmbeddingProviderConfigurationError(
         f"Unsupported ORBIT_EMBEDDING_PROVIDER: {settings.embedding_provider}"
     )
+
+
+def configured_embedding_provider_identity(settings: Settings) -> tuple[str, str]:
+    provider_name = settings.embedding_provider.strip().lower() or "mock"
+    if provider_name == "mock":
+        return ("mock", DEFAULT_MOCK_EMBEDDING_MODEL)
+    if provider_name == "openai":
+        return ("openai", settings.openai_embedding_model)
+    return (provider_name, "unconfigured")
