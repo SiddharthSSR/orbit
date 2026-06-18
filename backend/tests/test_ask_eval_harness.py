@@ -1,9 +1,14 @@
 import json
+import sys
 
 import pytest
+import scripts.run_ask_eval as ask_eval
 
 from scripts.run_ask_eval import (
     AskEvalQuestion,
+    build_argument_parser,
+    build_ask_payload,
+    build_context_preview_payload,
     build_eval_result,
     context_summary,
     find_item_positions,
@@ -37,6 +42,57 @@ def test_ask_eval_questions_have_expected_shape() -> None:
         assert question.intent
         assert question.expected_context_sections
         assert question.notes
+
+
+def test_default_eval_request_uses_keyword_retrieval() -> None:
+    args = build_argument_parser().parse_args([])
+    payload = build_context_preview_payload(
+        question="What did I save about AI?",
+        include_context=True,
+        retrieval_mode=args.retrieval_mode,
+        memory_top_k=args.memory_top_k,
+        min_vector_score=args.min_vector_score,
+    )
+
+    assert payload == {
+        "question": "What did I save about AI?",
+        "include_context": True,
+        "retrieval_mode": "keyword",
+        "memory_top_k": 5,
+        "min_vector_score": 0.0,
+    }
+
+
+def test_hybrid_flags_are_sent_to_context_preview() -> None:
+    args = build_argument_parser().parse_args(
+        [
+            "--retrieval-mode",
+            "hybrid",
+            "--memory-top-k",
+            "8",
+            "--min-vector-score",
+            "0.25",
+        ]
+    )
+
+    payload = build_context_preview_payload(
+        question="How is WorldLens going?",
+        include_context=True,
+        retrieval_mode=args.retrieval_mode,
+        memory_top_k=args.memory_top_k,
+        min_vector_score=args.min_vector_score,
+    )
+
+    assert payload["retrieval_mode"] == "hybrid"
+    assert payload["memory_top_k"] == 8
+    assert payload["min_vector_score"] == 0.25
+
+
+def test_ask_payload_remains_keyword_only() -> None:
+    assert build_ask_payload(question="What did I save about AI?", include_context=True) == {
+        "question": "What did I save about AI?",
+        "include_context": True,
+    }
 
 
 def test_load_eval_questions_rejects_invalid_shape(tmp_path) -> None:
@@ -226,6 +282,7 @@ def test_write_results_json_writes_summary_and_result_objects(tmp_path) -> None:
 
     saved = json.loads(output_path.read_text(encoding="utf-8"))
     assert saved["summary"]["total_questions"] == 1
+    assert saved["summary"]["retrieval_mode"] == "keyword"
     assert saved["summary"]["section_match_pass_count"] == 1
     assert saved["results"][0]["run_id"] == "run-1"
     assert saved["results"][0]["question_id"] == "saved_ai"
@@ -247,6 +304,7 @@ def test_write_results_jsonl_appends_summary_line(tmp_path) -> None:
     summary_line = json.loads(lines[2])
     assert summary_line["type"] == "summary"
     assert summary_line["summary"]["total_questions"] == 2
+    assert summary_line["summary"]["retrieval_mode"] == "keyword"
 
 
 def test_summarize_results_computes_section_match_pass_and_fail_counts() -> None:
@@ -308,6 +366,33 @@ def test_summarize_results_computes_global_ranking_and_absent_hit_counts() -> No
     assert summary["global_item_ranking_fail_count"] == 1
     assert summary["global_item_ranking_pass_rate"] == 0.5
     assert summary["unexpected_absent_item_hit_count"] == 3
+
+
+def test_summarize_results_includes_retrieval_and_vector_annotation_counts() -> None:
+    results = [
+        make_summary_result(
+            retrieval_mode="hybrid",
+            memory_top_k=8,
+            min_vector_score=0.25,
+            vector_score_annotations_present=True,
+            vector_score_count=2,
+        ),
+        make_summary_result(
+            retrieval_mode="hybrid",
+            memory_top_k=8,
+            min_vector_score=0.25,
+            vector_score_annotations_present=False,
+            vector_score_count=0,
+        ),
+    ]
+
+    summary = summarize_results(results)
+
+    assert summary["retrieval_mode"] == "hybrid"
+    assert summary["memory_top_k"] == 8
+    assert summary["min_vector_score"] == 0.25
+    assert summary["vector_score_annotation_result_count"] == 1
+    assert summary["vector_score_annotation_total_count"] == 2
 
 
 def test_build_eval_result_represents_per_question_error() -> None:
@@ -446,6 +531,107 @@ def test_build_eval_result_includes_item_ranking_fields() -> None:
     assert result["unexpected_absent_item_hits"] == ["Internet Bill Paid"]
     assert result["item_ranking_summary"] == (
         "1/2 expected top item(s) in first 5; 1 unexpected absent item hit(s)"
+    )
+
+
+def test_build_eval_result_includes_retrieval_metadata_and_vector_annotations() -> None:
+    result = build_eval_result(
+        run_id="run-1",
+        run_label=None,
+        timestamp="2026-06-18T00:00:00+00:00",
+        base_url="http://127.0.0.1:8000",
+        mode="context_preview",
+        question=make_question(),
+        retrieval_mode="hybrid",
+        memory_top_k=8,
+        min_vector_score=0.25,
+        preview={
+            "include_context": True,
+            "context_sections": ["Recent memory"],
+            "context": (
+                "Recent memory:\n"
+                "- AI Notes (note) [vector_score=0.500]: Agents\n"
+                "- WorldLens (note) [vector_score=0.300]: Camera"
+            ),
+        },
+    )
+
+    assert result["retrieval_mode"] == "hybrid"
+    assert result["memory_top_k"] == 8
+    assert result["min_vector_score"] == 0.25
+    assert result["vector_score_annotations_present"] is True
+    assert result["vector_score_count"] == 2
+
+
+def test_hybrid_ask_run_warns_and_keeps_ask_payload_unchanged(
+    tmp_path,
+    monkeypatch,
+    capsys,
+) -> None:
+    questions_file = tmp_path / "questions.json"
+    questions_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "saved_ai",
+                    "question": "What did I save about AI?",
+                    "intent": "memory_recall",
+                    "expected_context_sections": ["Recent memory"],
+                    "notes": "Hybrid smoke test.",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    calls: list[tuple[str, dict]] = []
+
+    def fake_post_json(base_url: str, path: str, payload: dict) -> dict:
+        calls.append((path, payload))
+        if path == "/ask/context-preview":
+            return {
+                "include_context": True,
+                "context_sections": ["Recent memory"],
+                "context": "Recent memory:\n- AI Notes [vector_score=0.500]",
+            }
+        return {"answer": "Mock answer"}
+
+    monkeypatch.setattr(ask_eval, "post_json", fake_post_json)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "run_ask_eval.py",
+            "--questions-file",
+            str(questions_file),
+            "--ask",
+            "--retrieval-mode",
+            "hybrid",
+            "--memory-top-k",
+            "8",
+            "--min-vector-score",
+            "0.25",
+        ],
+    )
+
+    assert ask_eval.main() == 0
+    output = capsys.readouterr().out
+    assert "Hybrid retrieval applies only to context_preview; /ask remains keyword-only." in output
+    assert calls[0] == (
+        "/ask/context-preview",
+        {
+            "question": "What did I save about AI?",
+            "include_context": True,
+            "retrieval_mode": "hybrid",
+            "memory_top_k": 8,
+            "min_vector_score": 0.25,
+        },
+    )
+    assert calls[1] == (
+        "/ask",
+        {
+            "question": "What did I save about AI?",
+            "include_context": True,
+        },
     )
 
 

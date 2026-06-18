@@ -16,6 +16,7 @@ from urllib.request import Request, urlopen
 
 DEFAULT_BASE_URL = "http://127.0.0.1:8000"
 DEFAULT_QUESTIONS_PATH = Path(__file__).resolve().parents[1] / "evals" / "ask_eval_questions.json"
+VECTOR_SCORE_ANNOTATION = "[vector_score="
 
 
 @dataclass(frozen=True)
@@ -59,15 +60,7 @@ def load_eval_questions(path: Path = DEFAULT_QUESTIONS_PATH) -> list[AskEvalQues
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run manual Orbit Ask context evaluation against a local backend.")
-    parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"Backend base URL. Default: {DEFAULT_BASE_URL}")
-    parser.add_argument("--questions-file", type=Path, default=DEFAULT_QUESTIONS_PATH, help="Path to eval JSON.")
-    parser.add_argument("--ask", action="store_true", help="Also call /ask and print the answer.")
-    parser.add_argument("--include-context", action=argparse.BooleanOptionalAction, default=True)
-    parser.add_argument("--context-chars", type=int, default=700, help="Context preview characters to print.")
-    parser.add_argument("--output", type=Path, help="Optional path to write structured eval results.")
-    parser.add_argument("--format", choices=["json", "jsonl"], default="json", help="Output format. Default: json.")
-    parser.add_argument("--run-label", help="Optional label stored with every result.")
+    parser = build_argument_parser()
     args = parser.parse_args()
 
     questions = load_eval_questions(args.questions_file)
@@ -80,6 +73,13 @@ def main() -> int:
     print(f"Loaded {len(questions)} Ask eval question(s).")
     print(f"Backend: {args.base_url.rstrip('/')}")
     print(f"Mode: {'context preview + ask' if args.ask else 'context preview only'}")
+    print(
+        "Retrieval: "
+        f"{args.retrieval_mode} "
+        f"(memory_top_k={args.memory_top_k}, min_vector_score={args.min_vector_score:g})"
+    )
+    if args.ask and args.retrieval_mode == "hybrid":
+        print("Hybrid retrieval applies only to context_preview; /ask remains keyword-only.")
     if args.run_label:
         print(f"Run label: {args.run_label}")
     print(f"Run ID: {run_id}")
@@ -95,10 +95,13 @@ def main() -> int:
             preview = post_json(
                 args.base_url,
                 "/ask/context-preview",
-                {
-                    "question": question.question,
-                    "include_context": args.include_context,
-                },
+                build_context_preview_payload(
+                    question=question.question,
+                    include_context=args.include_context,
+                    retrieval_mode=args.retrieval_mode,
+                    memory_top_k=args.memory_top_k,
+                    min_vector_score=args.min_vector_score,
+                ),
             )
         except RuntimeError as exc:
             error = str(exc)
@@ -112,6 +115,9 @@ def main() -> int:
                     base_url=args.base_url,
                     mode=mode,
                     question=question,
+                    retrieval_mode=args.retrieval_mode,
+                    memory_top_k=args.memory_top_k,
+                    min_vector_score=args.min_vector_score,
                     error=error,
                 )
             )
@@ -163,10 +169,10 @@ def main() -> int:
                 ask_response = post_json(
                     args.base_url,
                     "/ask",
-                    {
-                        "question": question.question,
-                        "include_context": args.include_context,
-                    },
+                    build_ask_payload(
+                        question=question.question,
+                        include_context=args.include_context,
+                    ),
                 )
             except RuntimeError as exc:
                 error = str(exc)
@@ -185,6 +191,9 @@ def main() -> int:
                 base_url=args.base_url,
                 mode=mode,
                 question=question,
+                retrieval_mode=args.retrieval_mode,
+                memory_top_k=args.memory_top_k,
+                min_vector_score=args.min_vector_score,
                 preview=preview,
                 answer=answer,
                 error=error,
@@ -199,6 +208,56 @@ def main() -> int:
         print(f"\nWrote {len(results)} result(s) to {args.output}")
 
     return 1 if had_error else 0
+
+
+def build_argument_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Run manual Orbit Ask context evaluation against a local backend.")
+    parser.add_argument("--base-url", default=DEFAULT_BASE_URL, help=f"Backend base URL. Default: {DEFAULT_BASE_URL}")
+    parser.add_argument("--questions-file", type=Path, default=DEFAULT_QUESTIONS_PATH, help="Path to eval JSON.")
+    parser.add_argument("--ask", action="store_true", help="Also call /ask and print the answer.")
+    parser.add_argument("--include-context", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument("--context-chars", type=int, default=700, help="Context preview characters to print.")
+    parser.add_argument("--output", type=Path, help="Optional path to write structured eval results.")
+    parser.add_argument("--format", choices=["json", "jsonl"], default="json", help="Output format. Default: json.")
+    parser.add_argument("--run-label", help="Optional label stored with every result.")
+    parser.add_argument(
+        "--retrieval-mode",
+        choices=["keyword", "hybrid"],
+        default="keyword",
+        help="Context preview memory retrieval mode. Default: keyword.",
+    )
+    parser.add_argument("--memory-top-k", type=int, default=5, help="Hybrid memory candidate limit. Default: 5.")
+    parser.add_argument(
+        "--min-vector-score",
+        type=float,
+        default=0.0,
+        help="Minimum hybrid vector score. Default: 0.0.",
+    )
+    return parser
+
+
+def build_context_preview_payload(
+    *,
+    question: str,
+    include_context: bool,
+    retrieval_mode: str = "keyword",
+    memory_top_k: int = 5,
+    min_vector_score: float = 0.0,
+) -> dict[str, Any]:
+    return {
+        "question": question,
+        "include_context": include_context,
+        "retrieval_mode": retrieval_mode,
+        "memory_top_k": memory_top_k,
+        "min_vector_score": min_vector_score,
+    }
+
+
+def build_ask_payload(*, question: str, include_context: bool) -> dict[str, Any]:
+    return {
+        "question": question,
+        "include_context": include_context,
+    }
 
 
 def post_json(base_url: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -227,6 +286,9 @@ def build_eval_result(
     base_url: str,
     mode: str,
     question: AskEvalQuestion,
+    retrieval_mode: str = "keyword",
+    memory_top_k: int = 5,
+    min_vector_score: float = 0.0,
     preview: dict[str, Any] | None = None,
     answer: str | None = None,
     error: str | None = None,
@@ -239,12 +301,18 @@ def build_eval_result(
         preview.get("context_sections", []),
     )
     ranking = item_ranking_details(question, context)
+    vector_score_count = context.count(VECTOR_SCORE_ANNOTATION)
     return {
         "run_id": run_id,
         "run_label": run_label,
         "timestamp": timestamp,
         "base_url": base_url.rstrip("/"),
         "mode": mode,
+        "retrieval_mode": retrieval_mode,
+        "memory_top_k": memory_top_k,
+        "min_vector_score": min_vector_score,
+        "vector_score_annotations_present": vector_score_count > 0,
+        "vector_score_count": vector_score_count,
         "question_id": question.id,
         "question": question.question,
         "intent": question.intent,
@@ -292,9 +360,10 @@ def write_results(results: list[dict[str, Any]], output_path: Path, output_forma
     raise ValueError(f"Unsupported output format: {output_format}")
 
 
-def summarize_results(results: list[dict[str, Any]]) -> dict[str, int | float]:
+def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     total_questions = len(results)
     questions_with_errors = sum(result.get("error") is not None for result in results)
+    first_result = results[0] if results else {}
 
     section_match_pass_count = sum(
         not result.get("missing_expected_sections")
@@ -325,6 +394,15 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, int | float]:
     )
 
     return {
+        "retrieval_mode": first_result.get("retrieval_mode", "keyword"),
+        "memory_top_k": first_result.get("memory_top_k", 5),
+        "min_vector_score": first_result.get("min_vector_score", 0.0),
+        "vector_score_annotation_result_count": sum(
+            bool(result.get("vector_score_annotations_present")) for result in results
+        ),
+        "vector_score_annotation_total_count": sum(
+            int(result.get("vector_score_count", 0)) for result in results
+        ),
         "total_questions": total_questions,
         "questions_with_errors": questions_with_errors,
         "section_match_pass_count": section_match_pass_count,
@@ -348,8 +426,14 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, int | float]:
     }
 
 
-def print_eval_summary(summary: dict[str, int | float]) -> None:
+def print_eval_summary(summary: dict[str, Any]) -> None:
     print("\nAsk eval summary")
+    print(
+        "* Retrieval: "
+        f"{summary['retrieval_mode']} "
+        f"(memory_top_k={summary['memory_top_k']}, "
+        f"min_vector_score={summary['min_vector_score']:g})"
+    )
     print(f"* Questions: {summary['total_questions']}")
     print(f"* Request errors: {summary['questions_with_errors']}")
     print(
@@ -367,6 +451,11 @@ def print_eval_summary(summary: dict[str, int | float]) -> None:
         f"{summary['global_item_ranking_evaluated_count']} passed"
     )
     print(f"* Unexpected absent hits: {summary['unexpected_absent_item_hit_count']}")
+    print(
+        "* Vector score annotations: "
+        f"{summary['vector_score_annotation_result_count']} result(s), "
+        f"{summary['vector_score_annotation_total_count']} total"
+    )
     print("* Global item ranking is legacy/informational; section-aware ranking is preferred.")
 
 
