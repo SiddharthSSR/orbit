@@ -107,7 +107,7 @@ final class TodayDashboardViewModel: ObservableObject {
                 payload: TodoUpdateRequest(isComplete: !todo.isComplete)
             )
             replace(updatedTodo)
-            notificationCenter.post(name: .orbitTodoDidChange, object: nil)
+            OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -121,7 +121,7 @@ final class TodayDashboardViewModel: ObservableObject {
                 payload: BillUpdateRequest(isPaid: !bill.isPaid)
             )
             replace(updatedBill)
-            notificationCenter.post(name: .orbitBillsDidChange, object: nil)
+            OrbitRefreshCenter.postBillsDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -135,7 +135,7 @@ final class TodayDashboardViewModel: ObservableObject {
                 payload: MemoryUpdateRequest(isArchived: true)
             )
             replace(archivedMemory)
-            notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
+            OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }

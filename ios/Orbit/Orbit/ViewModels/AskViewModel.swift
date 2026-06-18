@@ -309,13 +309,13 @@ final class AskViewModel: ObservableObject {
                 )
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Saved to memory"
-                notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
+                OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
             case "create_todo":
                 guard let title = draft.trimmedTodoTitle else { return }
                 _ = try await todoClient.createTodo(TodoCreateRequest(title: title))
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Todo created"
-                notificationCenter.post(name: .orbitTodoDidChange, object: nil)
+                OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
             default:
                 return
             }

@@ -47,17 +47,17 @@ struct TodayScreen: View {
             await dashboardViewModel.loadDashboard()
         }
         .onReceive(
-            NotificationCenter.default.publisher(for: .orbitMemoryDidChange)
+            OrbitRefreshCenter.publisher(for: .orbitMemoryDidChange)
         ) { _ in
             Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
         }
         .onReceive(
-            NotificationCenter.default.publisher(for: .orbitTodoDidChange)
+            OrbitRefreshCenter.publisher(for: .orbitTodoDidChange)
         ) { _ in
             Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
         }
         .onReceive(
-            NotificationCenter.default.publisher(for: .orbitBillsDidChange)
+            OrbitRefreshCenter.publisher(for: .orbitBillsDidChange)
         ) { _ in
             Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
         }

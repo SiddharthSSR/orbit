@@ -74,7 +74,7 @@ final class MemoryListViewModel: ObservableObject {
             if shouldShow(memory) {
                 memoryItems.insert(memory, at: 0)
             }
-            notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
+            OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -92,7 +92,7 @@ final class MemoryListViewModel: ObservableObject {
             } else {
                 replace(archived)
             }
-            notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
+            OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -103,7 +103,7 @@ final class MemoryListViewModel: ObservableObject {
         do {
             try await apiClient.deleteMemory(id: memory.id)
             memoryItems.removeAll { $0.id == memory.id }
-            notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
+            OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }

@@ -37,7 +37,7 @@ final class TodoListViewModel: ObservableObject {
         do {
             let todo = try await apiClient.createTodo(TodoCreateRequest(title: trimmedTitle))
             todos.insert(todo, at: 0)
-            notificationCenter.post(name: .orbitTodoDidChange, object: nil)
+            OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -51,7 +51,7 @@ final class TodoListViewModel: ObservableObject {
                 payload: TodoUpdateRequest(isComplete: !todo.isComplete)
             )
             replace(updatedTodo)
-            notificationCenter.post(name: .orbitTodoDidChange, object: nil)
+            OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -62,7 +62,7 @@ final class TodoListViewModel: ObservableObject {
         do {
             try await apiClient.deleteTodo(id: todo.id)
             todos.removeAll { $0.id == todo.id }
-            notificationCenter.post(name: .orbitTodoDidChange, object: nil)
+            OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }

@@ -147,6 +147,40 @@ final class BillListViewModelTests: XCTestCase {
     }
 }
 
+@MainActor
+final class OrbitRefreshCenterTests: XCTestCase {
+    func testHelperNamesMatchNotificationNameConstants() {
+        XCTAssertEqual(OrbitRefreshCenter.memoryDidChange, .orbitMemoryDidChange)
+        XCTAssertEqual(OrbitRefreshCenter.todoDidChange, .orbitTodoDidChange)
+        XCTAssertEqual(OrbitRefreshCenter.billsDidChange, .orbitBillsDidChange)
+    }
+
+    func testPostHelpersPostExpectedNamesOnGivenCenter() async {
+        let center = NotificationCenter()
+
+        let memory = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        OrbitRefreshCenter.postMemoryDidChange(on: center)
+        await fulfillment(of: [memory], timeout: 0.3)
+
+        let todo = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        OrbitRefreshCenter.postTodoDidChange(on: center)
+        await fulfillment(of: [todo], timeout: 0.3)
+
+        let bills = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+        OrbitRefreshCenter.postBillsDidChange(on: center)
+        await fulfillment(of: [bills], timeout: 0.3)
+    }
+
+    func testPublisherObservesPostedEvent() async {
+        let center = NotificationCenter()
+        let expectation = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+
+        OrbitRefreshCenter.postBillsDidChange(on: center)
+
+        await fulfillment(of: [expectation], timeout: 0.3)
+    }
+}
+
 private struct FailingBillAPIClient: BillAPIClientProtocol {
     func listBills() async throws -> [BillDTO] {
         throw FailingBillAPIError.expectedFailure

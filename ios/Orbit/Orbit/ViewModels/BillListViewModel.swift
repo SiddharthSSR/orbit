@@ -57,7 +57,7 @@ final class BillListViewModel: ObservableObject {
         do {
             let bill = try await apiClient.createBill(payload)
             bills.insert(bill, at: 0)
-            notificationCenter.post(name: .orbitBillsDidChange, object: nil)
+            OrbitRefreshCenter.postBillsDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -71,7 +71,7 @@ final class BillListViewModel: ObservableObject {
                 payload: BillUpdateRequest(isPaid: !bill.isPaid)
             )
             replace(updatedBill)
-            notificationCenter.post(name: .orbitBillsDidChange, object: nil)
+            OrbitRefreshCenter.postBillsDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -82,7 +82,7 @@ final class BillListViewModel: ObservableObject {
         do {
             try await apiClient.deleteBill(id: bill.id)
             bills.removeAll { $0.id == bill.id }
-            notificationCenter.post(name: .orbitBillsDidChange, object: nil)
+            OrbitRefreshCenter.postBillsDidChange(on: notificationCenter)
         } catch {
             errorMessage = readableMessage(for: error)
         }
