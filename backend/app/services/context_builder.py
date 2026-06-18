@@ -2,6 +2,7 @@ from datetime import date, timedelta
 
 from sqlalchemy.orm import Session
 
+from app.models.memory import MemoryRecord
 from app.repositories.bill_repository import BillRepository
 from app.repositories.memory_item_repository import MemoryItemRepository
 from app.repositories.mood_repository import MoodRepository
@@ -92,37 +93,41 @@ class OrbitContextBuilder:
         return "Unpaid bills:\n" + "\n".join(lines)
 
     def _recent_memory_section(self) -> str:
+        all_memory_items = MemoryItemRepository(self.session).list(include_archived=False)
+        keyword_scores = {
+            str(item.id): self._memory_keyword_score(item)
+            for item in all_memory_items
+        }
         keyword_memory_items = sorted(
-            MemoryItemRepository(self.session).list(include_archived=False),
-            key=lambda item: -score_text(
-                self.query_tokens,
-                item.title,
-                item.body,
-                item.kind,
-                item.source_url,
-                " ".join(item.tags),
-            ),
+            all_memory_items,
+            key=lambda item: -keyword_scores[str(item.id)],
         )
         vector_scores: dict[str, float] = {}
         if self.vector_memory_results is None:
             memory_items = keyword_memory_items[: self.section_limit]
         else:
-            memory_items = []
-            seen_ids: set[str] = set()
+            candidates = {str(item.id): item for item in keyword_memory_items}
             for result in self.vector_memory_results:
                 memory_id = str(result.memory_item.id)
-                if memory_id in seen_ids:
-                    continue
-                memory_items.append(result.memory_item)
-                vector_scores[memory_id] = result.score
-                seen_ids.add(memory_id)
-            for item in keyword_memory_items:
-                memory_id = str(item.id)
-                if memory_id in seen_ids:
-                    continue
-                memory_items.append(item)
-                seen_ids.add(memory_id)
-            memory_items = memory_items[: self.memory_limit]
+                candidates[memory_id] = result.memory_item
+                vector_scores[memory_id] = max(
+                    vector_scores.get(memory_id, 0.0),
+                    result.score,
+                )
+                keyword_scores.setdefault(memory_id, self._memory_keyword_score(result.memory_item))
+            keyword_order = {
+                str(item.id): position
+                for position, item in enumerate(keyword_memory_items)
+            }
+            memory_items = sorted(
+                candidates.values(),
+                key=lambda item: (
+                    -(keyword_scores[str(item.id)] + vector_scores.get(str(item.id), 0.0)),
+                    -keyword_scores[str(item.id)],
+                    -vector_scores.get(str(item.id), 0.0),
+                    keyword_order.get(str(item.id), len(keyword_order)),
+                ),
+            )[: self.memory_limit]
         if not memory_items:
             return "Recent memory:\n- None"
 
@@ -136,6 +141,16 @@ class OrbitContextBuilder:
                 f"- {item.title} ({item.kind}){tags}{source_url}{score}: {self._preview(item.body)}"
             )
         return "Recent memory:\n" + "\n".join(lines)
+
+    def _memory_keyword_score(self, item: MemoryRecord) -> int:
+        return score_text(
+            self.query_tokens,
+            item.title,
+            item.body,
+            item.kind,
+            item.source_url,
+            " ".join(item.tags),
+        )
 
     def _latest_moods_section(self) -> str:
         moods = sorted(

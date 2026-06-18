@@ -17,7 +17,7 @@ from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
 from app.services.context_builder import OrbitContextBuilder
-from app.services.memory_retrieval import MemoryRetrievalService
+from app.services.memory_retrieval import MemoryRetrievalService, MemorySearchResult
 
 
 def test_ask_creates_new_session_and_two_messages(client) -> None:
@@ -174,10 +174,15 @@ def test_context_preview_defaults_to_unchanged_keyword_mode(client) -> None:
     assert "Weekend Plan" in keyword_response.json()["context"]
 
 
-def test_hybrid_context_preview_prioritizes_ai_memory_and_dedupes(client) -> None:
+def test_hybrid_context_preview_prioritizes_ai_memory_and_dedupes(client, monkeypatch) -> None:
     client.post(
         "/memory",
-        json={"title": "Weekend Grocery List", "body": "Coffee and vegetables"},
+        json={
+            "title": "WorldLens Project Update",
+            "body": "Camera translation prototype",
+            "kind": "project_update",
+            "tags": ["worldlens", "ios"],
+        },
     )
     client.post(
         "/memory",
@@ -188,6 +193,18 @@ def test_hybrid_context_preview_prioritizes_ai_memory_and_dedupes(client) -> Non
             "tags": ["ai", "agents"],
         },
     )
+
+    def misleading_vector_order(service, query, *, top_k=5, min_score=0.0):
+        items = {
+            item.title: item
+            for item in service.memory_repository.list()
+        }
+        return [
+            MemorySearchResult(score=0.187, memory_item=items["WorldLens Project Update"]),
+            MemorySearchResult(score=0.170, memory_item=items["AI Agents Reading List"]),
+        ]
+
+    monkeypatch.setattr(MemoryRetrievalService, "search", misleading_vector_order)
 
     response = client.post(
         "/ask/context-preview",
@@ -200,8 +217,9 @@ def test_hybrid_context_preview_prioritizes_ai_memory_and_dedupes(client) -> Non
 
     assert response.status_code == 200
     context = response.json()["context"]
-    assert context.index("AI Agents Reading List") < context.index("Weekend Grocery List")
+    assert context.index("AI Agents Reading List") < context.index("WorldLens Project Update")
     assert context.count("AI Agents Reading List") == 1
+    assert context.count("WorldLens Project Update") == 1
     assert "vector_score=" in context
 
 

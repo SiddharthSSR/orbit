@@ -1,12 +1,13 @@
 import hashlib
-import re
 from typing import Protocol
 
 from app.core.config import Settings
+from app.services.relevance import tokenize_query
 
 
 DEFAULT_MOCK_EMBEDDING_DIMENSIONS = 64
-DEFAULT_MOCK_EMBEDDING_MODEL = f"mock-token-hash-v1-{DEFAULT_MOCK_EMBEDDING_DIMENSIONS}d"
+DEFAULT_MOCK_EMBEDDING_MODEL = f"mock-token-hash-v2-{DEFAULT_MOCK_EMBEDDING_DIMENSIONS}d"
+MOCK_EMBEDDING_STOPWORDS = {"save", "saved"}
 
 
 class EmbeddingProvider(Protocol):
@@ -28,11 +29,12 @@ class MockEmbeddingProvider:
         if dimensions <= 0:
             raise ValueError("Mock embedding dimensions must be positive")
         self.dimensions = dimensions
-        self.model = f"mock-token-hash-v1-{dimensions}d"
+        self.model = f"mock-token-hash-v2-{dimensions}d"
 
     def embed(self, text: str) -> list[float]:
         vector = [0.0] * self.dimensions
-        for token in re.findall(r"[a-z0-9]+", text.lower()):
+        tokens = tokenize_query(text) - MOCK_EMBEDDING_STOPWORDS
+        for token in tokens:
             digest = hashlib.sha256(token.encode("utf-8")).digest()
             bucket = int.from_bytes(digest[:8], "big") % self.dimensions
             vector[bucket] += 1.0

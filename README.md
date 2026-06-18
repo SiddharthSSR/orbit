@@ -182,11 +182,11 @@ curl -X POST http://127.0.0.1:8000/ask/context-preview \
   }'
 ```
 
-`retrieval_mode` is `keyword` or `hybrid` and defaults to `keyword`; `memory_top_k` accepts 1–20. Hybrid mode affects only the `Recent memory` section: current vector hits appear first with debug score annotations, followed by deduplicated keyword-only fallbacks. Missing, stale, failed, or temporarily unavailable embeddings degrade to keyword memory ordering. The production `/ask` route remains keyword-only; hybrid preview is an evaluation bridge before full Ask integration.
+`retrieval_mode` is `keyword` or `hybrid` and defaults to `keyword`; `memory_top_k` accepts 1–20. Hybrid mode affects only the `Recent memory` section. It deduplicates candidates and ranks them with the deterministic guardrail `keyword_score + vector_score`, so exact title/tag/body matches outweigh accidental vector similarity; vector-matched rows retain debug score annotations. Missing, stale, failed, or temporarily unavailable embeddings degrade to keyword memory ordering. The production `/ask` route remains keyword-only; hybrid preview is an evaluation bridge before full Ask integration.
 
 Orbit includes an embeddings/RAG foundation for memory items only. Embeddings are stored as JSON vectors in SQLite and searched with cosine similarity in Python; there is no external vector database. This retrieval path is development-only and is not connected to `/ask`, which continues to use keyword-ranked context. Orbit does not yet include production authentication/security for these development endpoints, streaming, or tool execution.
 
-The default embedding provider is deterministic and local:
+The default embedding provider is deterministic, local, and lexical. Its v2 tokenizer reuses Orbit relevance tokens, preserves meaningful short terms such as `ai`, `ui`, and `ios`, and removes generic query terms before hashing. Reindex after upgrading from the v1 mock model so existing memory items receive v2 embeddings:
 
 ```bash
 curl -X POST http://127.0.0.1:8000/memory/embeddings/reindex

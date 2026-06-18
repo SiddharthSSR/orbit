@@ -220,7 +220,7 @@ def make_retrieval_test_session():
 
 class FailingMockEmbeddingProvider:
     provider_name = "mock"
-    model = "mock-token-hash-v1-64d"
+    model = "mock-token-hash-v2-64d"
 
     def embed(self, text: str) -> list[float]:
         raise RuntimeError("mock embedding outage")

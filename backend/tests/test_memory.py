@@ -155,7 +155,7 @@ def test_reindex_and_search_memory_embeddings_with_mock_provider(client) -> None
     assert reindex_response.json() == {
         "indexed_count": 2,
         "provider": "mock",
-        "model": "mock-token-hash-v1-64d",
+        "model": "mock-token-hash-v2-64d",
     }
     assert search_response.status_code == 200
     assert search_response.json()[0]["memory_item"]["title"] == "AI Agents Reading List"
@@ -404,7 +404,7 @@ def test_memory_validation_fails_for_invalid_kind(client) -> None:
 
 class FailingMockEmbeddingProvider:
     provider_name = "mock"
-    model = "mock-token-hash-v1-64d"
+    model = "mock-token-hash-v2-64d"
 
     def embed(self, text: str) -> list[float]:
         raise RuntimeError("mock embedding outage")
