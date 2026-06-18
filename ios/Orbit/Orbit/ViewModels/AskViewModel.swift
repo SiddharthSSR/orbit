@@ -1,13 +1,5 @@
 import Foundation
 
-extension Notification.Name {
-    /// Posted after a memory item is created (e.g. by an Ask suggested action),
-    /// so screens showing memory can reload without a manual refresh.
-    static let orbitMemoryDidChange = Notification.Name("orbitMemoryDidChange")
-    /// Posted after a todo item is created, so screens showing todos can reload.
-    static let orbitTodoDidChange = Notification.Name("orbitTodoDidChange")
-}
-
 enum AskContextConfidence: Equatable {
     case noContext
     case lowContext

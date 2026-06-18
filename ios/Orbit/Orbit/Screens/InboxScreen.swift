@@ -100,7 +100,7 @@ struct InboxScreen: View {
         .onReceive(
             NotificationCenter.default.publisher(for: .orbitMemoryDidChange)
         ) { _ in
-            Task { await memoryViewModel.loadMemory() }
+            Task { await memoryViewModel.loadMemory(showsLoading: false) }
         }
     }
 

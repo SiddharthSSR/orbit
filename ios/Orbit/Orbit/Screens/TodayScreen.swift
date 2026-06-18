@@ -49,12 +49,12 @@ struct TodayScreen: View {
         .onReceive(
             NotificationCenter.default.publisher(for: .orbitMemoryDidChange)
         ) { _ in
-            Task { await dashboardViewModel.loadDashboard() }
+            Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
         }
         .onReceive(
             NotificationCenter.default.publisher(for: .orbitTodoDidChange)
         ) { _ in
-            Task { await dashboardViewModel.loadDashboard() }
+            Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
         }
     }
 

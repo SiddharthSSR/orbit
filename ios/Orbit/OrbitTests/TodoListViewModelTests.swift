@@ -69,6 +69,55 @@ final class TodoListViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isLoading)
     }
 
+    func testCreateToggleDeleteTodoEmitTodoRefreshEvents() async {
+        let center = NotificationCenter()
+        let viewModel = TodoListViewModel(
+            apiClient: MockTodoAPIClient(todos: []),
+            notificationCenter: center
+        )
+
+        let createEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        await viewModel.createTodo(title: "Call the dentist")
+        await fulfillment(of: [createEvent], timeout: 0.5)
+
+        let created = viewModel.todos[0]
+        let toggleEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        await viewModel.toggleTodoComplete(todo: created)
+        await fulfillment(of: [toggleEvent], timeout: 0.5)
+
+        let deleteEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        await viewModel.deleteTodo(todo: created)
+        await fulfillment(of: [deleteEvent], timeout: 0.5)
+    }
+
+    func testFailedTodoMutationDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = TodoListViewModel(
+            apiClient: FailingTodoAPIClient(),
+            notificationCenter: center
+        )
+        let event = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        event.isInverted = true
+
+        await viewModel.createTodo(title: "Will fail")
+
+        await fulfillment(of: [event], timeout: 0.3)
+    }
+
+    func testBlankTodoDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = TodoListViewModel(
+            apiClient: MockTodoAPIClient(todos: []),
+            notificationCenter: center
+        )
+        let event = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        event.isInverted = true
+
+        await viewModel.createTodo(title: "   ")
+
+        await fulfillment(of: [event], timeout: 0.3)
+    }
+
     private func makeTodo(
         title: String,
         notes: String? = nil,

@@ -13,6 +13,7 @@ final class TodayDashboardViewModel: ObservableObject {
     private let billAPIClient: any BillAPIClientProtocol
     private let memoryAPIClient: any MemoryAPIClientProtocol
     private let moodAPIClient: any MoodAPIClientProtocol
+    private let notificationCenter: NotificationCenter
 
     var openTodos: [TodoDTO] {
         Array(todos.filter { !$0.isComplete }.prefix(5))
@@ -42,16 +43,20 @@ final class TodayDashboardViewModel: ObservableObject {
         todoAPIClient: any TodoAPIClientProtocol = OrbitAPIClient(),
         billAPIClient: any BillAPIClientProtocol = OrbitAPIClient(),
         memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
-        moodAPIClient: any MoodAPIClientProtocol = OrbitAPIClient()
+        moodAPIClient: any MoodAPIClientProtocol = OrbitAPIClient(),
+        notificationCenter: NotificationCenter = .default
     ) {
         self.todoAPIClient = todoAPIClient
         self.billAPIClient = billAPIClient
         self.memoryAPIClient = memoryAPIClient
         self.moodAPIClient = moodAPIClient
+        self.notificationCenter = notificationCenter
     }
 
-    func loadDashboard() async {
-        isLoading = true
+    func loadDashboard(showsLoading: Bool = true) async {
+        if showsLoading {
+            isLoading = true
+        }
         errorMessage = nil
         defer { isLoading = false }
 
@@ -102,6 +107,7 @@ final class TodayDashboardViewModel: ObservableObject {
                 payload: TodoUpdateRequest(isComplete: !todo.isComplete)
             )
             replace(updatedTodo)
+            notificationCenter.post(name: .orbitTodoDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -128,6 +134,7 @@ final class TodayDashboardViewModel: ObservableObject {
                 payload: MemoryUpdateRequest(isArchived: true)
             )
             replace(archivedMemory)
+            notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }

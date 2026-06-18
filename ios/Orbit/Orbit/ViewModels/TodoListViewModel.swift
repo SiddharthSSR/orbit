@@ -7,9 +7,14 @@ final class TodoListViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let apiClient: any TodoAPIClientProtocol
+    private let notificationCenter: NotificationCenter
 
-    init(apiClient: any TodoAPIClientProtocol = OrbitAPIClient()) {
+    init(
+        apiClient: any TodoAPIClientProtocol = OrbitAPIClient(),
+        notificationCenter: NotificationCenter = .default
+    ) {
         self.apiClient = apiClient
+        self.notificationCenter = notificationCenter
     }
 
     func loadTodos() async {
@@ -32,6 +37,7 @@ final class TodoListViewModel: ObservableObject {
         do {
             let todo = try await apiClient.createTodo(TodoCreateRequest(title: trimmedTitle))
             todos.insert(todo, at: 0)
+            notificationCenter.post(name: .orbitTodoDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -45,6 +51,7 @@ final class TodoListViewModel: ObservableObject {
                 payload: TodoUpdateRequest(isComplete: !todo.isComplete)
             )
             replace(updatedTodo)
+            notificationCenter.post(name: .orbitTodoDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -55,6 +62,7 @@ final class TodoListViewModel: ObservableObject {
         do {
             try await apiClient.deleteTodo(id: todo.id)
             todos.removeAll { $0.id == todo.id }
+            notificationCenter.post(name: .orbitTodoDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }

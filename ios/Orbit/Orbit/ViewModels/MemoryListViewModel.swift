@@ -9,13 +9,20 @@ final class MemoryListViewModel: ObservableObject {
     @Published var activeTagFilter: String?
 
     private let apiClient: any MemoryAPIClientProtocol
+    private let notificationCenter: NotificationCenter
 
-    init(apiClient: any MemoryAPIClientProtocol = OrbitAPIClient()) {
+    init(
+        apiClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
+        notificationCenter: NotificationCenter = .default
+    ) {
         self.apiClient = apiClient
+        self.notificationCenter = notificationCenter
     }
 
-    func loadMemory() async {
-        isLoading = true
+    func loadMemory(showsLoading: Bool = true) async {
+        if showsLoading {
+            isLoading = true
+        }
         errorMessage = nil
         defer { isLoading = false }
 
@@ -67,6 +74,7 @@ final class MemoryListViewModel: ObservableObject {
             if shouldShow(memory) {
                 memoryItems.insert(memory, at: 0)
             }
+            notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -84,6 +92,7 @@ final class MemoryListViewModel: ObservableObject {
             } else {
                 replace(archived)
             }
+            notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -94,6 +103,7 @@ final class MemoryListViewModel: ObservableObject {
         do {
             try await apiClient.deleteMemory(id: memory.id)
             memoryItems.removeAll { $0.id == memory.id }
+            notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }

@@ -121,17 +121,61 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isLoading)
     }
 
+    func testToggleTodoCompleteEmitsTodoRefreshEvent() async {
+        let center = NotificationCenter()
+        let todo = makeTodo(title: "Finish report")
+        let viewModel = makeViewModel(todos: [todo], notificationCenter: center)
+        await viewModel.loadDashboard()
+        let event = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+
+        await viewModel.toggleTodoComplete(todo: todo)
+
+        await fulfillment(of: [event], timeout: 0.5)
+    }
+
+    func testArchiveMemoryEmitsMemoryRefreshEvent() async {
+        let center = NotificationCenter()
+        let memory = makeMemory(title: "Old note")
+        let viewModel = makeViewModel(memoryItems: [memory], notificationCenter: center)
+        await viewModel.loadDashboard()
+        let event = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+
+        await viewModel.archiveMemory(memory: memory)
+
+        await fulfillment(of: [event], timeout: 0.5)
+    }
+
+    func testFailedTodayMutationDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let todo = makeTodo(title: "Finish report")
+        let viewModel = TodayDashboardViewModel(
+            todoAPIClient: FailingDashboardTodoAPIClient(),
+            billAPIClient: MockBillAPIClient(bills: []),
+            memoryAPIClient: MockMemoryAPIClient(memoryItems: []),
+            moodAPIClient: MockMoodAPIClient(moods: []),
+            notificationCenter: center
+        )
+        let event = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        event.isInverted = true
+
+        await viewModel.toggleTodoComplete(todo: todo)
+
+        await fulfillment(of: [event], timeout: 0.3)
+    }
+
     private func makeViewModel(
         todos: [TodoDTO] = [],
         bills: [BillDTO] = [],
         memoryItems: [MemoryDTO] = [],
-        moods: [MoodDTO] = []
+        moods: [MoodDTO] = [],
+        notificationCenter: NotificationCenter = .default
     ) -> TodayDashboardViewModel {
         TodayDashboardViewModel(
             todoAPIClient: MockTodoAPIClient(todos: todos),
             billAPIClient: MockBillAPIClient(bills: bills),
             memoryAPIClient: MockMemoryAPIClient(memoryItems: memoryItems),
-            moodAPIClient: MockMoodAPIClient(moods: moods)
+            moodAPIClient: MockMoodAPIClient(moods: moods),
+            notificationCenter: notificationCenter
         )
     }
 
@@ -209,6 +253,24 @@ private struct FailingDashboardBillAPIClient: BillAPIClientProtocol {
     }
 
     func deleteBill(id: UUID) async throws {
+        throw FailingDashboardAPIError.expectedFailure
+    }
+}
+
+private struct FailingDashboardTodoAPIClient: TodoAPIClientProtocol {
+    func listTodos() async throws -> [TodoDTO] {
+        throw FailingDashboardAPIError.expectedFailure
+    }
+
+    func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO {
+        throw FailingDashboardAPIError.expectedFailure
+    }
+
+    func updateTodo(id: UUID, payload: TodoUpdateRequest) async throws -> TodoDTO {
+        throw FailingDashboardAPIError.expectedFailure
+    }
+
+    func deleteTodo(id: UUID) async throws {
         throw FailingDashboardAPIError.expectedFailure
     }
 }

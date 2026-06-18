@@ -91,6 +91,65 @@ final class MemoryListViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.memoryItems.map(\.title), ["AI article"])
     }
 
+    func testCreateMemoryEmitsMemoryRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = MemoryListViewModel(
+            apiClient: MockMemoryAPIClient(memoryItems: []),
+            notificationCenter: center
+        )
+        let event = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+
+        await viewModel.createMemory(title: "Quiet cafes", body: "Near work")
+
+        await fulfillment(of: [event], timeout: 0.5)
+    }
+
+    func testArchiveAndDeleteMemoryEmitMemoryRefreshEvents() async {
+        let center = NotificationCenter()
+        let memory = makeMemory(title: "Archive me")
+        let viewModel = MemoryListViewModel(
+            apiClient: MockMemoryAPIClient(memoryItems: [memory]),
+            notificationCenter: center
+        )
+        await viewModel.loadMemory()
+
+        let archiveEvent = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        await viewModel.archiveMemory(memory: memory)
+        await fulfillment(of: [archiveEvent], timeout: 0.5)
+
+        let deleteEvent = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        await viewModel.deleteMemory(memory: memory)
+        await fulfillment(of: [deleteEvent], timeout: 0.5)
+    }
+
+    func testFailedMemoryMutationDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = MemoryListViewModel(
+            apiClient: FailingMemoryAPIClient(),
+            notificationCenter: center
+        )
+        let event = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        event.isInverted = true
+
+        await viewModel.createMemory(title: "Will fail", body: "Body")
+
+        await fulfillment(of: [event], timeout: 0.3)
+    }
+
+    func testBlankMemoryDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = MemoryListViewModel(
+            apiClient: MockMemoryAPIClient(memoryItems: []),
+            notificationCenter: center
+        )
+        let event = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        event.isInverted = true
+
+        await viewModel.createMemory(title: "   ", body: "   ")
+
+        await fulfillment(of: [event], timeout: 0.3)
+    }
+
     private func makeMemory(
         title: String,
         body: String = "Body",
