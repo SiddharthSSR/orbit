@@ -78,8 +78,6 @@ def main() -> int:
         f"{args.retrieval_mode} "
         f"(memory_top_k={args.memory_top_k}, min_vector_score={args.min_vector_score:g})"
     )
-    if args.ask and args.retrieval_mode == "hybrid":
-        print("Hybrid retrieval applies only to context_preview; /ask remains keyword-only.")
     if args.run_label:
         print(f"Run label: {args.run_label}")
     print(f"Run ID: {run_id}")
@@ -172,6 +170,9 @@ def main() -> int:
                     build_ask_payload(
                         question=question.question,
                         include_context=args.include_context,
+                        retrieval_mode=args.retrieval_mode,
+                        memory_top_k=args.memory_top_k,
+                        min_vector_score=args.min_vector_score,
                     ),
                 )
             except RuntimeError as exc:
@@ -224,7 +225,7 @@ def build_argument_parser() -> argparse.ArgumentParser:
         "--retrieval-mode",
         choices=["keyword", "hybrid"],
         default="keyword",
-        help="Context preview memory retrieval mode. Default: keyword.",
+        help="Memory retrieval mode for context preview and optional /ask. Default: keyword.",
     )
     parser.add_argument("--memory-top-k", type=int, default=5, help="Hybrid memory candidate limit. Default: 5.")
     parser.add_argument(
@@ -253,11 +254,21 @@ def build_context_preview_payload(
     }
 
 
-def build_ask_payload(*, question: str, include_context: bool) -> dict[str, Any]:
-    return {
-        "question": question,
-        "include_context": include_context,
-    }
+def build_ask_payload(
+    *,
+    question: str,
+    include_context: bool,
+    retrieval_mode: str = "keyword",
+    memory_top_k: int = 5,
+    min_vector_score: float = 0.0,
+) -> dict[str, Any]:
+    return build_context_preview_payload(
+        question=question,
+        include_context=include_context,
+        retrieval_mode=retrieval_mode,
+        memory_top_k=memory_top_k,
+        min_vector_score=min_vector_score,
+    )
 
 
 def post_json(base_url: str, path: str, payload: dict[str, Any]) -> dict[str, Any]:

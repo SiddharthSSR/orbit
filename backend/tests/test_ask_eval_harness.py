@@ -88,10 +88,13 @@ def test_hybrid_flags_are_sent_to_context_preview() -> None:
     assert payload["min_vector_score"] == 0.25
 
 
-def test_ask_payload_remains_keyword_only() -> None:
+def test_ask_payload_defaults_to_keyword_retrieval() -> None:
     assert build_ask_payload(question="What did I save about AI?", include_context=True) == {
         "question": "What did I save about AI?",
         "include_context": True,
+        "retrieval_mode": "keyword",
+        "memory_top_k": 5,
+        "min_vector_score": 0.0,
     }
 
 
@@ -563,7 +566,7 @@ def test_build_eval_result_includes_retrieval_metadata_and_vector_annotations() 
     assert result["vector_score_count"] == 2
 
 
-def test_hybrid_ask_run_warns_and_keeps_ask_payload_unchanged(
+def test_hybrid_ask_run_sends_retrieval_fields_to_ask(
     tmp_path,
     monkeypatch,
     capsys,
@@ -615,7 +618,7 @@ def test_hybrid_ask_run_warns_and_keeps_ask_payload_unchanged(
 
     assert ask_eval.main() == 0
     output = capsys.readouterr().out
-    assert "Hybrid retrieval applies only to context_preview; /ask remains keyword-only." in output
+    assert "Hybrid retrieval applies only" not in output
     assert calls[0] == (
         "/ask/context-preview",
         {
@@ -631,6 +634,9 @@ def test_hybrid_ask_run_warns_and_keeps_ask_payload_unchanged(
         {
             "question": "What did I save about AI?",
             "include_context": True,
+            "retrieval_mode": "hybrid",
+            "memory_top_k": 8,
+            "min_vector_score": 0.25,
         },
     )
 

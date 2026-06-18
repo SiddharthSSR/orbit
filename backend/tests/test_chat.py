@@ -5,8 +5,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.api.routes import get_ai_provider
 from app.db.session import Base
+from app.main import app
 from app.models.bill import BillCreate, BillRecord
+from app.models.chat import AskRequest
 from app.models.memory import MemoryCreate, MemoryRecord
 from app.models.mood import MoodCreate, MoodRecord
 from app.models.project import ProjectCreate, ProjectRecord
@@ -18,6 +21,23 @@ from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
 from app.services.context_builder import OrbitContextBuilder
 from app.services.memory_retrieval import MemoryRetrievalService, MemorySearchResult
+
+
+class CapturingAIProvider:
+    def __init__(self) -> None:
+        self.context: str | None = None
+
+    def generate_answer(self, question, context, history):
+        self.context = context
+        return "Captured mock answer"
+
+
+def test_ask_request_defaults_to_keyword_mode() -> None:
+    request = AskRequest(question="What did I save about AI?")
+
+    assert request.retrieval_mode == "keyword"
+    assert request.memory_top_k == 5
+    assert request.min_vector_score == 0.0
 
 
 def test_ask_creates_new_session_and_two_messages(client) -> None:
@@ -296,15 +316,143 @@ def test_context_preview_validates_hybrid_controls(client) -> None:
     assert too_large.status_code == 422
 
 
-def test_ask_remains_keyword_only_and_does_not_call_vector_search(client, monkeypatch) -> None:
+def test_ask_keyword_mode_does_not_call_vector_search(client, monkeypatch) -> None:
     def fail_if_called(*args, **kwargs):
         raise AssertionError("/ask must not call vector retrieval")
 
     monkeypatch.setattr(MemoryRetrievalService, "search", fail_if_called)
 
-    response = client.post("/ask", json={"question": "What did I save about AI?"})
+    response = client.post(
+        "/ask",
+        json={
+            "question": "What did I save about AI?",
+            "retrieval_mode": "keyword",
+        },
+    )
 
     assert response.status_code == 200
+
+
+def test_ask_hybrid_mode_passes_vector_annotations_to_ai_provider(client, monkeypatch) -> None:
+    client.post(
+        "/memory",
+        json={
+            "title": "AI Agents Reading List",
+            "body": "Agent memory and retrieval",
+            "kind": "article",
+            "tags": ["ai", "agents"],
+        },
+    )
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+
+    def vector_results(service, query, *, top_k=5, min_score=0.0):
+        item = next(
+            item
+            for item in service.memory_repository.list()
+            if item.title == "AI Agents Reading List"
+        )
+        return [MemorySearchResult(score=0.625, memory_item=item)]
+
+    monkeypatch.setattr(MemoryRetrievalService, "search", vector_results)
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "What did I save about AI?",
+            "retrieval_mode": "hybrid",
+            "memory_top_k": 3,
+            "min_vector_score": 0.2,
+        },
+    )
+
+    assert response.status_code == 200
+    assert provider.context is not None
+    assert "AI Agents Reading List" in provider.context
+    assert "[vector_score=0.625]" in provider.context
+
+
+def test_ask_without_context_does_not_build_hybrid_context(client, monkeypatch) -> None:
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+
+    def fail_if_called(*args, **kwargs):
+        raise AssertionError("vector retrieval must not run when context is disabled")
+
+    monkeypatch.setattr(MemoryRetrievalService, "search", fail_if_called)
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "What did I save about AI?",
+            "include_context": False,
+            "retrieval_mode": "hybrid",
+        },
+    )
+
+    assert response.status_code == 200
+    assert provider.context == ""
+
+
+def test_ask_hybrid_mode_falls_back_when_vector_search_returns_no_results(
+    client,
+    monkeypatch,
+) -> None:
+    client.post(
+        "/memory",
+        json={
+            "title": "AI Fallback Note",
+            "body": "Keyword-only retrieval",
+            "tags": ["ai"],
+        },
+    )
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+    monkeypatch.setattr(MemoryRetrievalService, "search", lambda *args, **kwargs: [])
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "What did I save about AI?",
+            "retrieval_mode": "hybrid",
+        },
+    )
+
+    assert response.status_code == 200
+    assert provider.context is not None
+    assert "AI Fallback Note" in provider.context
+    assert "vector_score=" not in provider.context
+
+
+def test_ask_hybrid_mode_falls_back_when_vector_search_raises(client, monkeypatch) -> None:
+    client.post(
+        "/memory",
+        json={
+            "title": "Runtime Fallback Note",
+            "body": "Keyword memory remains available",
+            "tags": ["runtime"],
+        },
+    )
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+
+    def fail_search(*args, **kwargs):
+        raise RuntimeError("temporary vector search failure")
+
+    monkeypatch.setattr(MemoryRetrievalService, "search", fail_search)
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "What runtime note did I save?",
+            "retrieval_mode": "hybrid",
+        },
+    )
+
+    assert response.status_code == 200
+    assert provider.context is not None
+    assert "Runtime Fallback Note" in provider.context
+    assert "vector_score=" not in provider.context
 
 
 def test_ask_with_existing_session_appends_messages(client) -> None:

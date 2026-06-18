@@ -82,6 +82,9 @@ class AskRequest(BaseModel):
     question: str = Field(min_length=1)
     session_id: UUID | None = None
     include_context: bool = True
+    retrieval_mode: Literal["keyword", "hybrid"] = "keyword"
+    memory_top_k: int = Field(default=5, ge=1, le=20)
+    min_vector_score: float = 0.0
 
     @field_validator("question")
     @classmethod

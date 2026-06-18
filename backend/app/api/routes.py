@@ -88,6 +88,44 @@ def _chat_title_from_question(question: str) -> str:
     return f"{title[:77].rstrip()}..."
 
 
+def build_orbit_context_for_question(
+    session: Session,
+    *,
+    question: str,
+    include_context: bool,
+    retrieval_mode: str,
+    memory_top_k: int,
+    min_vector_score: float,
+) -> str:
+    if not include_context:
+        return ""
+
+    vector_memory_results = None
+    if retrieval_mode == "hybrid":
+        try:
+            embedding_provider = build_embedding_provider(settings)
+        except EmbeddingProviderConfigurationError as exc:
+            raise HTTPException(status_code=500, detail=str(exc)) from exc
+        try:
+            vector_memory_results = MemoryRetrievalService(
+                session,
+                embedding_provider,
+            ).search(
+                question,
+                top_k=memory_top_k,
+                min_score=min_vector_score,
+            )
+        except Exception:
+            vector_memory_results = []
+
+    return OrbitContextBuilder(
+        session,
+        question=question,
+        vector_memory_results=vector_memory_results,
+        memory_limit=memory_top_k,
+    ).build_context()
+
+
 @router.get("/health", tags=["system"])
 def health() -> dict[str, str]:
     return {"status": "ok"}
@@ -98,31 +136,14 @@ def preview_ask_context(
     payload: AskContextPreviewRequest,
     session: Session = Depends(get_session),
 ) -> AskContextPreviewResponse:
-    context = ""
-    if payload.include_context:
-        vector_memory_results = None
-        if payload.retrieval_mode == "hybrid":
-            try:
-                embedding_provider = build_embedding_provider(settings)
-            except EmbeddingProviderConfigurationError as exc:
-                raise HTTPException(status_code=500, detail=str(exc)) from exc
-            try:
-                vector_memory_results = MemoryRetrievalService(
-                    session,
-                    embedding_provider,
-                ).search(
-                    payload.question,
-                    top_k=payload.memory_top_k,
-                    min_score=payload.min_vector_score,
-                )
-            except Exception:
-                vector_memory_results = []
-        context = OrbitContextBuilder(
-            session,
-            question=payload.question,
-            vector_memory_results=vector_memory_results,
-            memory_limit=payload.memory_top_k,
-        ).build_context()
+    context = build_orbit_context_for_question(
+        session,
+        question=payload.question,
+        include_context=payload.include_context,
+        retrieval_mode=payload.retrieval_mode,
+        memory_top_k=payload.memory_top_k,
+        min_vector_score=payload.min_vector_score,
+    )
     return AskContextPreviewResponse(
         question=payload.question,
         include_context=payload.include_context,
@@ -153,7 +174,14 @@ def ask(
         role="user",
         content=payload.question,
     )
-    context = OrbitContextBuilder(session, question=payload.question).build_context() if payload.include_context else ""
+    context = build_orbit_context_for_question(
+        session,
+        question=payload.question,
+        include_context=payload.include_context,
+        retrieval_mode=payload.retrieval_mode,
+        memory_top_k=payload.memory_top_k,
+        min_vector_score=payload.min_vector_score,
+    )
     history = [
         {"role": message.role, "content": message.content}
         for message in chat_repository.list_messages_for_session(chat_session.id)
