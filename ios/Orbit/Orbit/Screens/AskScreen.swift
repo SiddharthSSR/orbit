@@ -261,6 +261,50 @@ private struct FlowLayout<Content: View>: View {
     }
 }
 
+/// Lightweight, dependency-free rendering helper for assistant answers.
+///
+/// Assistant answers are inline-Markdown-ish (bold labels, links, "- " bullets,
+/// "Next step:" lines). We render each line with native `AttributedString`
+/// inline parsing and fall back to plain text when parsing fails. User messages
+/// are never passed through this helper — they stay plain.
+enum AskAnswerMarkdown {
+    /// Non-empty, trimmed lines to render, preserving the answer's line structure.
+    static func displayLines(from content: String) -> [String] {
+        content
+            .components(separatedBy: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+    }
+
+    /// True for a "Next step:" line, which is emphasized slightly in the UI.
+    static func isNextStep(_ line: String) -> Bool {
+        line.lowercased().hasPrefix("next step")
+    }
+
+    /// Renders one line: converts a leading "- "/"* " bullet to "•", parses
+    /// inline Markdown (bold, links), and falls back to plain text on failure.
+    static func attributedLine(_ rawLine: String) -> AttributedString {
+        var line = rawLine
+        var bulletPrefix: AttributedString?
+        if let marker = ["- ", "* "].first(where: { line.hasPrefix($0) }) {
+            line = String(line.dropFirst(marker.count))
+            bulletPrefix = AttributedString("•  ")
+        }
+
+        let parsed = (try? AttributedString(
+            markdown: line,
+            options: AttributedString.MarkdownParsingOptions(
+                interpretedSyntax: .inlineOnlyPreservingWhitespace
+            )
+        )) ?? AttributedString(line)
+
+        if let bulletPrefix {
+            return bulletPrefix + parsed
+        }
+        return parsed
+    }
+}
+
 private struct ChatMessageRow: View {
     let message: ChatMessageDTO
 
@@ -275,9 +319,7 @@ private struct ChatMessageRow: View {
             Label(roleLabel, systemImage: roleIcon)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(isAssistant ? Color.secondary : Color.accentColor)
-            Text(message.content)
-                .font(.body)
-                .textSelection(.enabled)
+            messageBody
         }
         .padding(12)
         .frame(maxWidth: 360, alignment: .leading)
@@ -287,6 +329,26 @@ private struct ChatMessageRow: View {
                 .stroke(isAssistant ? Color(.separator).opacity(0.4) : Color.accentColor.opacity(0.18))
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    @ViewBuilder
+    private var messageBody: some View {
+        if isAssistant {
+            VStack(alignment: .leading, spacing: 5) {
+                ForEach(Array(AskAnswerMarkdown.displayLines(from: message.content).enumerated()), id: \.offset) { _, line in
+                    Text(AskAnswerMarkdown.attributedLine(line))
+                        .font(AskAnswerMarkdown.isNextStep(line) ? .body.weight(.semibold) : .body)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+            .tint(.accentColor)
+            .textSelection(.enabled)
+        } else {
+            Text(message.content)
+                .font(.body)
+                .textSelection(.enabled)
+        }
     }
 
     private var isAssistant: Bool {

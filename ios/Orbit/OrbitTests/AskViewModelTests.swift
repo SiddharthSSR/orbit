@@ -420,6 +420,59 @@ final class AskViewModelTests: XCTestCase {
     }
 }
 
+final class AskAnswerMarkdownTests: XCTestCase {
+    func testParsesBoldLabel() {
+        let attributed = AskAnswerMarkdown.attributedLine("**Bills:** due soon")
+
+        XCTAssertEqual(String(attributed.characters), "Bills: due soon")
+        let hasBold = attributed.runs.contains { run in
+            run.inlinePresentationIntent?.contains(.stronglyEmphasized) ?? false
+        }
+        XCTAssertTrue(hasBold)
+    }
+
+    func testParsesLinkAsTappableRun() {
+        let attributed = AskAnswerMarkdown.attributedLine("See [docs](https://example.com)")
+
+        XCTAssertEqual(String(attributed.characters), "See docs")
+        let link = attributed.runs.compactMap(\.link).first
+        XCTAssertEqual(link, URL(string: "https://example.com"))
+    }
+
+    func testConvertsLeadingBulletMarkerToGlyph() {
+        let dash = AskAnswerMarkdown.attributedLine("- Furlenco Furniture Rent")
+        let star = AskAnswerMarkdown.attributedLine("* Credit Card Payment")
+
+        XCTAssertTrue(String(dash.characters).hasPrefix("•  Furlenco Furniture Rent"))
+        XCTAssertTrue(String(star.characters).hasPrefix("•  Credit Card Payment"))
+    }
+
+    func testPlainTextRendersAndFallsBack() {
+        let attributed = AskAnswerMarkdown.attributedLine("Just a plain sentence.")
+
+        XCTAssertEqual(String(attributed.characters), "Just a plain sentence.")
+        let hasBold = attributed.runs.contains { run in
+            run.inlinePresentationIntent?.contains(.stronglyEmphasized) ?? false
+        }
+        XCTAssertFalse(hasBold)
+    }
+
+    func testDisplayLinesTrimsAndDropsEmptyLines() {
+        let content = "You have 2 bills.\n\n- Credit Card Payment\n  - Furlenco\n"
+
+        XCTAssertEqual(
+            AskAnswerMarkdown.displayLines(from: content),
+            ["You have 2 bills.", "- Credit Card Payment", "- Furlenco"]
+        )
+    }
+
+    func testNextStepDetection() {
+        XCTAssertTrue(AskAnswerMarkdown.isNextStep("Next step: pay the overdue bill"))
+        XCTAssertTrue(AskAnswerMarkdown.isNextStep("next steps: review todos"))
+        XCTAssertFalse(AskAnswerMarkdown.isNextStep("You should focus today"))
+    }
+}
+
 private struct FailingChatAPIClient: ChatAPIClientProtocol {
     func ask(_ payload: AskRequest) async throws -> AskResponse {
         throw FailingChatAPIError.expectedFailure
