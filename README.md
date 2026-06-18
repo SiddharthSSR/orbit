@@ -278,7 +278,7 @@ python scripts/compare_ask_eval_runs.py \
   --output eval-results/latest-comparison.json
 ```
 
-The comparison reports summary rate deltas and classifies each question as improved, preserved, degraded, or changed. Degradation means hybrid loses expected section coverage or a section-aware expected item; improvement means it gains either signal. Questions present in only one run are marked changed.
+The comparison reports summary rate deltas and classifies each question as improved, preserved, degraded, or changed. Degradation means hybrid loses expected section coverage or a section-aware expected item; improvement means it gains either signal. Questions present in only one run are marked changed. The comparison also reports an **answer-quality delta**: keyword and hybrid `answer_quality_pass_rate`, their delta, and the hybrid answer-quality failure count. Older eval outputs that predate answer-quality reporting are handled gracefully (missing fields read as `0`/`0.0`), so the comparison never crashes on them.
 
 Run repeated paired samples and enforce initial rollout thresholds:
 
@@ -290,6 +290,14 @@ python scripts/run_ask_eval_samples.py \
 ```
 
 Each sample writes keyword, hybrid, and comparison JSON files plus an aggregate `summary.json`. The initial local guardrails default to a `0.0` maximum hybrid fallback rate and a `25.0` ms maximum average latency delta; `--fail-on-degraded` additionally requires zero degraded questions. With local mock embeddings, fallback rate should remain zero, the latency delta should remain small, and degraded questions should be zero before hybrid retrieval is exposed in iOS.
+
+Repeated sampling can also gate **answer quality**. The aggregate `summary.json` records per-run keyword/hybrid `answer_quality_pass_rate` values plus averages, minimums, and total failures. `--min-hybrid-answer-quality-pass-rate` (default `0.0`, i.e. no gating) fails the run when the minimum hybrid answer-quality pass rate across runs falls below the threshold:
+
+```bash
+python scripts/run_ask_eval_samples.py --runs 5 --ask --min-hybrid-answer-quality-pass-rate 1.0
+```
+
+Answer-quality gating requires `--ask` (the rate is `0.0` when no answers are produced). For local mock evals the recommended threshold is `1.0`, because the deterministic mock should pass every question. For real OpenAI runs, choose the threshold from repeated manual smoke results rather than blindly setting `1.0`; answer quality remains deterministic and local for mock evals and is never gated by default.
 
 Both `POST /ask` and `POST /ask/context-preview` support opt-in hybrid retrieval with `retrieval_mode: "hybrid"`, `memory_top_k` (default `5`, range `1` to `20`), and `min_vector_score` (default `0.0`). Keyword retrieval remains the default for backward compatibility. Hybrid retrieval changes only the Recent memory section; the other context sections retain their existing ranking. If vector retrieval is unavailable at runtime, Orbit falls back to keyword-ranked memory. The eval harness sends the selected retrieval settings to both endpoints when `--ask` is enabled.
 

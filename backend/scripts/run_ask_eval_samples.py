@@ -61,6 +61,16 @@ def build_argument_parser() -> argparse.ArgumentParser:
         default=25.0,
         help="Maximum allowed average hybrid-keyword latency delta. Default: 25.0 ms.",
     )
+    parser.add_argument(
+        "--min-hybrid-answer-quality-pass-rate",
+        type=_rate_float,
+        default=0.0,
+        help=(
+            "Minimum allowed hybrid answer-quality pass rate across runs. "
+            "Default: 0.0 (no gating). Use 1.0 for local mock; choose real-LLM "
+            "thresholds from repeated smoke results."
+        ),
+    )
     return parser
 
 
@@ -107,6 +117,7 @@ def run_samples(
         max_hybrid_fallback_rate=args.max_hybrid_fallback_rate,
         max_avg_latency_delta_ms=args.max_avg_latency_delta_ms,
         fail_on_degraded=args.fail_on_degraded,
+        min_hybrid_answer_quality_pass_rate=args.min_hybrid_answer_quality_pass_rate,
     )
     (args.output_dir / "summary.json").write_text(
         json.dumps(summary, indent=2, ensure_ascii=False) + "\n",
@@ -131,6 +142,7 @@ def aggregate_sample_results(
     max_hybrid_fallback_rate: float,
     max_avg_latency_delta_ms: float,
     fail_on_degraded: bool,
+    min_hybrid_answer_quality_pass_rate: float = 0.0,
 ) -> dict[str, Any]:
     if not keyword_runs or len(keyword_runs) != len(hybrid_runs) or len(keyword_runs) != len(comparisons):
         raise ValueError("keyword, hybrid, and comparison samples must have the same non-zero length.")
@@ -168,6 +180,20 @@ def aggregate_sample_results(
     )
     avg_latency_delta_ms = _average(latency_delta_values)
 
+    keyword_answer_quality_pass_rate_values = [
+        _answer_quality_rate(run["summary"]) for run in keyword_runs
+    ]
+    hybrid_answer_quality_pass_rate_values = [
+        _answer_quality_rate(run["summary"]) for run in hybrid_runs
+    ]
+    total_keyword_answer_quality_failures = sum(
+        _answer_quality_failures(run["summary"]) for run in keyword_runs
+    )
+    total_hybrid_answer_quality_failures = sum(
+        _answer_quality_failures(run["summary"]) for run in hybrid_runs
+    )
+    min_hybrid_answer_quality_pass_rate_value = min(hybrid_answer_quality_pass_rate_values)
+
     failed_thresholds: list[str] = []
     if hybrid_fallback_rate > max_hybrid_fallback_rate:
         failed_thresholds.append("hybrid_fallback_rate")
@@ -175,6 +201,8 @@ def aggregate_sample_results(
         failed_thresholds.append("avg_latency_delta_ms")
     if fail_on_degraded and total_degraded_questions > 0:
         failed_thresholds.append("degraded_questions")
+    if min_hybrid_answer_quality_pass_rate_value < min_hybrid_answer_quality_pass_rate:
+        failed_thresholds.append("hybrid_answer_quality_pass_rate")
 
     return {
         "runs": len(keyword_runs),
@@ -191,6 +219,14 @@ def aggregate_sample_results(
         "total_degraded_questions": total_degraded_questions,
         "total_improved_questions": total_improved_questions,
         "total_preserved_questions": total_preserved_questions,
+        "keyword_answer_quality_pass_rate_values": keyword_answer_quality_pass_rate_values,
+        "hybrid_answer_quality_pass_rate_values": hybrid_answer_quality_pass_rate_values,
+        "avg_keyword_answer_quality_pass_rate": _average(keyword_answer_quality_pass_rate_values),
+        "avg_hybrid_answer_quality_pass_rate": _average(hybrid_answer_quality_pass_rate_values),
+        "min_keyword_answer_quality_pass_rate": min(keyword_answer_quality_pass_rate_values),
+        "min_hybrid_answer_quality_pass_rate": min_hybrid_answer_quality_pass_rate_value,
+        "total_keyword_answer_quality_failures": total_keyword_answer_quality_failures,
+        "total_hybrid_answer_quality_failures": total_hybrid_answer_quality_failures,
         "pass": not failed_thresholds,
         "failed_thresholds": failed_thresholds,
     }
@@ -205,6 +241,22 @@ def print_sample_report(summary: dict[str, Any]) -> None:
     print(f"* Maximum latency delta: {summary['max_latency_delta_ms']:+.2f} ms")
     print(f"* Hybrid fallback rate: {summary['hybrid_fallback_rate']:.2%}")
     print(f"* Degraded questions: {summary['total_degraded_questions']}")
+    print(
+        "* Average keyword answer quality: "
+        f"{summary['avg_keyword_answer_quality_pass_rate']:.2%}"
+    )
+    print(
+        "* Average hybrid answer quality: "
+        f"{summary['avg_hybrid_answer_quality_pass_rate']:.2%}"
+    )
+    print(
+        "* Minimum hybrid answer quality: "
+        f"{summary['min_hybrid_answer_quality_pass_rate']:.2%}"
+    )
+    print(
+        "* Hybrid answer-quality failures: "
+        f"{summary['total_hybrid_answer_quality_failures']}"
+    )
     print(f"* Result: {'PASS' if summary['pass'] else 'FAIL'}")
     if summary["failed_thresholds"]:
         print(f"* Failed thresholds: {', '.join(summary['failed_thresholds'])}")
@@ -246,6 +298,23 @@ def _average(values: list[float]) -> float:
     return sum(values) / len(values)
 
 
+def _answer_quality_rate(summary: dict[str, Any]) -> float:
+    """Hybrid/keyword answer-quality pass rate, defaulting to 0.0 when absent."""
+    value = summary.get("answer_quality_pass_rate")
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return 0.0
+
+
+def _answer_quality_failures(summary: dict[str, Any]) -> int:
+    value = summary.get("answer_quality_fail_count")
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, (int, float)):
+        return int(value)
+    return 0
+
+
 def _required_number(summary: dict[str, Any], key: str) -> float:
     value = summary.get(key)
     if not isinstance(value, (int, float)) or isinstance(value, bool):
@@ -271,6 +340,13 @@ def _non_negative_float(value: str) -> float:
     parsed = float(value)
     if parsed < 0:
         raise argparse.ArgumentTypeError("must be non-negative")
+    return parsed
+
+
+def _rate_float(value: str) -> float:
+    parsed = float(value)
+    if not 0.0 <= parsed <= 1.0:
+        raise argparse.ArgumentTypeError("must be between 0.0 and 1.0")
     return parsed
 
 

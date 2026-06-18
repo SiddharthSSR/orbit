@@ -36,9 +36,73 @@ def test_aggregate_summary_calculation() -> None:
         "total_degraded_questions": 1,
         "total_improved_questions": 2,
         "total_preserved_questions": 17,
+        "keyword_answer_quality_pass_rate_values": [0.0, 0.0],
+        "hybrid_answer_quality_pass_rate_values": [0.0, 0.0],
+        "avg_keyword_answer_quality_pass_rate": 0.0,
+        "avg_hybrid_answer_quality_pass_rate": 0.0,
+        "min_keyword_answer_quality_pass_rate": 0.0,
+        "min_hybrid_answer_quality_pass_rate": 0.0,
+        "total_keyword_answer_quality_failures": 0,
+        "total_hybrid_answer_quality_failures": 0,
         "pass": True,
         "failed_thresholds": [],
     }
+
+
+def test_aggregate_summary_includes_answer_quality_rates() -> None:
+    summary = aggregate_sample_results(
+        [make_eval(1.0, answer_quality_pass_rate=1.0)],
+        [make_eval(2.0, attempts=10, answer_quality_pass_rate=0.8, answer_quality_fail_count=2)],
+        [make_comparison()],
+        max_hybrid_fallback_rate=0.0,
+        max_avg_latency_delta_ms=25.0,
+        fail_on_degraded=False,
+    )
+
+    assert summary["keyword_answer_quality_pass_rate_values"] == [1.0]
+    assert summary["hybrid_answer_quality_pass_rate_values"] == [0.8]
+    assert summary["avg_hybrid_answer_quality_pass_rate"] == 0.8
+    assert summary["min_hybrid_answer_quality_pass_rate"] == 0.8
+    assert summary["total_hybrid_answer_quality_failures"] == 2
+    # Default threshold (0.0) does not gate.
+    assert summary["pass"] is True
+
+
+def test_answer_quality_threshold_passes_when_all_hybrid_runs_are_perfect() -> None:
+    summary = aggregate_sample_results(
+        [make_eval(1.0, answer_quality_pass_rate=1.0), make_eval(1.0, answer_quality_pass_rate=1.0)],
+        [
+            make_eval(2.0, attempts=10, answer_quality_pass_rate=1.0),
+            make_eval(2.0, attempts=10, answer_quality_pass_rate=1.0),
+        ],
+        [make_comparison(), make_comparison()],
+        max_hybrid_fallback_rate=0.0,
+        max_avg_latency_delta_ms=25.0,
+        fail_on_degraded=False,
+        min_hybrid_answer_quality_pass_rate=1.0,
+    )
+
+    assert summary["pass"] is True
+    assert summary["failed_thresholds"] == []
+
+
+def test_answer_quality_threshold_fails_when_hybrid_min_below_threshold() -> None:
+    summary = aggregate_sample_results(
+        [make_eval(1.0, answer_quality_pass_rate=1.0), make_eval(1.0, answer_quality_pass_rate=1.0)],
+        [
+            make_eval(2.0, attempts=10, answer_quality_pass_rate=1.0),
+            make_eval(2.0, attempts=10, answer_quality_pass_rate=0.8, answer_quality_fail_count=2),
+        ],
+        [make_comparison(), make_comparison()],
+        max_hybrid_fallback_rate=0.0,
+        max_avg_latency_delta_ms=25.0,
+        fail_on_degraded=False,
+        min_hybrid_answer_quality_pass_rate=1.0,
+    )
+
+    assert summary["pass"] is False
+    assert summary["failed_thresholds"] == ["hybrid_answer_quality_pass_rate"]
+    assert summary["min_hybrid_answer_quality_pass_rate"] == 0.8
 
 
 def test_thresholds_pass_at_limits() -> None:
@@ -119,6 +183,7 @@ def test_cli_argument_defaults_and_overrides() -> None:
     assert defaults.fail_on_degraded is False
     assert defaults.max_hybrid_fallback_rate == 0.0
     assert defaults.max_avg_latency_delta_ms == 25.0
+    assert defaults.min_hybrid_answer_quality_pass_rate == 0.0
 
     configured = parser.parse_args(
         [
@@ -140,6 +205,8 @@ def test_cli_argument_defaults_and_overrides() -> None:
             "0.1",
             "--max-avg-latency-delta-ms",
             "10",
+            "--min-hybrid-answer-quality-pass-rate",
+            "1.0",
         ]
     )
 
@@ -152,6 +219,12 @@ def test_cli_argument_defaults_and_overrides() -> None:
     assert configured.fail_on_degraded is True
     assert configured.max_hybrid_fallback_rate == 0.1
     assert configured.max_avg_latency_delta_ms == 10.0
+    assert configured.min_hybrid_answer_quality_pass_rate == 1.0
+
+
+def test_cli_rejects_out_of_range_answer_quality_threshold() -> None:
+    with pytest.raises(SystemExit):
+        build_argument_parser().parse_args(["--min-hybrid-answer-quality-pass-rate", "1.5"])
 
 
 @pytest.mark.parametrize(("flag", "value"), [("--runs", "0"), ("--memory-top-k", "21")])
@@ -160,14 +233,26 @@ def test_cli_rejects_invalid_integer_controls(flag, value) -> None:
         build_argument_parser().parse_args([flag, value])
 
 
-def make_eval(latency: float, *, fallbacks: int = 0, attempts: int = 0) -> dict:
-    return {
-        "summary": {
-            "avg_context_build_ms": latency,
-            "retrieval_fallback_count": fallbacks,
-            "retrieval_vector_attempt_count": attempts,
-        }
+def make_eval(
+    latency: float,
+    *,
+    fallbacks: int = 0,
+    attempts: int = 0,
+    answer_quality_pass_rate: float | None = None,
+    answer_quality_fail_count: int | None = None,
+) -> dict:
+    summary = {
+        "avg_context_build_ms": latency,
+        "retrieval_fallback_count": fallbacks,
+        "retrieval_vector_attempt_count": attempts,
     }
+    # Older eval outputs omit answer-quality fields; only include when provided
+    # so the graceful-missing path stays covered.
+    if answer_quality_pass_rate is not None:
+        summary["answer_quality_pass_rate"] = answer_quality_pass_rate
+    if answer_quality_fail_count is not None:
+        summary["answer_quality_fail_count"] = answer_quality_fail_count
+    return {"summary": summary}
 
 
 def make_comparison(*, degraded: int = 0, improved: int = 0, preserved: int = 10) -> dict:

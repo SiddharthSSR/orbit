@@ -47,6 +47,15 @@ def test_valid_comparison_summary_includes_metrics_and_deltas() -> None:
         "keyword_question_count": 1,
         "hybrid_question_count": 1,
         "compared_question_count": 1,
+        "keyword_answer_quality_evaluated_count": 0,
+        "hybrid_answer_quality_evaluated_count": 0,
+        "keyword_answer_quality_pass_count": 0,
+        "hybrid_answer_quality_pass_count": 0,
+        "keyword_answer_quality_fail_count": 0,
+        "hybrid_answer_quality_fail_count": 0,
+        "keyword_answer_quality_pass_rate": 0.0,
+        "hybrid_answer_quality_pass_rate": 0.0,
+        "answer_quality_pass_rate_delta": 0.0,
         "improved_count": 0,
         "preserved_count": 1,
         "degraded_count": 0,
@@ -85,6 +94,45 @@ def test_classifies_preserved_when_key_metrics_are_equal() -> None:
 
     assert question["classification"] == "preserved"
     assert question["hybrid_vector_score_count"] == 2
+
+
+def test_comparison_summary_includes_answer_quality_rates_and_delta() -> None:
+    keyword = make_run(
+        answer_quality={
+            "answer_quality_evaluated_count": 10,
+            "answer_quality_pass_count": 6,
+            "answer_quality_fail_count": 4,
+            "answer_quality_pass_rate": 0.6,
+        }
+    )
+    hybrid = make_run(
+        answer_quality={
+            "answer_quality_evaluated_count": 10,
+            "answer_quality_pass_count": 10,
+            "answer_quality_fail_count": 0,
+            "answer_quality_pass_rate": 1.0,
+        }
+    )
+
+    summary = compare_eval_runs(keyword, hybrid)["summary"]
+
+    assert summary["keyword_answer_quality_pass_rate"] == 0.6
+    assert summary["hybrid_answer_quality_pass_rate"] == 1.0
+    assert summary["answer_quality_pass_rate_delta"] == pytest.approx(0.4)
+    assert summary["keyword_answer_quality_fail_count"] == 4
+    assert summary["hybrid_answer_quality_fail_count"] == 0
+    assert summary["hybrid_answer_quality_evaluated_count"] == 10
+
+
+def test_comparison_handles_missing_answer_quality_fields() -> None:
+    # Older eval outputs that predate answer-quality reporting must not crash.
+    summary = compare_eval_runs(make_run(), make_run())["summary"]
+
+    assert summary["keyword_answer_quality_pass_rate"] == 0.0
+    assert summary["hybrid_answer_quality_pass_rate"] == 0.0
+    assert summary["answer_quality_pass_rate_delta"] == 0.0
+    assert summary["keyword_answer_quality_evaluated_count"] == 0
+    assert summary["hybrid_answer_quality_fail_count"] == 0
 
 
 def test_write_comparison_uses_summary_and_questions_shape(tmp_path) -> None:
@@ -143,17 +191,22 @@ def make_run(
     vector_count=0,
     fallback_count=0,
     avg_context_build_ms=5.0,
+    answer_quality=None,
 ):
     if result is None:
         result = make_result()
+    summary = {
+        "section_match_pass_rate": section_rate,
+        "section_item_ranking_pass_rate": ranking_rate,
+        "vector_score_annotation_total_count": vector_count,
+        "retrieval_fallback_count": fallback_count,
+        "avg_context_build_ms": avg_context_build_ms,
+    }
+    # Older eval outputs omit answer-quality fields; include only when provided.
+    if answer_quality is not None:
+        summary.update(answer_quality)
     return {
-        "summary": {
-            "section_match_pass_rate": section_rate,
-            "section_item_ranking_pass_rate": ranking_rate,
-            "vector_score_annotation_total_count": vector_count,
-            "retrieval_fallback_count": fallback_count,
-            "avg_context_build_ms": avg_context_build_ms,
-        },
+        "summary": summary,
         "results": [result],
     }
 

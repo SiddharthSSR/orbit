@@ -170,11 +170,47 @@ def compare_eval_runs(
         "hybrid_question_count": len(hybrid_results),
         "compared_question_count": len(questions),
     }
+    summary.update(_answer_quality_summary(keyword_summary, hybrid_summary))
     for classification in ("improved", "preserved", "degraded", "changed"):
         summary[f"{classification}_count"] = sum(
             question["classification"] == classification for question in questions
         )
     return {"summary": summary, "questions": questions}
+
+
+def _answer_quality_summary(
+    keyword_summary: dict[str, Any], hybrid_summary: dict[str, Any]
+) -> dict[str, Any]:
+    """Answer-quality comparison fields.
+
+    Older eval outputs predate answer-quality reporting, so missing fields are
+    treated as ``0`` (counts) or ``0.0`` (rates) rather than raising.
+    """
+    keyword_rate = _rate(keyword_summary, "answer_quality_pass_rate")
+    hybrid_rate = _rate(hybrid_summary, "answer_quality_pass_rate")
+    return {
+        "keyword_answer_quality_evaluated_count": _count(
+            keyword_summary, "answer_quality_evaluated_count"
+        ),
+        "hybrid_answer_quality_evaluated_count": _count(
+            hybrid_summary, "answer_quality_evaluated_count"
+        ),
+        "keyword_answer_quality_pass_count": _count(
+            keyword_summary, "answer_quality_pass_count"
+        ),
+        "hybrid_answer_quality_pass_count": _count(
+            hybrid_summary, "answer_quality_pass_count"
+        ),
+        "keyword_answer_quality_fail_count": _count(
+            keyword_summary, "answer_quality_fail_count"
+        ),
+        "hybrid_answer_quality_fail_count": _count(
+            hybrid_summary, "answer_quality_fail_count"
+        ),
+        "keyword_answer_quality_pass_rate": keyword_rate,
+        "hybrid_answer_quality_pass_rate": hybrid_rate,
+        "answer_quality_pass_rate_delta": hybrid_rate - keyword_rate,
+    }
 
 
 def compare_question(
@@ -268,6 +304,17 @@ def print_comparison_report(comparison: dict[str, Any]) -> None:
             f"delta {summary['avg_context_build_ms_delta']:+.2f} ms"
         )
     print(
+        "* Answer quality pass rate: "
+        f"keyword {_percent(summary['keyword_answer_quality_pass_rate'])}, "
+        f"hybrid {_percent(summary['hybrid_answer_quality_pass_rate'])}, "
+        f"delta {_signed_percent(summary['answer_quality_pass_rate_delta'])}"
+    )
+    print(
+        "* Hybrid answer-quality failures: "
+        f"{summary['hybrid_answer_quality_fail_count']} "
+        f"of {summary['hybrid_answer_quality_evaluated_count']} evaluated"
+    )
+    print(
         "* Classifications: "
         f"{summary['improved_count']} improved, "
         f"{summary['preserved_count']} preserved, "
@@ -337,6 +384,22 @@ def _optional_number(value: Any) -> float | None:
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         return float(value)
     return None
+
+
+def _rate(summary: dict[str, Any], key: str) -> float:
+    value = summary.get(key)
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return 0.0
+
+
+def _count(summary: dict[str, Any], key: str) -> int:
+    value = summary.get(key)
+    if isinstance(value, bool):
+        return 0
+    if isinstance(value, (int, float)):
+        return int(value)
+    return 0
 
 
 if __name__ == "__main__":
