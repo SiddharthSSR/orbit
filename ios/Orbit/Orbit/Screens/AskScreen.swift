@@ -258,15 +258,15 @@ struct AskScreen: View {
         }
         .sheet(
             item: Binding(
-                get: { viewModel.selectedSuggestedAction },
-                set: { action in
-                    if action == nil {
+                get: { viewModel.selectedSuggestedActionDraft },
+                set: { draft in
+                    if draft == nil {
                         viewModel.dismissSuggestedActionPreview()
                     }
                 }
             )
-        ) { action in
-            SuggestedActionPreviewSheet(action: action)
+        ) { draft in
+            SuggestedActionPreviewSheet(draft: draft)
         }
     }
 
@@ -488,47 +488,57 @@ private struct ChatMessageRow: View {
 private struct SuggestedActionPreviewSheet: View {
     @Environment(\.dismiss) private var dismiss
 
-    let action: SuggestedActionDTO
+    let draft: SuggestedActionDraft
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
-                    Label("Preview only — nothing will be changed yet.", systemImage: "eye")
+                    Label("Draft preview only — nothing will be saved yet.", systemImage: "eye")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                 }
 
                 Section("Action") {
-                    LabeledContent("Type", value: action.typeLabel)
-                    if let subtitle = action.subtitle, !subtitle.isEmpty {
-                        Text(subtitle)
+                    LabeledContent("Type", value: draft.actionType)
+                    Text(draft.primaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if let secondaryText = draft.secondaryText {
+                        Text(secondaryText)
+                            .font(.footnote)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
-                Section("What this would do") {
-                    Text(action.previewDescription)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-
-                if !action.sortedPayload.isEmpty {
-                    Section("Draft details") {
-                        ForEach(action.sortedPayload, id: \.key) { item in
-                            LabeledContent(payloadLabel(item.key), value: item.value)
+                Section("Draft fields") {
+                    ForEach(draft.fields) { field in
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(field.label)
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                            Text(field.value)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .textSelection(.enabled)
+                            if field.futureEditable {
+                                Text("Editable in a future MVP.")
+                                    .font(.caption2)
+                                    .foregroundStyle(.secondary)
+                            }
                         }
+                        .padding(.vertical, 2)
                     }
                 }
 
                 Section {
-                    Button("Execution coming soon") {}
+                    Button(draft.confirmationTitle) {}
                         .frame(maxWidth: .infinity)
                         .buttonStyle(.borderedProminent)
                         .disabled(true)
                 }
                 .listRowBackground(Color.clear)
             }
-            .navigationTitle(action.previewTitle)
+            .navigationTitle(draft.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -539,10 +549,6 @@ private struct SuggestedActionPreviewSheet: View {
             }
         }
         .presentationDetents([.medium, .large])
-    }
-
-    private func payloadLabel(_ key: String) -> String {
-        key.replacingOccurrences(of: "_", with: " ").capitalized
     }
 }
 

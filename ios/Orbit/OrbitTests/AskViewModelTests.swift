@@ -89,8 +89,98 @@ final class AskViewModelTests: XCTestCase {
         viewModel.selectSuggestedAction(action)
 
         XCTAssertEqual(viewModel.selectedSuggestedAction, action)
+        XCTAssertEqual(viewModel.selectedSuggestedActionDraft, SuggestedActionDraft(action: action))
         viewModel.dismissSuggestedActionPreview()
         XCTAssertNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.selectedSuggestedActionDraft)
+    }
+
+    func testCreateTodoActionMapsToTodoDraft() {
+        let draft = SuggestedActionDraft(
+            action: makeSuggestedAction(
+                type: "create_todo",
+                title: "Create a todo",
+                subtitle: "Fallback todo title",
+                payload: ["draft_title": "Call the dentist"]
+            )
+        )
+
+        XCTAssertEqual(draft.title, "Create todo draft")
+        XCTAssertEqual(draft.actionType, "create_todo")
+        XCTAssertEqual(draft.fields, [
+            SuggestedActionDraftField(
+                label: "Todo title",
+                value: "Call the dentist",
+                futureEditable: true
+            )
+        ])
+        XCTAssertEqual(draft.confirmationTitle, "Save coming soon")
+    }
+
+    func testSaveMemoryActionMapsToMemoryDraft() {
+        let draft = SuggestedActionDraft(
+            action: makeSuggestedAction(
+                type: "save_memory",
+                title: "Save to memory",
+                subtitle: "I like quiet cafes",
+                payload: nil
+            )
+        )
+
+        XCTAssertEqual(draft.title, "Save memory draft")
+        XCTAssertEqual(draft.fields.first?.label, "Memory text")
+        XCTAssertEqual(draft.fields.first?.value, "I like quiet cafes")
+        XCTAssertEqual(draft.fields.first?.futureEditable, true)
+    }
+
+    func testReviewBillsActionMapsToReadOnlyReviewDraft() {
+        let draft = SuggestedActionDraft(
+            action: makeSuggestedAction(
+                type: "review_bills",
+                title: "Review bills",
+                subtitle: "Upcoming payments",
+                payload: ["scope": "Overdue and due soon"]
+            )
+        )
+
+        XCTAssertEqual(draft.title, "Review bills")
+        XCTAssertEqual(draft.fields.first?.label, "Scope")
+        XCTAssertEqual(draft.fields.first?.value, "Overdue and due soon")
+        XCTAssertEqual(draft.fields.first?.futureEditable, false)
+        XCTAssertEqual(draft.confirmationTitle, "Confirm coming soon")
+    }
+
+    func testUnknownActionMapsToGenericDraft() {
+        let draft = SuggestedActionDraft(
+            action: makeSuggestedAction(
+                type: "future_action",
+                title: "Future action",
+                subtitle: "Preview future behavior",
+                payload: nil
+            )
+        )
+
+        XCTAssertEqual(draft.title, "Future action")
+        XCTAssertEqual(draft.actionType, "future_action")
+        XCTAssertEqual(draft.fields.first?.label, "Details")
+        XCTAssertEqual(draft.fields.first?.value, "Preview future behavior")
+        XCTAssertTrue(draft.primaryText.contains("future confirmation"))
+    }
+
+    func testDraftPreviewSelectionDoesNotMakeAPIRequests() async {
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = makeViewModel(client)
+
+        viewModel.selectSuggestedAction(makeSuggestedAction())
+        _ = viewModel.selectedSuggestedActionDraft
+        viewModel.dismissSuggestedActionPreview()
+
+        let askRequest = await client.lastAskRequest()
+        let previewRequest = await client.lastPreviewRequest()
+        let deletedSessions = await client.deletedSessions()
+        XCTAssertNil(askRequest)
+        XCTAssertNil(previewRequest)
+        XCTAssertTrue(deletedSessions.isEmpty)
     }
 
     func testUnknownSuggestedActionUsesGenericPreviewCopy() {
@@ -160,6 +250,19 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.selectedSession?.id, session.id)
         XCTAssertEqual(viewModel.messages.map(\.content), ["Question", "Answer"])
         XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testSelectSessionClearsSuggestedActionDraft() async {
+        let session = makeSession(title: "Existing")
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [session], messagesBySession: [session.id: []])
+        )
+        viewModel.selectSuggestedAction(makeSuggestedAction())
+
+        await viewModel.selectSession(session)
+
+        XCTAssertNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.selectedSuggestedActionDraft)
     }
 
     func testStartNewSessionClearsSelectionAndMessages() async {
@@ -232,6 +335,7 @@ final class AskViewModelTests: XCTestCase {
         )
         let viewModel = makeViewModel(client)
         await viewModel.selectSession(session)
+        viewModel.selectSuggestedAction(makeSuggestedAction())
         XCTAssertFalse(viewModel.messages.isEmpty)
 
         await viewModel.deleteSession(session)
@@ -239,6 +343,8 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.selectedSession)
         XCTAssertTrue(viewModel.messages.isEmpty)
         XCTAssertTrue(viewModel.sessions.isEmpty)
+        XCTAssertNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.selectedSuggestedActionDraft)
         XCTAssertNil(viewModel.errorMessage)
     }
 
@@ -585,14 +691,16 @@ final class AskViewModelTests: XCTestCase {
 
     private func makeSuggestedAction(
         type: String = "create_todo",
-        title: String = "Create a todo"
+        title: String = "Create a todo",
+        subtitle: String? = "Preview details",
+        payload: [String: String]? = ["draft_title": "Follow up"]
     ) -> SuggestedActionDTO {
         SuggestedActionDTO(
             id: type,
             type: type,
             title: title,
-            subtitle: "Preview details",
-            payload: ["draft_title": "Follow up"]
+            subtitle: subtitle,
+            payload: payload
         )
     }
 }

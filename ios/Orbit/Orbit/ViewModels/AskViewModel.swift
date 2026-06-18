@@ -93,6 +93,10 @@ final class AskViewModel: ObservableObject {
         Self.contextConfidence(for: contextPreview)
     }
 
+    var selectedSuggestedActionDraft: SuggestedActionDraft? {
+        selectedSuggestedAction.map(SuggestedActionDraft.init(action:))
+    }
+
     private let apiClient: any ChatAPIClientProtocol
     private let preferences: AskRetrievalPreferences
 
@@ -124,6 +128,7 @@ final class AskViewModel: ObservableObject {
     func selectSession(_ session: ChatSessionDTO) async {
         isLoading = true
         errorMessage = nil
+        selectedSuggestedAction = nil
         defer { isLoading = false }
 
         do {
@@ -131,7 +136,6 @@ final class AskViewModel: ObservableObject {
             messages = try await apiClient.listMessages(sessionId: session.id)
             answerContextSummaries = [:]
             answerSuggestedActions = [:]
-            selectedSuggestedAction = nil
         } catch {
             errorMessage = readableMessage(for: error)
         }
