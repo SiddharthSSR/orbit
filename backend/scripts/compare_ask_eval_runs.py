@@ -115,6 +115,12 @@ def compare_eval_runs(
     ]
     keyword_summary = keyword["summary"]
     hybrid_summary = hybrid["summary"]
+    keyword_avg_context_build_ms = _optional_number(
+        keyword_summary.get("avg_context_build_ms")
+    )
+    hybrid_avg_context_build_ms = _optional_number(
+        hybrid_summary.get("avg_context_build_ms")
+    )
     summary: dict[str, Any] = {
         "keyword_section_match_pass_rate": keyword_summary["section_match_pass_rate"],
         "hybrid_section_match_pass_rate": hybrid_summary["section_match_pass_rate"],
@@ -141,6 +147,24 @@ def compare_eval_runs(
         "vector_score_annotation_total_count_delta": (
             hybrid_summary["vector_score_annotation_total_count"]
             - keyword_summary["vector_score_annotation_total_count"]
+        ),
+        "keyword_retrieval_fallback_count": int(
+            keyword_summary.get("retrieval_fallback_count", 0)
+        ),
+        "hybrid_retrieval_fallback_count": int(
+            hybrid_summary.get("retrieval_fallback_count", 0)
+        ),
+        "retrieval_fallback_count_delta": int(
+            hybrid_summary.get("retrieval_fallback_count", 0)
+        )
+        - int(keyword_summary.get("retrieval_fallback_count", 0)),
+        "keyword_avg_context_build_ms": keyword_avg_context_build_ms,
+        "hybrid_avg_context_build_ms": hybrid_avg_context_build_ms,
+        "avg_context_build_ms_delta": (
+            hybrid_avg_context_build_ms - keyword_avg_context_build_ms
+            if keyword_avg_context_build_ms is not None
+            and hybrid_avg_context_build_ms is not None
+            else None
         ),
         "keyword_question_count": len(keyword_results),
         "hybrid_question_count": len(hybrid_results),
@@ -231,6 +255,19 @@ def print_comparison_report(comparison: dict[str, Any]) -> None:
         f"delta {summary['vector_score_annotation_total_count_delta']:+g}"
     )
     print(
+        "* Retrieval fallbacks: "
+        f"keyword {summary['keyword_retrieval_fallback_count']}, "
+        f"hybrid {summary['hybrid_retrieval_fallback_count']}, "
+        f"delta {summary['retrieval_fallback_count_delta']:+d}"
+    )
+    if summary["avg_context_build_ms_delta"] is not None:
+        print(
+            "* Average context build: "
+            f"keyword {summary['keyword_avg_context_build_ms']:.2f} ms, "
+            f"hybrid {summary['hybrid_avg_context_build_ms']:.2f} ms, "
+            f"delta {summary['avg_context_build_ms_delta']:+.2f} ms"
+        )
+    print(
         "* Classifications: "
         f"{summary['improved_count']} improved, "
         f"{summary['preserved_count']} preserved, "
@@ -294,6 +331,12 @@ def _percent(value: float) -> str:
 
 def _signed_percent(value: float) -> str:
     return f"{value:+.1%}"
+
+
+def _optional_number(value: Any) -> float | None:
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    return None
 
 
 if __name__ == "__main__":

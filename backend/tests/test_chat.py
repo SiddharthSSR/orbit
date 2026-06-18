@@ -120,6 +120,7 @@ def test_ask_context_preview_respects_include_context_false(client) -> None:
     assert data["include_context"] is False
     assert data["context"] == ""
     assert data["context_sections"] == []
+    assert data["retrieval_diagnostics"] is None
 
 
 def test_ask_context_preview_rejects_blank_question(client) -> None:
@@ -192,6 +193,12 @@ def test_context_preview_defaults_to_unchanged_keyword_mode(client) -> None:
     assert default_response.json()["context"] == keyword_response.json()["context"]
     assert "vector_score=" not in default_response.json()["context"]
     assert "Weekend Plan" in keyword_response.json()["context"]
+    diagnostics = keyword_response.json()["retrieval_diagnostics"]
+    assert diagnostics["retrieval_mode"] == "keyword"
+    assert diagnostics["vector_attempted"] is False
+    assert diagnostics["vector_result_count"] == 0
+    assert diagnostics["fallback_used"] is False
+    assert diagnostics["context_build_ms"] >= 0
 
 
 def test_hybrid_context_preview_prioritizes_ai_memory_and_dedupes(client, monkeypatch) -> None:
@@ -241,6 +248,12 @@ def test_hybrid_context_preview_prioritizes_ai_memory_and_dedupes(client, monkey
     assert context.count("AI Agents Reading List") == 1
     assert context.count("WorldLens Project Update") == 1
     assert "vector_score=" in context
+    diagnostics = response.json()["retrieval_diagnostics"]
+    assert diagnostics["retrieval_mode"] == "hybrid"
+    assert diagnostics["vector_attempted"] is True
+    assert diagnostics["vector_result_count"] == 2
+    assert diagnostics["vector_error"] is None
+    assert diagnostics["fallback_used"] is False
 
 
 def test_hybrid_context_preview_prioritizes_worldlens_memory(client) -> None:
@@ -295,6 +308,11 @@ def test_hybrid_context_preview_falls_back_when_embeddings_are_missing(client, d
     context = response.json()["context"]
     assert context.index("AI Fallback Note") < context.index("Weekend Fallback")
     assert "vector_score=" not in context
+    diagnostics = response.json()["retrieval_diagnostics"]
+    assert diagnostics["vector_attempted"] is True
+    assert diagnostics["vector_result_count"] == 0
+    assert diagnostics["vector_error"] is None
+    assert diagnostics["fallback_used"] is True
 
 
 def test_context_preview_validates_hybrid_controls(client) -> None:
@@ -370,6 +388,10 @@ def test_ask_hybrid_mode_passes_vector_annotations_to_ai_provider(client, monkey
     assert provider.context is not None
     assert "AI Agents Reading List" in provider.context
     assert "[vector_score=0.625]" in provider.context
+    diagnostics = response.json()["retrieval_diagnostics"]
+    assert diagnostics["vector_attempted"] is True
+    assert diagnostics["vector_result_count"] == 1
+    assert diagnostics["fallback_used"] is False
 
 
 def test_ask_without_context_does_not_build_hybrid_context(client, monkeypatch) -> None:
@@ -392,6 +414,7 @@ def test_ask_without_context_does_not_build_hybrid_context(client, monkeypatch) 
 
     assert response.status_code == 200
     assert provider.context == ""
+    assert response.json()["retrieval_diagnostics"] is None
 
 
 def test_ask_hybrid_mode_falls_back_when_vector_search_returns_no_results(
@@ -422,6 +445,11 @@ def test_ask_hybrid_mode_falls_back_when_vector_search_returns_no_results(
     assert provider.context is not None
     assert "AI Fallback Note" in provider.context
     assert "vector_score=" not in provider.context
+    diagnostics = response.json()["retrieval_diagnostics"]
+    assert diagnostics["vector_attempted"] is True
+    assert diagnostics["vector_result_count"] == 0
+    assert diagnostics["vector_error"] is None
+    assert diagnostics["fallback_used"] is True
 
 
 def test_ask_hybrid_mode_falls_back_when_vector_search_raises(client, monkeypatch) -> None:
@@ -453,6 +481,11 @@ def test_ask_hybrid_mode_falls_back_when_vector_search_raises(client, monkeypatc
     assert provider.context is not None
     assert "Runtime Fallback Note" in provider.context
     assert "vector_score=" not in provider.context
+    diagnostics = response.json()["retrieval_diagnostics"]
+    assert diagnostics["vector_attempted"] is True
+    assert diagnostics["vector_result_count"] == 0
+    assert diagnostics["vector_error"] == "temporary vector search failure"
+    assert diagnostics["fallback_used"] is True
 
 
 def test_ask_with_existing_session_appends_messages(client) -> None:

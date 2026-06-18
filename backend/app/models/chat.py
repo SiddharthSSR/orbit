@@ -78,6 +78,17 @@ class ChatMessageRead(BaseModel):
     created_at: datetime
 
 
+class RetrievalDiagnostics(BaseModel):
+    retrieval_mode: Literal["keyword", "hybrid"]
+    memory_top_k: int
+    min_vector_score: float
+    vector_attempted: bool
+    vector_result_count: int
+    vector_error: str | None = None
+    fallback_used: bool
+    context_build_ms: float
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1)
     session_id: UUID | None = None
@@ -100,6 +111,7 @@ class AskResponse(BaseModel):
     user_message: ChatMessageRead
     assistant_message: ChatMessageRead
     answer: str
+    retrieval_diagnostics: RetrievalDiagnostics | None = None
 
 
 class AskContextPreviewRequest(BaseModel):
@@ -123,3 +135,4 @@ class AskContextPreviewResponse(BaseModel):
     include_context: bool
     context: str
     context_sections: list[str]
+    retrieval_diagnostics: RetrievalDiagnostics | None = None

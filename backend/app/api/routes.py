@@ -1,5 +1,6 @@
 from uuid import UUID
 from datetime import date
+from time import perf_counter
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -15,6 +16,7 @@ from app.models.chat import (
     ChatMessageRead,
     ChatSessionCreate,
     ChatSessionRead,
+    RetrievalDiagnostics,
 )
 from app.models.embedding import (
     MemoryEmbeddingFailedItemRead,
@@ -96,11 +98,16 @@ def build_orbit_context_for_question(
     retrieval_mode: str,
     memory_top_k: int,
     min_vector_score: float,
-) -> str:
+) -> tuple[str, RetrievalDiagnostics | None]:
     if not include_context:
-        return ""
+        return "", None
 
+    started_at = perf_counter()
     vector_memory_results = None
+    vector_attempted = retrieval_mode == "hybrid"
+    vector_result_count = 0
+    vector_error = None
+    fallback_used = False
     if retrieval_mode == "hybrid":
         try:
             embedding_provider = build_embedding_provider(settings)
@@ -115,15 +122,30 @@ def build_orbit_context_for_question(
                 top_k=memory_top_k,
                 min_score=min_vector_score,
             )
-        except Exception:
+            vector_result_count = len(vector_memory_results)
+            fallback_used = vector_result_count == 0
+        except Exception as exc:
             vector_memory_results = []
+            vector_error = str(exc).strip() or exc.__class__.__name__
+            fallback_used = True
 
-    return OrbitContextBuilder(
+    context = OrbitContextBuilder(
         session,
         question=question,
         vector_memory_results=vector_memory_results,
         memory_limit=memory_top_k,
     ).build_context()
+    diagnostics = RetrievalDiagnostics(
+        retrieval_mode=retrieval_mode,
+        memory_top_k=memory_top_k,
+        min_vector_score=min_vector_score,
+        vector_attempted=vector_attempted,
+        vector_result_count=vector_result_count,
+        vector_error=vector_error,
+        fallback_used=fallback_used,
+        context_build_ms=(perf_counter() - started_at) * 1000,
+    )
+    return context, diagnostics
 
 
 @router.get("/health", tags=["system"])
@@ -136,7 +158,7 @@ def preview_ask_context(
     payload: AskContextPreviewRequest,
     session: Session = Depends(get_session),
 ) -> AskContextPreviewResponse:
-    context = build_orbit_context_for_question(
+    context, retrieval_diagnostics = build_orbit_context_for_question(
         session,
         question=payload.question,
         include_context=payload.include_context,
@@ -149,6 +171,7 @@ def preview_ask_context(
         include_context=payload.include_context,
         context=context,
         context_sections=extract_context_sections(context),
+        retrieval_diagnostics=retrieval_diagnostics,
     )
 
 
@@ -174,7 +197,7 @@ def ask(
         role="user",
         content=payload.question,
     )
-    context = build_orbit_context_for_question(
+    context, retrieval_diagnostics = build_orbit_context_for_question(
         session,
         question=payload.question,
         include_context=payload.include_context,
@@ -199,6 +222,7 @@ def ask(
         user_message=user_message,
         assistant_message=assistant_message,
         answer=answer,
+        retrieval_diagnostics=retrieval_diagnostics,
     )
 
 

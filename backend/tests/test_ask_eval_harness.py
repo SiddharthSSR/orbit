@@ -379,6 +379,10 @@ def test_summarize_results_includes_retrieval_and_vector_annotation_counts() -> 
             min_vector_score=0.25,
             vector_score_annotations_present=True,
             vector_score_count=2,
+            retrieval_fallback_used=False,
+            retrieval_vector_attempted=True,
+            retrieval_vector_result_count=2,
+            retrieval_context_build_ms=12.0,
         ),
         make_summary_result(
             retrieval_mode="hybrid",
@@ -386,6 +390,10 @@ def test_summarize_results_includes_retrieval_and_vector_annotation_counts() -> 
             min_vector_score=0.25,
             vector_score_annotations_present=False,
             vector_score_count=0,
+            retrieval_fallback_used=True,
+            retrieval_vector_attempted=True,
+            retrieval_vector_result_count=0,
+            retrieval_context_build_ms=18.0,
         ),
     ]
 
@@ -396,6 +404,10 @@ def test_summarize_results_includes_retrieval_and_vector_annotation_counts() -> 
     assert summary["min_vector_score"] == 0.25
     assert summary["vector_score_annotation_result_count"] == 1
     assert summary["vector_score_annotation_total_count"] == 2
+    assert summary["retrieval_fallback_count"] == 1
+    assert summary["retrieval_vector_attempt_count"] == 2
+    assert summary["retrieval_vector_result_total_count"] == 2
+    assert summary["avg_context_build_ms"] == 15.0
 
 
 def test_build_eval_result_represents_per_question_error() -> None:
@@ -556,6 +568,16 @@ def test_build_eval_result_includes_retrieval_metadata_and_vector_annotations() 
                 "- AI Notes (note) [vector_score=0.500]: Agents\n"
                 "- WorldLens (note) [vector_score=0.300]: Camera"
             ),
+            "retrieval_diagnostics": {
+                "retrieval_mode": "hybrid",
+                "memory_top_k": 8,
+                "min_vector_score": 0.25,
+                "vector_attempted": True,
+                "vector_result_count": 2,
+                "vector_error": None,
+                "fallback_used": False,
+                "context_build_ms": 14.5,
+            },
         },
     )
 
@@ -564,6 +586,10 @@ def test_build_eval_result_includes_retrieval_metadata_and_vector_annotations() 
     assert result["min_vector_score"] == 0.25
     assert result["vector_score_annotations_present"] is True
     assert result["vector_score_count"] == 2
+    assert result["retrieval_fallback_used"] is False
+    assert result["retrieval_vector_attempted"] is True
+    assert result["retrieval_vector_result_count"] == 2
+    assert result["retrieval_context_build_ms"] == 14.5
 
 
 def test_hybrid_ask_run_sends_retrieval_fields_to_ask(
@@ -587,6 +613,7 @@ def test_hybrid_ask_run_sends_retrieval_fields_to_ask(
         encoding="utf-8",
     )
     calls: list[tuple[str, dict]] = []
+    output_file = tmp_path / "results.json"
 
     def fake_post_json(base_url: str, path: str, payload: dict) -> dict:
         calls.append((path, payload))
@@ -596,7 +623,15 @@ def test_hybrid_ask_run_sends_retrieval_fields_to_ask(
                 "context_sections": ["Recent memory"],
                 "context": "Recent memory:\n- AI Notes [vector_score=0.500]",
             }
-        return {"answer": "Mock answer"}
+        return {
+            "answer": "Mock answer",
+            "retrieval_diagnostics": {
+                "vector_attempted": True,
+                "vector_result_count": 1,
+                "fallback_used": False,
+                "context_build_ms": 7.5,
+            },
+        }
 
     monkeypatch.setattr(ask_eval, "post_json", fake_post_json)
     monkeypatch.setattr(
@@ -613,6 +648,8 @@ def test_hybrid_ask_run_sends_retrieval_fields_to_ask(
             "8",
             "--min-vector-score",
             "0.25",
+            "--output",
+            str(output_file),
         ],
     )
 
@@ -639,6 +676,11 @@ def test_hybrid_ask_run_sends_retrieval_fields_to_ask(
             "min_vector_score": 0.25,
         },
     )
+    saved_result = json.loads(output_file.read_text(encoding="utf-8"))["results"][0]
+    assert saved_result["retrieval_vector_attempted"] is True
+    assert saved_result["retrieval_vector_result_count"] == 1
+    assert saved_result["retrieval_fallback_used"] is False
+    assert saved_result["retrieval_context_build_ms"] == 7.5
 
 
 def make_result(question_id: str = "saved_ai") -> dict:

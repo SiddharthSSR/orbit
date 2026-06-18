@@ -12,8 +12,20 @@ from scripts.compare_ask_eval_runs import (
 
 def test_valid_comparison_summary_includes_metrics_and_deltas() -> None:
     comparison = compare_eval_runs(
-        make_run(section_rate=0.8, ranking_rate=0.5, vector_count=0),
-        make_run(section_rate=1.0, ranking_rate=0.75, vector_count=12),
+        make_run(
+            section_rate=0.8,
+            ranking_rate=0.5,
+            vector_count=0,
+            fallback_count=0,
+            avg_context_build_ms=4.0,
+        ),
+        make_run(
+            section_rate=1.0,
+            ranking_rate=0.75,
+            vector_count=12,
+            fallback_count=2,
+            avg_context_build_ms=9.5,
+        ),
     )
 
     assert comparison["summary"] == {
@@ -26,6 +38,12 @@ def test_valid_comparison_summary_includes_metrics_and_deltas() -> None:
         "keyword_vector_score_annotation_total_count": 0,
         "hybrid_vector_score_annotation_total_count": 12,
         "vector_score_annotation_total_count_delta": 12,
+        "keyword_retrieval_fallback_count": 0,
+        "hybrid_retrieval_fallback_count": 2,
+        "retrieval_fallback_count_delta": 2,
+        "keyword_avg_context_build_ms": 4.0,
+        "hybrid_avg_context_build_ms": 9.5,
+        "avg_context_build_ms_delta": 5.5,
         "keyword_question_count": 1,
         "hybrid_question_count": 1,
         "compared_question_count": 1,
@@ -123,6 +141,8 @@ def make_run(
     section_rate=1.0,
     ranking_rate=1.0,
     vector_count=0,
+    fallback_count=0,
+    avg_context_build_ms=5.0,
 ):
     if result is None:
         result = make_result()
@@ -131,6 +151,8 @@ def make_run(
             "section_match_pass_rate": section_rate,
             "section_item_ranking_pass_rate": ranking_rate,
             "vector_score_annotation_total_count": vector_count,
+            "retrieval_fallback_count": fallback_count,
+            "avg_context_build_ms": avg_context_build_ms,
         },
         "results": [result],
     }

@@ -162,6 +162,7 @@ def main() -> int:
 
         answer: str | None = None
         error: str | None = None
+        retrieval_diagnostics = preview.get("retrieval_diagnostics")
         if args.ask:
             try:
                 ask_response = post_json(
@@ -181,6 +182,10 @@ def main() -> int:
                 print(f"ERROR: {error}", file=sys.stderr)
             else:
                 answer = str(ask_response.get("answer", ""))
+                retrieval_diagnostics = ask_response.get(
+                    "retrieval_diagnostics",
+                    retrieval_diagnostics,
+                )
                 print("Answer:")
                 print(indent_block(answer or "(empty)"))
 
@@ -196,6 +201,7 @@ def main() -> int:
                 memory_top_k=args.memory_top_k,
                 min_vector_score=args.min_vector_score,
                 preview=preview,
+                retrieval_diagnostics=retrieval_diagnostics,
                 answer=answer,
                 error=error,
             )
@@ -301,6 +307,7 @@ def build_eval_result(
     memory_top_k: int = 5,
     min_vector_score: float = 0.0,
     preview: dict[str, Any] | None = None,
+    retrieval_diagnostics: dict[str, Any] | None = None,
     answer: str | None = None,
     error: str | None = None,
 ) -> dict[str, Any]:
@@ -313,6 +320,10 @@ def build_eval_result(
     )
     ranking = item_ranking_details(question, context)
     vector_score_count = context.count(VECTOR_SCORE_ANNOTATION)
+    if retrieval_diagnostics is None:
+        retrieval_diagnostics = preview.get("retrieval_diagnostics")
+    if not isinstance(retrieval_diagnostics, dict):
+        retrieval_diagnostics = {}
     return {
         "run_id": run_id,
         "run_label": run_label,
@@ -324,6 +335,10 @@ def build_eval_result(
         "min_vector_score": min_vector_score,
         "vector_score_annotations_present": vector_score_count > 0,
         "vector_score_count": vector_score_count,
+        "retrieval_fallback_used": retrieval_diagnostics.get("fallback_used"),
+        "retrieval_vector_attempted": retrieval_diagnostics.get("vector_attempted"),
+        "retrieval_vector_result_count": retrieval_diagnostics.get("vector_result_count"),
+        "retrieval_context_build_ms": retrieval_diagnostics.get("context_build_ms"),
         "question_id": question.id,
         "question": question.question,
         "intent": question.intent,
@@ -403,6 +418,12 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
     global_item_ranking_fail_count = (
         global_item_ranking_evaluated_count - global_item_ranking_pass_count
     )
+    context_build_times = [
+        float(result["retrieval_context_build_ms"])
+        for result in results
+        if isinstance(result.get("retrieval_context_build_ms"), (int, float))
+        and not isinstance(result.get("retrieval_context_build_ms"), bool)
+    ]
 
     return {
         "retrieval_mode": first_result.get("retrieval_mode", "keyword"),
@@ -413,6 +434,20 @@ def summarize_results(results: list[dict[str, Any]]) -> dict[str, Any]:
         ),
         "vector_score_annotation_total_count": sum(
             int(result.get("vector_score_count", 0)) for result in results
+        ),
+        "retrieval_fallback_count": sum(
+            result.get("retrieval_fallback_used") is True for result in results
+        ),
+        "retrieval_vector_attempt_count": sum(
+            result.get("retrieval_vector_attempted") is True for result in results
+        ),
+        "retrieval_vector_result_total_count": sum(
+            int(result.get("retrieval_vector_result_count") or 0) for result in results
+        ),
+        "avg_context_build_ms": (
+            sum(context_build_times) / len(context_build_times)
+            if context_build_times
+            else 0.0
         ),
         "total_questions": total_questions,
         "questions_with_errors": questions_with_errors,
@@ -466,6 +501,13 @@ def print_eval_summary(summary: dict[str, Any]) -> None:
         "* Vector score annotations: "
         f"{summary['vector_score_annotation_result_count']} result(s), "
         f"{summary['vector_score_annotation_total_count']} total"
+    )
+    print(
+        "* Retrieval diagnostics: "
+        f"{summary['retrieval_vector_attempt_count']} vector attempt(s), "
+        f"{summary['retrieval_vector_result_total_count']} vector result(s), "
+        f"{summary['retrieval_fallback_count']} fallback(s), "
+        f"{summary['avg_context_build_ms']:.2f} ms average context build"
     )
     print("* Global item ranking is legacy/informational; section-aware ranking is preferred.")
 
