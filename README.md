@@ -278,6 +278,17 @@ python scripts/compare_ask_eval_runs.py \
 
 The comparison reports summary rate deltas and classifies each question as improved, preserved, degraded, or changed. Degradation means hybrid loses expected section coverage or a section-aware expected item; improvement means it gains either signal. Questions present in only one run are marked changed.
 
+Run repeated paired samples and enforce initial rollout thresholds:
+
+```bash
+python scripts/run_ask_eval_samples.py \
+  --runs 5 \
+  --output-dir eval-results/samples/latest \
+  --fail-on-degraded
+```
+
+Each sample writes keyword, hybrid, and comparison JSON files plus an aggregate `summary.json`. The initial local guardrails default to a `0.0` maximum hybrid fallback rate and a `25.0` ms maximum average latency delta; `--fail-on-degraded` additionally requires zero degraded questions. With local mock embeddings, fallback rate should remain zero, the latency delta should remain small, and degraded questions should be zero before hybrid retrieval is exposed in iOS.
+
 Both `POST /ask` and `POST /ask/context-preview` support opt-in hybrid retrieval with `retrieval_mode: "hybrid"`, `memory_top_k` (default `5`, range `1` to `20`), and `min_vector_score` (default `0.0`). Keyword retrieval remains the default for backward compatibility. Hybrid retrieval changes only the Recent memory section; the other context sections retain their existing ranking. If vector retrieval is unavailable at runtime, Orbit falls back to keyword-ranked memory. The eval harness sends the selected retrieval settings to both endpoints when `--ask` is enabled.
 
 Both responses include `retrieval_diagnostics` when context is enabled. The object reports the retrieval mode and controls, whether vector search was attempted, its result count and runtime error (if any), whether keyword fallback was used, and total context-build latency in milliseconds. It is `null` when `include_context=false`. Empty vector results and runtime vector-search failures use keyword-ranked memory; embedding provider configuration errors retain the existing HTTP 500 behavior. Diagnostics are returned in the API response only—Orbit does not send them to an external telemetry service.
