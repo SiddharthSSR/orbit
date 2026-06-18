@@ -449,6 +449,97 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
     }
 
+    func testExecuteSaveMemorySuccessEmitsMemoryRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            notificationCenter: center
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "I like quiet cafes", payload: nil)
+        )
+        let memoryEvent = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        let todoEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        todoEvent.isInverted = true
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        await fulfillment(of: [memoryEvent, todoEvent], timeout: 0.5)
+    }
+
+    func testExecuteCreateTodoSuccessEmitsTodoRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            notificationCenter: center
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Call the dentist", payload: nil)
+        )
+        let todoEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        let memoryEvent = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        memoryEvent.isInverted = true
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        await fulfillment(of: [todoEvent, memoryEvent], timeout: 0.5)
+    }
+
+    func testFailedSaveMemoryDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: FailingMemoryAPIClient(),
+            notificationCenter: center
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "I like quiet cafes", payload: nil)
+        )
+        let memoryEvent = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        memoryEvent.isInverted = true
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        await fulfillment(of: [memoryEvent], timeout: 0.3)
+    }
+
+    func testFailedCreateTodoDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            todoClient: FailingTodoAPIClient(),
+            notificationCenter: center
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Call the dentist", payload: nil)
+        )
+        let todoEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        todoEvent.isInverted = true
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        await fulfillment(of: [todoEvent], timeout: 0.3)
+    }
+
+    func testReviewBillsDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            notificationCenter: center
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Upcoming", payload: nil)
+        )
+        let memoryEvent = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        memoryEvent.isInverted = true
+        let todoEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        todoEvent.isInverted = true
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        await fulfillment(of: [memoryEvent, todoEvent], timeout: 0.3)
+    }
+
     func testExecuteDoesNotCreateMemoryForInvalidSaveMemoryDraft() async throws {
         let memoryClient = MockMemoryAPIClient(memoryItems: [])
         let viewModel = makeViewModel(
@@ -964,12 +1055,14 @@ final class AskViewModelTests: XCTestCase {
         _ apiClient: any ChatAPIClientProtocol,
         memoryClient: (any MemoryAPIClientProtocol)? = nil,
         todoClient: (any TodoAPIClientProtocol)? = nil,
+        notificationCenter: NotificationCenter? = nil,
         defaults: UserDefaults? = nil
     ) -> AskViewModel {
         AskViewModel(
             apiClient: apiClient,
             memoryClient: memoryClient ?? MockMemoryAPIClient(memoryItems: []),
             todoClient: todoClient ?? MockTodoAPIClient(todos: []),
+            notificationCenter: notificationCenter ?? NotificationCenter(),
             preferences: AskRetrievalPreferences(defaults: defaults ?? makeIsolatedDefaults())
         )
     }

@@ -1,5 +1,13 @@
 import Foundation
 
+extension Notification.Name {
+    /// Posted after a memory item is created (e.g. by an Ask suggested action),
+    /// so screens showing memory can reload without a manual refresh.
+    static let orbitMemoryDidChange = Notification.Name("orbitMemoryDidChange")
+    /// Posted after a todo item is created, so screens showing todos can reload.
+    static let orbitTodoDidChange = Notification.Name("orbitTodoDidChange")
+}
+
 enum AskContextConfidence: Equatable {
     case noContext
     case lowContext
@@ -104,17 +112,20 @@ final class AskViewModel: ObservableObject {
     private let apiClient: any ChatAPIClientProtocol
     private let memoryClient: any MemoryAPIClientProtocol
     private let todoClient: any TodoAPIClientProtocol
+    private let notificationCenter: NotificationCenter
     private let preferences: AskRetrievalPreferences
 
     init(
         apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
         memoryClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
         todoClient: any TodoAPIClientProtocol = OrbitAPIClient(),
+        notificationCenter: NotificationCenter = .default,
         preferences: AskRetrievalPreferences = AskRetrievalPreferences()
     ) {
         self.apiClient = apiClient
         self.memoryClient = memoryClient
         self.todoClient = todoClient
+        self.notificationCenter = notificationCenter
         self.preferences = preferences
         // `didSet` does not fire for assignments made during init, so loading
         // the stored values here restores them without writing back.
@@ -306,11 +317,13 @@ final class AskViewModel: ObservableObject {
                 )
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Saved to memory"
+                notificationCenter.post(name: .orbitMemoryDidChange, object: nil)
             case "create_todo":
                 guard let title = draft.trimmedTodoTitle else { return }
                 _ = try await todoClient.createTodo(TodoCreateRequest(title: title))
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Todo created"
+                notificationCenter.post(name: .orbitTodoDidChange, object: nil)
             default:
                 return
             }

@@ -97,6 +97,11 @@ struct InboxScreen: View {
         .task {
             await memoryViewModel.loadMemory()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .orbitMemoryDidChange)
+        ) { _ in
+            Task { await memoryViewModel.loadMemory() }
+        }
     }
 
     private func createMemory() async {

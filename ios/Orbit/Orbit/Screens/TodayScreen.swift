@@ -46,6 +46,16 @@ struct TodayScreen: View {
         .task {
             await dashboardViewModel.loadDashboard()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .orbitMemoryDidChange)
+        ) { _ in
+            Task { await dashboardViewModel.loadDashboard() }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .orbitTodoDidChange)
+        ) { _ in
+            Task { await dashboardViewModel.loadDashboard() }
+        }
     }
 
     private var summaryCard: some View {
