@@ -103,15 +103,18 @@ final class AskViewModel: ObservableObject {
 
     private let apiClient: any ChatAPIClientProtocol
     private let memoryClient: any MemoryAPIClientProtocol
+    private let todoClient: any TodoAPIClientProtocol
     private let preferences: AskRetrievalPreferences
 
     init(
         apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
         memoryClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
+        todoClient: any TodoAPIClientProtocol = OrbitAPIClient(),
         preferences: AskRetrievalPreferences = AskRetrievalPreferences()
     ) {
         self.apiClient = apiClient
         self.memoryClient = memoryClient
+        self.todoClient = todoClient
         self.preferences = preferences
         // `didSet` does not fire for assignments made during init, so loading
         // the stored values here restores them without writing back.
@@ -275,15 +278,14 @@ final class AskViewModel: ObservableObject {
         editableSuggestedActionDraft = draft
     }
 
-    /// Executes the one currently supported suggested action: save_memory.
-    /// Requires an explicit user tap, a valid draft, and is a no-op for any
-    /// other action type. Reuses the existing memory create endpoint.
+    /// Executes the currently supported suggested actions: save_memory and
+    /// create_todo. Requires an explicit user tap and a valid draft, and is a
+    /// no-op for any other action type (review_bills, unknown). Reuses the
+    /// existing memory and todo create endpoints.
     func executeSelectedSuggestedActionDraft() async {
         guard !isExecutingSuggestedAction,
               let draft = editableSuggestedActionDraft,
-              draft.actionType == "save_memory",
-              draft.canExecute,
-              let memoryText = draft.trimmedMemoryText else {
+              draft.canExecute else {
             return
         }
 
@@ -292,15 +294,26 @@ final class AskViewModel: ObservableObject {
         defer { isExecutingSuggestedAction = false }
 
         do {
-            _ = try await memoryClient.createMemory(
-                MemoryCreateRequest(
-                    title: Self.memoryTitle(from: memoryText),
-                    body: memoryText,
-                    kind: "note"
+            switch draft.actionType {
+            case "save_memory":
+                guard let memoryText = draft.trimmedMemoryText else { return }
+                _ = try await memoryClient.createMemory(
+                    MemoryCreateRequest(
+                        title: Self.memoryTitle(from: memoryText),
+                        body: memoryText,
+                        kind: "note"
+                    )
                 )
-            )
-            clearSuggestedActionPreview()
-            suggestedActionSuccessMessage = "Saved to memory"
+                clearSuggestedActionPreview()
+                suggestedActionSuccessMessage = "Saved to memory"
+            case "create_todo":
+                guard let title = draft.trimmedTodoTitle else { return }
+                _ = try await todoClient.createTodo(TodoCreateRequest(title: title))
+                clearSuggestedActionPreview()
+                suggestedActionSuccessMessage = "Todo created"
+            default:
+                return
+            }
         } catch {
             suggestedActionErrorMessage = readableMessage(for: error)
         }

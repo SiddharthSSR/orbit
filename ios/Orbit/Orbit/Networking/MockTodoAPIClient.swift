@@ -2,9 +2,14 @@ import Foundation
 
 actor MockTodoAPIClient: TodoAPIClientProtocol {
     private var todos: [TodoDTO]
+    private var createRequests: [TodoCreateRequest] = []
 
     init(todos: [TodoDTO] = MockTodoAPIClient.previewTodos) {
         self.todos = todos
+    }
+
+    func recordedCreateRequests() -> [TodoCreateRequest] {
+        createRequests
     }
 
     func listTodos() async throws -> [TodoDTO] {
@@ -12,6 +17,7 @@ actor MockTodoAPIClient: TodoAPIClientProtocol {
     }
 
     func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO {
+        createRequests.append(payload)
         let now = Date()
         let todo = TodoDTO(
             id: UUID(),

@@ -187,7 +187,7 @@ final class AskViewModelTests: XCTestCase {
 
         XCTAssertTrue(draft.isValid)
         XCTAssertNil(draft.validationError)
-        XCTAssertEqual(draft.validationStatus, "Draft looks valid. Execution coming soon.")
+        XCTAssertEqual(draft.validationStatus, "Draft looks valid and ready to create a todo.")
     }
 
     func testSaveMemoryDraftIsInvalidWhenTextIsEmpty() {
@@ -269,19 +269,32 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertFalse(draft.canExecute)
     }
 
-    func testCreateTodoAndReviewBillsAreNotExecutable() {
-        let todo = makeEditableDraft(type: "create_todo", value: "Call the dentist")
+    func testValidCreateTodoDraftIsExecutable() {
+        let draft = makeEditableDraft(type: "create_todo", value: "Call the dentist")
+
+        XCTAssertTrue(draft.canExecute)
+        XCTAssertEqual(draft.executionButtonTitle, "Create todo")
+        XCTAssertEqual(draft.executionSafetyText, "This will create a todo.")
+    }
+
+    func testInvalidCreateTodoDraftIsNotExecutable() {
+        var draft = makeEditableDraft(type: "create_todo", value: "Call the dentist")
+
+        draft.updateField(id: "Todo title", value: "   ")
+
+        XCTAssertFalse(draft.canExecute)
+    }
+
+    func testReviewBillsIsNotExecutable() {
         let bills = EditableSuggestedActionDraft(
             source: SuggestedActionDraft(
                 action: makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Bills", payload: nil)
             )
         )
 
-        XCTAssertFalse(todo.canExecute)
-        XCTAssertEqual(todo.executionButtonTitle, "Coming soon")
-        XCTAssertNil(todo.executionSafetyText)
         XCTAssertFalse(bills.canExecute)
         XCTAssertEqual(bills.executionButtonTitle, "Coming soon")
+        XCTAssertNil(bills.executionSafetyText)
     }
 
     func testExecuteSaveMemoryCallsCreateOnceWithTrimmedTextAndClearsDraft() async throws {
@@ -329,11 +342,39 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isExecutingSuggestedAction)
     }
 
-    func testExecuteDoesNotCreateMemoryForCreateTodoDraft() async {
+    func testExecuteCreateTodoCallsTodoCreateOnceWithTrimmedTitleAndClearsDraft() async throws {
         let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let todoClient = MockTodoAPIClient(todos: [])
         let viewModel = makeViewModel(
             MockChatAPIClient(sessions: [], messagesBySession: [:]),
-            memoryClient: memoryClient
+            memoryClient: memoryClient,
+            todoClient: todoClient
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Draft title", payload: nil)
+        )
+        var draft = try XCTUnwrap(viewModel.editableSuggestedActionDraft)
+        draft.updateField(id: "Todo title", value: "  Call the dentist  ")
+        viewModel.updateEditableSuggestedActionDraft(draft)
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        let todoRequests = await todoClient.recordedCreateRequests()
+        let memoryRequests = await memoryClient.recordedCreateRequests()
+        XCTAssertEqual(todoRequests.count, 1)
+        XCTAssertEqual(todoRequests.first?.title, "Call the dentist")
+        XCTAssertTrue(memoryRequests.isEmpty, "create_todo must not create a memory")
+        XCTAssertEqual(viewModel.suggestedActionSuccessMessage, "Todo created")
+        XCTAssertNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.editableSuggestedActionDraft)
+        XCTAssertNil(viewModel.suggestedActionErrorMessage)
+        XCTAssertFalse(viewModel.isExecutingSuggestedAction)
+    }
+
+    func testExecuteCreateTodoFailureKeepsDraftAndShowsError() async {
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            todoClient: FailingTodoAPIClient()
         )
         viewModel.selectSuggestedAction(
             makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Call the dentist", payload: nil)
@@ -341,8 +382,69 @@ final class AskViewModelTests: XCTestCase {
 
         await viewModel.executeSelectedSuggestedActionDraft()
 
-        let requests = await memoryClient.recordedCreateRequests()
+        XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
+        XCTAssertNotNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.suggestedActionSuccessMessage)
+        XCTAssertEqual(viewModel.suggestedActionErrorMessage, "Expected todo API failure.")
+        XCTAssertFalse(viewModel.isExecutingSuggestedAction)
+    }
+
+    func testExecuteDoesNotCreateTodoForInvalidCreateTodoDraft() async throws {
+        let todoClient = MockTodoAPIClient(todos: [])
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            todoClient: todoClient
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Draft", payload: nil)
+        )
+        var draft = try XCTUnwrap(viewModel.editableSuggestedActionDraft)
+        draft.updateField(id: "Todo title", value: "   ")
+        viewModel.updateEditableSuggestedActionDraft(draft)
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        let requests = await todoClient.recordedCreateRequests()
         XCTAssertTrue(requests.isEmpty)
+        XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
+    }
+
+    func testRepeatedExecuteDoesNotCreateDuplicateTodo() async {
+        let todoClient = MockTodoAPIClient(todos: [])
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            todoClient: todoClient
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Call the dentist", payload: nil)
+        )
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+        // Second call has no draft (cleared on success), so it must be a no-op.
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        let requests = await todoClient.recordedCreateRequests()
+        XCTAssertEqual(requests.count, 1)
+    }
+
+    func testExecuteReviewBillsDraftCreatesNothing() async {
+        let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let todoClient = MockTodoAPIClient(todos: [])
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: memoryClient,
+            todoClient: todoClient
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Upcoming", payload: nil)
+        )
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        let todoRequests = await todoClient.recordedCreateRequests()
+        let memoryRequests = await memoryClient.recordedCreateRequests()
+        XCTAssertTrue(todoRequests.isEmpty)
+        XCTAssertTrue(memoryRequests.isEmpty)
         XCTAssertNil(viewModel.suggestedActionSuccessMessage)
         XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
     }
@@ -861,11 +963,13 @@ final class AskViewModelTests: XCTestCase {
     private func makeViewModel(
         _ apiClient: any ChatAPIClientProtocol,
         memoryClient: (any MemoryAPIClientProtocol)? = nil,
+        todoClient: (any TodoAPIClientProtocol)? = nil,
         defaults: UserDefaults? = nil
     ) -> AskViewModel {
         AskViewModel(
             apiClient: apiClient,
             memoryClient: memoryClient ?? MockMemoryAPIClient(memoryItems: []),
+            todoClient: todoClient ?? MockTodoAPIClient(todos: []),
             preferences: AskRetrievalPreferences(defaults: defaults ?? makeIsolatedDefaults())
         )
     }
@@ -1039,5 +1143,31 @@ private enum FailingMemoryAPIError: LocalizedError {
 
     var errorDescription: String? {
         "Expected memory API failure."
+    }
+}
+
+private struct FailingTodoAPIClient: TodoAPIClientProtocol {
+    func listTodos() async throws -> [TodoDTO] {
+        throw FailingTodoAPIError.expectedFailure
+    }
+
+    func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO {
+        throw FailingTodoAPIError.expectedFailure
+    }
+
+    func updateTodo(id: UUID, payload: TodoUpdateRequest) async throws -> TodoDTO {
+        throw FailingTodoAPIError.expectedFailure
+    }
+
+    func deleteTodo(id: UUID) async throws {
+        throw FailingTodoAPIError.expectedFailure
+    }
+}
+
+private enum FailingTodoAPIError: LocalizedError {
+    case expectedFailure
+
+    var errorDescription: String? {
+        "Expected todo API failure."
     }
 }
