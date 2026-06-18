@@ -61,6 +61,7 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
         messagesBySession[session.id, default: []].append(contentsOf: [userMessage, assistantMessage])
         sessions.sort { $0.updatedAt > $1.updatedAt }
         let contextSections = payload.includeContext ? ["Today", "Open todos", "Recent memory"] : []
+        let suggestedActions = makeSuggestedActions(for: payload.question)
 
         return AskResponse(
             session: session,
@@ -71,6 +72,7 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
             contextSummary: contextSections.isEmpty
                 ? nil
                 : "Context used: \(contextSections.joined(separator: ", "))",
+            suggestedActions: suggestedActions,
             retrievalDiagnostics: diagnostics(
                 mode: payload.retrievalMode,
                 memoryTopK: payload.memoryTopK,
@@ -167,6 +169,44 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
         let prefix = String(normalized.prefix(59))
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return "\(prefix)…"
+    }
+
+    private func makeSuggestedActions(for question: String) -> [SuggestedActionDTO] {
+        let normalized = question.lowercased()
+        if normalized.contains("remember that") || normalized.contains("remember this") {
+            return [
+                SuggestedActionDTO(
+                    id: "save-memory",
+                    type: "save_memory",
+                    title: "Save to memory",
+                    subtitle: "Keep this detail in Orbit memory",
+                    payload: nil
+                )
+            ]
+        }
+        if normalized.contains("bill") {
+            return [
+                SuggestedActionDTO(
+                    id: "review-bills",
+                    type: "review_bills",
+                    title: "Review bills",
+                    subtitle: "Check overdue and upcoming bills",
+                    payload: nil
+                )
+            ]
+        }
+        if normalized.contains("todo") || normalized.contains("task") || normalized.contains("follow up") {
+            return [
+                SuggestedActionDTO(
+                    id: "create-todo",
+                    type: "create_todo",
+                    title: "Create a todo",
+                    subtitle: "Turn this into a follow-up task",
+                    payload: nil
+                )
+            ]
+        }
+        return []
     }
 
     private func diagnostics(

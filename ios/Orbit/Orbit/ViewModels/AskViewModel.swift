@@ -86,6 +86,7 @@ final class AskViewModel: ObservableObject {
     @Published var previewErrorMessage: String?
     @Published private(set) var latestRetrievalDiagnostics: RetrievalDiagnostics?
     @Published private(set) var answerContextSummaries: [UUID: String] = [:]
+    @Published private(set) var answerSuggestedActions: [UUID: [SuggestedActionDTO]] = [:]
 
     var contextConfidence: AskContextConfidence {
         Self.contextConfidence(for: contextPreview)
@@ -128,6 +129,7 @@ final class AskViewModel: ObservableObject {
             selectedSession = session
             messages = try await apiClient.listMessages(sessionId: session.id)
             answerContextSummaries = [:]
+            answerSuggestedActions = [:]
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -158,6 +160,9 @@ final class AskViewModel: ObservableObject {
             latestRetrievalDiagnostics = response.retrievalDiagnostics
             if let contextSummary = response.contextSummary {
                 answerContextSummaries[response.assistantMessage.id] = contextSummary
+            }
+            if let actions = response.suggestedActions, !actions.isEmpty {
+                answerSuggestedActions[response.assistantMessage.id] = actions
             }
             draftQuestion = ""
             upsertSession(response.session)
@@ -198,6 +203,7 @@ final class AskViewModel: ObservableObject {
         contextPreview = nil
         latestRetrievalDiagnostics = nil
         answerContextSummaries = [:]
+        answerSuggestedActions = [:]
         previewErrorMessage = nil
     }
 
@@ -214,6 +220,7 @@ final class AskViewModel: ObservableObject {
                 contextPreview = nil
                 latestRetrievalDiagnostics = nil
                 answerContextSummaries = [:]
+                answerSuggestedActions = [:]
                 previewErrorMessage = nil
             }
         } catch {
@@ -229,6 +236,11 @@ final class AskViewModel: ObservableObject {
     func contextSummary(for message: ChatMessageDTO) -> String? {
         guard message.role == "assistant" else { return nil }
         return answerContextSummaries[message.id]
+    }
+
+    func suggestedActions(for message: ChatMessageDTO) -> [SuggestedActionDTO] {
+        guard message.role == "assistant" else { return [] }
+        return answerSuggestedActions[message.id, default: []]
     }
 
     private var retrievalMode: RetrievalMode {

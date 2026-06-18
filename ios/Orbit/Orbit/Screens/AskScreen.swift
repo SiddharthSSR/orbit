@@ -152,7 +152,8 @@ struct AskScreen: View {
                     ForEach(viewModel.messages) { message in
                         ChatMessageRow(
                             message: message,
-                            contextSummary: viewModel.contextSummary(for: message)
+                            contextSummary: viewModel.contextSummary(for: message),
+                            suggestedActions: viewModel.suggestedActions(for: message)
                         )
                     }
                 }
@@ -371,6 +372,8 @@ enum AskAnswerMarkdown {
 private struct ChatMessageRow: View {
     let message: ChatMessageDTO
     let contextSummary: String?
+    let suggestedActions: [SuggestedActionDTO]
+    @State private var selectedSuggestedAction: SuggestedActionDTO?
 
     var body: some View {
         bubble
@@ -392,6 +395,26 @@ private struct ChatMessageRow: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel(contextSummary)
             }
+            if isAssistant, !suggestedActions.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Suggested")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    FlowLayout(spacing: 6) {
+                        ForEach(suggestedActions) { action in
+                            Button {
+                                selectedSuggestedAction = action
+                            } label: {
+                                Label(action.title, systemImage: actionIcon(for: action))
+                                    .font(.caption.weight(.medium))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .accessibilityLabel("Suggested action: \(action.title)")
+                        }
+                    }
+                }
+            }
         }
         .padding(12)
         .frame(maxWidth: 360, alignment: .leading)
@@ -401,6 +424,13 @@ private struct ChatMessageRow: View {
                 .stroke(isAssistant ? Color(.separator).opacity(0.4) : Color.accentColor.opacity(0.18))
         }
         .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .alert(item: $selectedSuggestedAction) { action in
+            Alert(
+                title: Text(action.title),
+                message: Text("Action execution is coming soon. Nothing was changed."),
+                dismissButton: .default(Text("OK"))
+            )
+        }
     }
 
     @ViewBuilder
@@ -433,6 +463,19 @@ private struct ChatMessageRow: View {
 
     private var roleIcon: String {
         isAssistant ? "sparkles" : "person.crop.circle"
+    }
+
+    private func actionIcon(for action: SuggestedActionDTO) -> String {
+        switch action.type {
+        case "review_bills":
+            "creditcard"
+        case "create_todo":
+            "checklist"
+        case "save_memory":
+            "bookmark"
+        default:
+            "sparkles"
+        }
     }
 }
 

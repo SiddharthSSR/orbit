@@ -52,6 +52,7 @@ from app.services.memory_retrieval import (
     MemoryRetrievalService,
     memory_content_hash,
 )
+from app.services.suggested_actions import build_suggested_actions
 
 router = APIRouter()
 
@@ -248,6 +249,11 @@ def ask(
         if context_sections
         else None
     )
+    suggested_actions = build_suggested_actions(
+        question=payload.question,
+        answer=answer,
+        context_sections=context_sections,
+    )
 
     return AskResponse(
         session=chat_session,
@@ -256,6 +262,7 @@ def ask(
         answer=answer,
         context_sections=context_sections,
         context_summary=context_summary,
+        suggested_actions=suggested_actions,
         retrieval_diagnostics=retrieval_diagnostics,
     )
 

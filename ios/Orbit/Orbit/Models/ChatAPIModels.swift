@@ -52,6 +52,14 @@ struct RetrievalDiagnostics: Decodable, Equatable, Sendable {
     var contextBuildMs: Double
 }
 
+struct SuggestedActionDTO: Decodable, Identifiable, Hashable, Sendable {
+    let id: String
+    var type: String
+    var title: String
+    var subtitle: String?
+    var payload: [String: String]?
+}
+
 struct AskRequest: Encodable, Sendable {
     var question: String
     var sessionId: UUID?
@@ -68,6 +76,7 @@ struct AskResponse: Decodable, Sendable {
     var answer: String
     var contextSections: [String]? = nil
     var contextSummary: String? = nil
+    var suggestedActions: [SuggestedActionDTO]? = nil
     var retrievalDiagnostics: RetrievalDiagnostics? = nil
 }
 

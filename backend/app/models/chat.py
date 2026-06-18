@@ -89,6 +89,14 @@ class RetrievalDiagnostics(BaseModel):
     context_build_ms: float
 
 
+class SuggestedActionDTO(BaseModel):
+    id: str
+    type: str
+    title: str
+    subtitle: str | None = None
+    payload: dict[str, str] | None = None
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=1)
     session_id: UUID | None = None
@@ -113,6 +121,7 @@ class AskResponse(BaseModel):
     answer: str
     context_sections: list[str] = Field(default_factory=list)
     context_summary: str | None = None
+    suggested_actions: list[SuggestedActionDTO] = Field(default_factory=list)
     retrieval_diagnostics: RetrievalDiagnostics | None = None
 
 

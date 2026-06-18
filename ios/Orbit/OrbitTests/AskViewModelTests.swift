@@ -72,6 +72,16 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.contextSummary(for: viewModel.messages[1]))
     }
 
+    func testSendQuestionMapsSuggestedActionsToAssistantOnly() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        viewModel.draftQuestion = "What bills are coming up?"
+
+        await viewModel.sendQuestion()
+
+        XCTAssertTrue(viewModel.suggestedActions(for: viewModel.messages[0]).isEmpty)
+        XCTAssertEqual(viewModel.suggestedActions(for: viewModel.messages[1]).map(\.type), ["review_bills"])
+    }
+
     func testSendQuestionClearsDraft() async {
         let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "How are my projects going?"
@@ -155,6 +165,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.contextPreview)
         XCTAssertNil(viewModel.latestRetrievalDiagnostics)
         XCTAssertTrue(viewModel.answerContextSummaries.isEmpty)
+        XCTAssertTrue(viewModel.answerSuggestedActions.isEmpty)
         XCTAssertTrue(viewModel.useHybridRetrieval)
         XCTAssertFalse(viewModel.includeContext)
     }

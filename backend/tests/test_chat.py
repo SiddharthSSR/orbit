@@ -55,6 +55,7 @@ def test_ask_creates_new_session_and_two_messages(client) -> None:
     assert data["answer"] == data["assistant_message"]["content"]
     assert data["context_sections"] == ["Today"]
     assert data["context_summary"] == "Context used: Today"
+    assert data["suggested_actions"] == []
     assert "context" not in data
     # With an empty database the mock provider has no useful context to summarize.
     assert "Orbit context" in data["answer"]
@@ -86,6 +87,29 @@ def test_ask_without_context_returns_empty_context_summary(client) -> None:
     assert response.status_code == 200
     assert response.json()["context_sections"] == []
     assert response.json()["context_summary"] is None
+
+
+def test_ask_without_context_can_return_save_memory_action(client) -> None:
+    response = client.post(
+        "/ask",
+        json={"question": "Remember that I like quiet cafes", "include_context": False},
+    )
+
+    assert response.status_code == 200
+    assert [action["type"] for action in response.json()["suggested_actions"]] == ["save_memory"]
+
+
+def test_ask_with_due_bill_returns_review_bills_action(client) -> None:
+    client.post(
+        "/bills",
+        json={"name": "Internet", "due_date": "2026-06-21", "amount": 1200},
+    )
+
+    response = client.post("/ask", json={"question": "What bills are coming up?"})
+
+    assert response.status_code == 200
+    action_types = [action["type"] for action in response.json()["suggested_actions"]]
+    assert "review_bills" in action_types
 
 
 def test_ask_session_title_collapses_whitespace_and_strips_quotes(client) -> None:

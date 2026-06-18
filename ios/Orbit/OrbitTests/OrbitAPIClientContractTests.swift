@@ -171,7 +171,16 @@ final class OrbitAPIClientContractTests: XCTestCase {
           },
           "answer": "Based on available Orbit context...",
           "context_sections": ["Today", "Open todos"],
-          "context_summary": "Context used: Today, Open todos"
+          "context_summary": "Context used: Today, Open todos",
+          "suggested_actions": [
+            {
+              "id": "review-bills",
+              "type": "review_bills",
+              "title": "Review bills",
+              "subtitle": "Check overdue and upcoming bills",
+              "payload": null
+            }
+          ]
         }
         """.utf8))
 
@@ -181,6 +190,8 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(response.answer, "Based on available Orbit context...")
         XCTAssertEqual(response.contextSections, ["Today", "Open todos"])
         XCTAssertEqual(response.contextSummary, "Context used: Today, Open todos")
+        XCTAssertEqual(response.suggestedActions?.map(\.type), ["review_bills"])
+        XCTAssertEqual(response.suggestedActions?.first?.title, "Review bills")
         XCTAssertNil(response.retrievalDiagnostics)
     }
 
@@ -213,6 +224,7 @@ final class OrbitAPIClientContractTests: XCTestCase {
 
         XCTAssertNil(response.contextSections)
         XCTAssertNil(response.contextSummary)
+        XCTAssertNil(response.suggestedActions)
     }
 
     func testDecodesAskContextPreviewResponseFromBackendJSON() throws {
