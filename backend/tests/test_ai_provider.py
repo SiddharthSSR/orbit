@@ -87,6 +87,14 @@ def test_system_prompt_contains_answer_quality_instructions() -> None:
     assert "cite the memory item" in lowered
 
 
+def test_system_prompt_requires_overdue_bills_in_coming_up_answers() -> None:
+    lowered = SYSTEM_PROMPT.lower()
+
+    assert "coming up" in lowered
+    assert "overdue first" in lowered
+    assert "never omit an" in lowered and "overdue unpaid bill" in lowered
+
+
 def test_mock_provider_returns_direct_answer_for_ai_memory_question() -> None:
     provider = MockAIProvider()
 

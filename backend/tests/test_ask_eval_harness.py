@@ -615,6 +615,110 @@ def test_answer_quality_details_not_evaluated_without_answer_or_terms() -> None:
     assert no_answer["answer_quality_pass"] is False
 
 
+def test_answer_quality_details_passes_when_one_group_alternative_matches() -> None:
+    question = AskEvalQuestion(
+        id="focus_today",
+        question="What should I focus on today?",
+        intent="daily_planning",
+        expected_context_sections=["Open todos"],
+        notes="Grouped wording.",
+        expected_answer_term_groups=[
+            ["focus today", "should focus", "focus on"],
+            ["Next step", "next steps"],
+        ],
+    )
+
+    quality = answer_quality_details(
+        question,
+        "Here is what to focus on. Next step: ship the eval.",
+    )
+
+    assert quality["answer_quality_evaluated"] is True
+    assert quality["answer_term_group_matches"] == ["focus on", "Next step"]
+    assert quality["missing_answer_term_groups"] == []
+    assert quality["answer_quality_pass"] is True
+
+
+def test_answer_quality_details_fails_when_a_group_has_no_match() -> None:
+    question = AskEvalQuestion(
+        id="focus_today",
+        question="What should I focus on today?",
+        intent="daily_planning",
+        expected_context_sections=["Open todos"],
+        notes="Grouped wording.",
+        expected_answer_term_groups=[
+            ["focus today", "should focus", "focus on"],
+            ["Next step", "next steps"],
+        ],
+    )
+
+    quality = answer_quality_details(
+        question,
+        "Here are your priorities for the day.",
+    )
+
+    assert quality["answer_quality_evaluated"] is True
+    assert quality["answer_term_group_matches"] == []
+    assert quality["missing_answer_term_groups"] == [
+        ["focus today", "should focus", "focus on"],
+        ["Next step", "next steps"],
+    ]
+    assert quality["answer_quality_pass"] is False
+
+
+def test_answer_quality_details_combines_strict_grouped_and_absent_terms() -> None:
+    question = AskEvalQuestion(
+        id="upcoming_bills",
+        question="What bills are coming up?",
+        intent="bill_review",
+        expected_context_sections=["Unpaid bills"],
+        notes="Strict bill names plus flexible urgency wording.",
+        expected_answer_terms=["Credit Card Payment", "Furlenco"],
+        expected_answer_term_groups=[["coming up", "due", "urgent"]],
+        absent_answer_terms=["Internet Bill Paid"],
+    )
+
+    passing = answer_quality_details(
+        question,
+        "Two bills are coming up: Credit Card Payment and Furlenco Furniture Rent.",
+    )
+    failing = answer_quality_details(
+        question,
+        "Only Furlenco Furniture Rent is coming up.",
+    )
+
+    assert passing["answer_quality_pass"] is True
+    assert passing["answer_term_matches"] == ["Credit Card Payment", "Furlenco"]
+    assert passing["answer_term_group_matches"] == ["coming up"]
+    assert passing["unexpected_answer_terms"] == []
+
+    # Missing the overdue Credit Card Payment fails the strict requirement.
+    assert failing["answer_quality_pass"] is False
+    assert failing["missing_answer_terms"] == ["Credit Card Payment"]
+
+
+def test_load_eval_questions_rejects_non_list_group_alternatives(tmp_path) -> None:
+    invalid_file = tmp_path / "invalid_groups.json"
+    invalid_file.write_text(
+        json.dumps(
+            [
+                {
+                    "id": "focus_today",
+                    "question": "What should I focus on today?",
+                    "intent": "daily_planning",
+                    "expected_context_sections": ["Open todos"],
+                    "expected_answer_term_groups": ["focus today"],
+                    "notes": "Groups must be lists, not strings.",
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="expected_answer_term_groups"):
+        load_eval_questions(invalid_file)
+
+
 def test_build_eval_result_includes_answer_quality_fields() -> None:
     question = AskEvalQuestion(
         id="saved_ai",
@@ -648,6 +752,43 @@ def test_build_eval_result_includes_answer_quality_fields() -> None:
     assert result["missing_answer_terms"] == []
     assert result["unexpected_answer_terms"] == []
     assert result["answer_quality_pass"] is True
+
+
+def test_build_eval_result_includes_group_match_and_missing_details() -> None:
+    question = AskEvalQuestion(
+        id="focus_today",
+        question="What should I focus on today?",
+        intent="daily_planning",
+        expected_context_sections=["Open todos"],
+        notes="Grouped wording with one missing group.",
+        expected_answer_term_groups=[
+            ["focus today", "should focus", "focus on"],
+            ["Next step", "next steps"],
+        ],
+    )
+
+    result = build_eval_result(
+        run_id="run-1",
+        run_label=None,
+        timestamp="2026-06-18T00:00:00+00:00",
+        base_url="http://127.0.0.1:8000",
+        mode="ask",
+        question=question,
+        preview={
+            "include_context": True,
+            "context_sections": ["Open todos"],
+            "context": "Open todos:\n- [Overdue] Ship Orbit Ask eval improvements",
+        },
+        answer="You should focus on shipping the overdue eval task.",
+    )
+
+    assert result["expected_answer_term_groups"] == [
+        ["focus today", "should focus", "focus on"],
+        ["Next step", "next steps"],
+    ]
+    assert result["answer_term_group_matches"] == ["should focus", "focus on"]
+    assert result["missing_answer_term_groups"] == [["Next step", "next steps"]]
+    assert result["answer_quality_pass"] is False
 
 
 def test_summarize_results_computes_answer_quality_pass_rate() -> None:

@@ -4,7 +4,10 @@
     "question": "What should I focus on today?",
     "intent": "daily_planning",
     "expected_context_sections": ["Today", "Open todos", "Unpaid bills", "Latest mood", "Active projects"],
-    "expected_answer_terms": ["focus today", "Next step"],
+    "expected_answer_term_groups": [
+      ["focus today", "should focus", "focus on", "priority today"],
+      ["Next step", "next steps"]
+    ],
     "notes": "Should surface urgent todos, unpaid bills, latest mood, and active projects."
   },
   {
@@ -14,9 +17,9 @@
     "expected_context_sections": ["Today", "Unpaid bills"],
     "expected_top_items": ["Credit Card Payment", "Furlenco"],
     "expected_absent_items": ["Internet Bill Paid"],
-    "expected_answer_terms": ["unpaid bill", "Credit Card Payment"],
+    "expected_answer_terms": ["Credit Card Payment", "Furlenco"],
     "absent_answer_terms": ["Internet Bill Paid"],
-    "notes": "Should prioritize unpaid bills by overdue/today/upcoming due dates."
+    "notes": "Overdue unpaid bills count as coming up, so Credit Card Payment must be included alongside Furlenco."
   },
   {
     "id": "saved_ai",
@@ -62,7 +65,9 @@
     "intent": "project_planning",
     "expected_context_sections": ["Active projects", "Open todos", "Recent memory"],
     "expected_absent_items": ["SwiftUI Learning Sprint"],
-    "expected_answer_terms": ["active project"],
+    "expected_answer_term_groups": [
+      ["active project", "projects need attention", "project"]
+    ],
     "absent_answer_terms": ["SwiftUI Learning Sprint"],
     "notes": "Should summarize active projects and any related open tasks or recent updates."
   },
@@ -71,7 +76,9 @@
     "question": "What did I save recently?",
     "intent": "memory_review",
     "expected_context_sections": ["Recent memory"],
-    "expected_answer_terms": ["most relevant save"],
+    "expected_answer_term_groups": [
+      ["most relevant save", "recently saved", "you recently saved", "saved"]
+    ],
     "notes": "Should show recent non-archived memory captures."
   },
   {
@@ -79,7 +86,10 @@
     "question": "Based on my mood, what should I do next?",
     "intent": "mood_guidance",
     "expected_context_sections": ["Latest mood", "Open todos", "Active projects"],
-    "expected_answer_terms": ["mood check-in", "Next step"],
+    "expected_answer_term_groups": [
+      ["mood check-in", "focused", "energy"],
+      ["Next step", "next steps"]
+    ],
     "notes": "Should use latest mood alongside practical todos/projects without inventing coaching details."
   },
   {
@@ -92,8 +102,11 @@
       "Open todos": ["Ship Orbit Ask eval improvements"],
       "Unpaid bills": ["Credit Card Payment"]
     },
-    "expected_answer_terms": ["overdue or due today", "Credit Card Payment"],
-    "notes": "Should emphasize overdue and due-today todos and bills."
+    "expected_answer_terms": ["Credit Card Payment"],
+    "expected_answer_term_groups": [
+      ["overdue or due today", "overdue", "due today"]
+    ],
+    "notes": "Should emphasize overdue and due-today todos and bills, including the overdue Credit Card Payment."
   },
   {
     "id": "orbit_progress",

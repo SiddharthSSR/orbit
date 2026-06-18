@@ -30,6 +30,7 @@ class AskEvalQuestion:
     expected_top_items_by_section: dict[str, list[str]] = field(default_factory=dict)
     expected_absent_items: list[str] = field(default_factory=list)
     expected_answer_terms: list[str] = field(default_factory=list)
+    expected_answer_term_groups: list[list[str]] = field(default_factory=list)
     absent_answer_terms: list[str] = field(default_factory=list)
 
 
@@ -57,6 +58,9 @@ def load_eval_questions(path: Path = DEFAULT_QUESTIONS_PATH) -> list[AskEvalQues
                 ),
                 expected_absent_items=_optional_string_list(item, "expected_absent_items", index),
                 expected_answer_terms=_optional_string_list(item, "expected_answer_terms", index),
+                expected_answer_term_groups=_optional_string_group_list(
+                    item, "expected_answer_term_groups", index
+                ),
                 absent_answer_terms=_optional_string_list(item, "absent_answer_terms", index),
             )
         )
@@ -201,6 +205,13 @@ def main() -> int:
                     )
                     if quality["missing_answer_terms"]:
                         print(f"Missing answer terms: {', '.join(quality['missing_answer_terms'])}")
+                    if quality["missing_answer_term_groups"]:
+                        print(
+                            "Missing answer term groups: "
+                            + "; ".join(
+                                "/".join(group) for group in quality["missing_answer_term_groups"]
+                            )
+                        )
                     if quality["unexpected_answer_terms"]:
                         print(
                             "Unexpected answer terms: "
@@ -383,10 +394,13 @@ def build_eval_result(
         "context": context,
         "answer": answer,
         "expected_answer_terms": question.expected_answer_terms,
+        "expected_answer_term_groups": question.expected_answer_term_groups,
         "absent_answer_terms": question.absent_answer_terms,
         "answer_quality_evaluated": answer_quality["answer_quality_evaluated"],
         "answer_term_matches": answer_quality["answer_term_matches"],
         "missing_answer_terms": answer_quality["missing_answer_terms"],
+        "answer_term_group_matches": answer_quality["answer_term_group_matches"],
+        "missing_answer_term_groups": answer_quality["missing_answer_term_groups"],
         "unexpected_answer_terms": answer_quality["unexpected_answer_terms"],
         "answer_quality_pass": answer_quality["answer_quality_pass"],
         "answer_quality_summary": answer_quality["answer_quality_summary"],
@@ -747,34 +761,70 @@ def item_ranking_details(question: AskEvalQuestion, context: str, *, top_n: int 
 
 
 def answer_quality_details(question: AskEvalQuestion, answer: str | None) -> dict[str, Any]:
-    """Check an answer against the question's expected/absent answer terms.
+    """Check an answer against the question's expected/grouped/absent answer terms.
 
-    Matching is case-insensitive substring matching. A question is only
-    evaluated when it declares answer-quality terms and an answer is present
-    (i.e. the run used ``--ask``); otherwise it is reported as not evaluated.
+    Matching is case-insensitive substring matching. There are three signals:
+
+    * ``expected_answer_terms`` are strict — every term must be present.
+    * ``expected_answer_term_groups`` allow wording flexibility — each group is a
+      list of acceptable alternatives, and at least one alternative per group
+      must be present. This keeps checks robust to real-LLM phrasing.
+    * ``absent_answer_terms`` must not appear.
+
+    A question is only evaluated when it declares any of these and an answer is
+    present (i.e. the run used ``--ask``); otherwise it is reported as not
+    evaluated.
     """
     expected = question.expected_answer_terms
+    groups = question.expected_answer_term_groups
     absent = question.absent_answer_terms
-    evaluated = bool(expected or absent) and answer is not None
+    evaluated = bool(expected or groups or absent) and answer is not None
     answer_text = (answer or "").lower()
 
-    matches = [term for term in expected if term.lower() in answer_text] if evaluated else []
-    missing = [term for term in expected if term.lower() not in answer_text] if evaluated else []
-    unexpected = [term for term in absent if term.lower() in answer_text] if evaluated else []
-    passed = evaluated and not missing and not unexpected
-
     if not evaluated:
-        summary = "No answer quality expectations" if not (expected or absent) else "Answer not requested"
-    else:
         summary = (
-            f"{len(matches)}/{len(expected)} expected term(s) present; "
-            f"{len(unexpected)} unexpected term(s)"
+            "No answer quality expectations"
+            if not (expected or groups or absent)
+            else "Answer not requested"
         )
+        return {
+            "answer_quality_evaluated": False,
+            "answer_term_matches": [],
+            "missing_answer_terms": [],
+            "answer_term_group_matches": [],
+            "missing_answer_term_groups": [],
+            "unexpected_answer_terms": [],
+            "answer_quality_pass": False,
+            "answer_quality_summary": summary,
+        }
+
+    matches = [term for term in expected if term.lower() in answer_text]
+    missing = [term for term in expected if term.lower() not in answer_text]
+
+    group_matches: list[str] = []
+    missing_groups: list[list[str]] = []
+    for group in groups:
+        hits = [alternative for alternative in group if alternative.lower() in answer_text]
+        if hits:
+            group_matches.extend(hits)
+        else:
+            missing_groups.append(group)
+
+    unexpected = [term for term in absent if term.lower() in answer_text]
+    passed = not missing and not missing_groups and not unexpected
+
+    summary = (
+        f"{len(matches)}/{len(expected)} expected term(s), "
+        f"{len(groups) - len(missing_groups)}/{len(groups)} term group(s) present; "
+        f"{len(unexpected)} unexpected term(s)"
+    )
 
     return {
-        "answer_quality_evaluated": evaluated,
+        "answer_quality_evaluated": True,
         "answer_term_matches": matches,
         "missing_answer_terms": missing,
+        "answer_term_group_matches": group_matches,
+        "missing_answer_term_groups": missing_groups,
         "unexpected_answer_terms": unexpected,
         "answer_quality_pass": passed,
         "answer_quality_summary": summary,
@@ -855,6 +905,28 @@ def _optional_string_list(item: dict[str, Any], key: str, index: int) -> list[st
     if not all(isinstance(entry, str) and entry.strip() for entry in value):
         raise ValueError(f"Eval question at index {index} field '{key}' must contain strings.")
     return value
+
+
+def _optional_string_group_list(
+    item: dict[str, Any], key: str, index: int
+) -> list[list[str]]:
+    value = item.get(key, [])
+    if not isinstance(value, list):
+        raise ValueError(
+            f"Eval question at index {index} field '{key}' must be a list of term groups."
+        )
+    groups: list[list[str]] = []
+    for group in value:
+        if not isinstance(group, list) or not group:
+            raise ValueError(
+                f"Eval question at index {index} field '{key}' must contain non-empty groups."
+            )
+        if not all(isinstance(entry, str) and entry.strip() for entry in group):
+            raise ValueError(
+                f"Eval question at index {index} field '{key}' groups must contain strings."
+            )
+        groups.append(group)
+    return groups
 
 
 def _optional_section_item_lists(
