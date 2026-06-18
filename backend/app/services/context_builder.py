@@ -21,6 +21,28 @@ def extract_context_sections(context: str) -> list[str]:
     return sections
 
 
+def extract_used_context_sections(context: str) -> list[str]:
+    lines = context.splitlines()
+    sections: list[str] = []
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if not stripped.endswith(":") or stripped.startswith("-"):
+            continue
+        body = lines[index + 1 :]
+        next_section = next(
+            (
+                body_index
+                for body_index, body_line in enumerate(body)
+                if body_line.strip().endswith(":") and not body_line.strip().startswith("-")
+            ),
+            len(body),
+        )
+        body_lines = [body_line.strip() for body_line in body[:next_section] if body_line.strip()]
+        if any(body_line != "- None" for body_line in body_lines):
+            sections.append(stripped[:-1])
+    return sections
+
+
 class OrbitContextBuilder:
     def __init__(
         self,

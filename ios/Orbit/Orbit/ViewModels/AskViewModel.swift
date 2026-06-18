@@ -85,6 +85,7 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var isPreviewLoading = false
     @Published var previewErrorMessage: String?
     @Published private(set) var latestRetrievalDiagnostics: RetrievalDiagnostics?
+    @Published private(set) var answerContextSummaries: [UUID: String] = [:]
 
     var contextConfidence: AskContextConfidence {
         Self.contextConfidence(for: contextPreview)
@@ -126,6 +127,7 @@ final class AskViewModel: ObservableObject {
         do {
             selectedSession = session
             messages = try await apiClient.listMessages(sessionId: session.id)
+            answerContextSummaries = [:]
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -154,6 +156,9 @@ final class AskViewModel: ObservableObject {
             messages.append(response.userMessage)
             messages.append(response.assistantMessage)
             latestRetrievalDiagnostics = response.retrievalDiagnostics
+            if let contextSummary = response.contextSummary {
+                answerContextSummaries[response.assistantMessage.id] = contextSummary
+            }
             draftQuestion = ""
             upsertSession(response.session)
         } catch {
@@ -192,6 +197,7 @@ final class AskViewModel: ObservableObject {
         errorMessage = nil
         contextPreview = nil
         latestRetrievalDiagnostics = nil
+        answerContextSummaries = [:]
         previewErrorMessage = nil
     }
 
@@ -207,6 +213,7 @@ final class AskViewModel: ObservableObject {
                 messages = []
                 contextPreview = nil
                 latestRetrievalDiagnostics = nil
+                answerContextSummaries = [:]
                 previewErrorMessage = nil
             }
         } catch {
@@ -217,6 +224,11 @@ final class AskViewModel: ObservableObject {
     func clearCurrentSession() async {
         guard let session = selectedSession else { return }
         await deleteSession(session)
+    }
+
+    func contextSummary(for message: ChatMessageDTO) -> String? {
+        guard message.role == "assistant" else { return nil }
+        return answerContextSummaries[message.id]
     }
 
     private var retrievalMode: RetrievalMode {

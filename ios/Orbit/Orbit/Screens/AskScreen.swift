@@ -150,7 +150,10 @@ struct AskScreen: View {
                     .listRowBackground(Color.clear)
                 } else {
                     ForEach(viewModel.messages) { message in
-                        ChatMessageRow(message: message)
+                        ChatMessageRow(
+                            message: message,
+                            contextSummary: viewModel.contextSummary(for: message)
+                        )
                     }
                 }
 
@@ -367,6 +370,7 @@ enum AskAnswerMarkdown {
 
 private struct ChatMessageRow: View {
     let message: ChatMessageDTO
+    let contextSummary: String?
 
     var body: some View {
         bubble
@@ -380,6 +384,14 @@ private struct ChatMessageRow: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(isAssistant ? Color.secondary : Color.accentColor)
             messageBody
+            if isAssistant, let contextSummary {
+                Divider()
+                Label(contextSummary, systemImage: "doc.text.magnifyingglass")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityLabel(contextSummary)
+            }
         }
         .padding(12)
         .frame(maxWidth: 360, alignment: .leading)

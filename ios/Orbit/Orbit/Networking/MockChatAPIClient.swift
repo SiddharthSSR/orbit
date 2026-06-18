@@ -60,12 +60,17 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
 
         messagesBySession[session.id, default: []].append(contentsOf: [userMessage, assistantMessage])
         sessions.sort { $0.updatedAt > $1.updatedAt }
+        let contextSections = payload.includeContext ? ["Today", "Open todos", "Recent memory"] : []
 
         return AskResponse(
             session: session,
             userMessage: userMessage,
             assistantMessage: assistantMessage,
             answer: assistantContent,
+            contextSections: contextSections,
+            contextSummary: contextSections.isEmpty
+                ? nil
+                : "Context used: \(contextSections.joined(separator: ", "))",
             retrievalDiagnostics: diagnostics(
                 mode: payload.retrievalMode,
                 memoryTopK: payload.memoryTopK,

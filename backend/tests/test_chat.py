@@ -51,12 +51,39 @@ def test_ask_creates_new_session_and_two_messages(client) -> None:
     assert data["user_message"]["content"] == "What should I focus on today?"
     assert data["assistant_message"]["role"] == "assistant"
     assert data["answer"] == data["assistant_message"]["content"]
+    assert data["context_sections"] == ["Today"]
+    assert data["context_summary"] == "Context used: Today"
+    assert "context" not in data
     # With an empty database the mock provider has no useful context to summarize.
     assert "Orbit context" in data["answer"]
 
     messages_response = client.get(f"/chat/sessions/{data['session']['id']}/messages")
     assert messages_response.status_code == 200
     assert [message["role"] for message in messages_response.json()] == ["user", "assistant"]
+
+
+def test_ask_returns_only_non_empty_context_sections(client) -> None:
+    client.post(
+        "/memory",
+        json={"title": "AI retrieval notes", "body": "Lightweight relevance", "tags": ["ai"]},
+    )
+
+    response = client.post("/ask", json={"question": "What did I save about AI?"})
+
+    assert response.status_code == 200
+    assert response.json()["context_sections"] == ["Today", "Recent memory"]
+    assert response.json()["context_summary"] == "Context used: Today, Recent memory"
+
+
+def test_ask_without_context_returns_empty_context_summary(client) -> None:
+    response = client.post(
+        "/ask",
+        json={"question": "What should I focus on?", "include_context": False},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["context_sections"] == []
+    assert response.json()["context_summary"] is None
 
 
 def test_ask_session_title_collapses_whitespace_and_strips_quotes(client) -> None:

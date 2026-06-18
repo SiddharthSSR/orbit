@@ -47,6 +47,31 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(viewModel.messages.last?.content.contains("available Orbit context") == true)
     }
 
+    func testSendQuestionStoresContextSummaryForAssistantOnly() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        viewModel.draftQuestion = "What did I save about AI?"
+
+        await viewModel.sendQuestion()
+
+        let userMessage = viewModel.messages[0]
+        let assistantMessage = viewModel.messages[1]
+        XCTAssertNil(viewModel.contextSummary(for: userMessage))
+        XCTAssertEqual(
+            viewModel.contextSummary(for: assistantMessage),
+            "Context used: Today, Open todos, Recent memory"
+        )
+    }
+
+    func testSendQuestionWithoutContextDoesNotStoreContextSummary() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        viewModel.includeContext = false
+        viewModel.draftQuestion = "What did I save about AI?"
+
+        await viewModel.sendQuestion()
+
+        XCTAssertNil(viewModel.contextSummary(for: viewModel.messages[1]))
+    }
+
     func testSendQuestionClearsDraft() async {
         let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "How are my projects going?"
@@ -129,6 +154,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
         XCTAssertNil(viewModel.contextPreview)
         XCTAssertNil(viewModel.latestRetrievalDiagnostics)
+        XCTAssertTrue(viewModel.answerContextSummaries.isEmpty)
         XCTAssertTrue(viewModel.useHybridRetrieval)
         XCTAssertFalse(viewModel.includeContext)
     }

@@ -37,7 +37,11 @@ from app.repositories.mood_repository import MoodRepository
 from app.repositories.project_repository import ProjectRepository
 from app.repositories.todo_repository import TodoRepository
 from app.services.ai_provider import AIProvider, AIProviderConfigurationError, build_ai_provider
-from app.services.context_builder import OrbitContextBuilder, extract_context_sections
+from app.services.context_builder import (
+    OrbitContextBuilder,
+    extract_context_sections,
+    extract_used_context_sections,
+)
 from app.services.embedding_provider import (
     EmbeddingProvider,
     EmbeddingProviderConfigurationError,
@@ -224,12 +228,20 @@ def ask(
         content=answer,
     )
     session.refresh(chat_session)
+    context_sections = extract_used_context_sections(context)
+    context_summary = (
+        f"Context used: {', '.join(context_sections)}"
+        if context_sections
+        else None
+    )
 
     return AskResponse(
         session=chat_session,
         user_message=user_message,
         assistant_message=assistant_message,
         answer=answer,
+        context_sections=context_sections,
+        context_summary=context_summary,
         retrieval_diagnostics=retrieval_diagnostics,
     )
 

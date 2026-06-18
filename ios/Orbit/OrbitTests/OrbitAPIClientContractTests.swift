@@ -169,7 +169,9 @@ final class OrbitAPIClientContractTests: XCTestCase {
             "content": "Based on available Orbit context...",
             "created_at": "2026-06-16T10:11:13.123456"
           },
-          "answer": "Based on available Orbit context..."
+          "answer": "Based on available Orbit context...",
+          "context_sections": ["Today", "Open todos"],
+          "context_summary": "Context used: Today, Open todos"
         }
         """.utf8))
 
@@ -177,7 +179,40 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(response.userMessage.role, "user")
         XCTAssertEqual(response.assistantMessage.role, "assistant")
         XCTAssertEqual(response.answer, "Based on available Orbit context...")
+        XCTAssertEqual(response.contextSections, ["Today", "Open todos"])
+        XCTAssertEqual(response.contextSummary, "Context used: Today, Open todos")
         XCTAssertNil(response.retrievalDiagnostics)
+    }
+
+    func testDecodesOlderAskResponseWithoutContextSummary() throws {
+        let response = try decoder.decode(AskResponse.self, from: Data("""
+        {
+          "session": {
+            "id": "66666666-6666-6666-6666-666666666666",
+            "title": "Older response",
+            "created_at": "2026-06-16T10:11:12.123456",
+            "updated_at": "2026-06-16T10:12:12.123456"
+          },
+          "user_message": {
+            "id": "77777777-7777-7777-7777-777777777777",
+            "session_id": "66666666-6666-6666-6666-666666666666",
+            "role": "user",
+            "content": "Question",
+            "created_at": "2026-06-16T10:11:12.123456"
+          },
+          "assistant_message": {
+            "id": "88888888-8888-8888-8888-888888888888",
+            "session_id": "66666666-6666-6666-6666-666666666666",
+            "role": "assistant",
+            "content": "Answer",
+            "created_at": "2026-06-16T10:11:13.123456"
+          },
+          "answer": "Answer"
+        }
+        """.utf8))
+
+        XCTAssertNil(response.contextSections)
+        XCTAssertNil(response.contextSummary)
     }
 
     func testDecodesAskContextPreviewResponseFromBackendJSON() throws {

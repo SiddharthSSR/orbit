@@ -66,6 +66,8 @@ struct AskResponse: Decodable, Sendable {
     var userMessage: ChatMessageDTO
     var assistantMessage: ChatMessageDTO
     var answer: String
+    var contextSections: [String]? = nil
+    var contextSummary: String? = nil
     var retrievalDiagnostics: RetrievalDiagnostics? = nil
 }
 

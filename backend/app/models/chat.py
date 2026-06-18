@@ -111,6 +111,8 @@ class AskResponse(BaseModel):
     user_message: ChatMessageRead
     assistant_message: ChatMessageRead
     answer: str
+    context_sections: list[str] = Field(default_factory=list)
+    context_summary: str | None = None
     retrieval_diagnostics: RetrievalDiagnostics | None = None
 
 
