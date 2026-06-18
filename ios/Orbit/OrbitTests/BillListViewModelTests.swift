@@ -76,6 +76,55 @@ final class BillListViewModelTests: XCTestCase {
         XCTAssertFalse(viewModel.isLoading)
     }
 
+    func testCreateToggleDeleteBillEmitBillsRefreshEvents() async {
+        let center = NotificationCenter()
+        let viewModel = BillListViewModel(
+            apiClient: MockBillAPIClient(bills: []),
+            notificationCenter: center
+        )
+
+        let createEvent = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+        await viewModel.createBill(name: "Electricity", amount: 800, dueDate: makeDate())
+        await fulfillment(of: [createEvent], timeout: 0.5)
+
+        let created = viewModel.bills[0]
+        let toggleEvent = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+        await viewModel.toggleBillPaid(bill: created)
+        await fulfillment(of: [toggleEvent], timeout: 0.5)
+
+        let deleteEvent = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+        await viewModel.deleteBill(bill: created)
+        await fulfillment(of: [deleteEvent], timeout: 0.5)
+    }
+
+    func testFailedBillMutationDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = BillListViewModel(
+            apiClient: FailingBillAPIClient(),
+            notificationCenter: center
+        )
+        let event = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+        event.isInverted = true
+
+        await viewModel.createBill(name: "Will fail", amount: 100, dueDate: makeDate())
+
+        await fulfillment(of: [event], timeout: 0.3)
+    }
+
+    func testBlankBillDoesNotEmitRefreshEvent() async {
+        let center = NotificationCenter()
+        let viewModel = BillListViewModel(
+            apiClient: MockBillAPIClient(bills: []),
+            notificationCenter: center
+        )
+        let event = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+        event.isInverted = true
+
+        await viewModel.createBill(name: "   ", amount: 100, dueDate: makeDate())
+
+        await fulfillment(of: [event], timeout: 0.3)
+    }
+
     private func makeBill(name: String, isPaid: Bool = false) -> BillDTO {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         return BillDTO(

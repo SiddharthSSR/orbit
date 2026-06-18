@@ -56,6 +56,11 @@ struct TodayScreen: View {
         ) { _ in
             Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .orbitBillsDidChange)
+        ) { _ in
+            Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
+        }
     }
 
     private var summaryCard: some View {

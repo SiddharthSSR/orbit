@@ -121,6 +121,7 @@ final class TodayDashboardViewModel: ObservableObject {
                 payload: BillUpdateRequest(isPaid: !bill.isPaid)
             )
             replace(updatedBill)
+            notificationCenter.post(name: .orbitBillsDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }

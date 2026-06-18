@@ -7,6 +7,8 @@ extension Notification.Name {
     static let orbitMemoryDidChange = Notification.Name("orbitMemoryDidChange")
     /// Posted after a todo item is created, updated, completed, or deleted.
     static let orbitTodoDidChange = Notification.Name("orbitTodoDidChange")
+    /// Posted after a bill is created, marked paid/unpaid, or deleted.
+    static let orbitBillsDidChange = Notification.Name("orbitBillsDidChange")
 }
 
 @main

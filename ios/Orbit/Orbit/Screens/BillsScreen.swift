@@ -81,6 +81,11 @@ struct BillsScreen: View {
         .task {
             await billViewModel.loadBills()
         }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .orbitBillsDidChange)
+        ) { _ in
+            Task { await billViewModel.loadBills(showsLoading: false) }
+        }
     }
 
     private func createBill() async {

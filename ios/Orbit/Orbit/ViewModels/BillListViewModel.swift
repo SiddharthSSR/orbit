@@ -7,13 +7,20 @@ final class BillListViewModel: ObservableObject {
     @Published var errorMessage: String?
 
     private let apiClient: any BillAPIClientProtocol
+    private let notificationCenter: NotificationCenter
 
-    init(apiClient: any BillAPIClientProtocol = OrbitAPIClient()) {
+    init(
+        apiClient: any BillAPIClientProtocol = OrbitAPIClient(),
+        notificationCenter: NotificationCenter = .default
+    ) {
         self.apiClient = apiClient
+        self.notificationCenter = notificationCenter
     }
 
-    func loadBills() async {
-        isLoading = true
+    func loadBills(showsLoading: Bool = true) async {
+        if showsLoading {
+            isLoading = true
+        }
         errorMessage = nil
         defer { isLoading = false }
 
@@ -50,6 +57,7 @@ final class BillListViewModel: ObservableObject {
         do {
             let bill = try await apiClient.createBill(payload)
             bills.insert(bill, at: 0)
+            notificationCenter.post(name: .orbitBillsDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -63,6 +71,7 @@ final class BillListViewModel: ObservableObject {
                 payload: BillUpdateRequest(isPaid: !bill.isPaid)
             )
             replace(updatedBill)
+            notificationCenter.post(name: .orbitBillsDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -73,6 +82,7 @@ final class BillListViewModel: ObservableObject {
         do {
             try await apiClient.deleteBill(id: bill.id)
             bills.removeAll { $0.id == bill.id }
+            notificationCenter.post(name: .orbitBillsDidChange, object: nil)
         } catch {
             errorMessage = readableMessage(for: error)
         }

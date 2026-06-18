@@ -133,6 +133,18 @@ final class TodayDashboardViewModelTests: XCTestCase {
         await fulfillment(of: [event], timeout: 0.5)
     }
 
+    func testToggleBillPaidEmitsBillsRefreshEvent() async {
+        let center = NotificationCenter()
+        let bill = makeBill(name: "Electricity")
+        let viewModel = makeViewModel(bills: [bill], notificationCenter: center)
+        await viewModel.loadDashboard()
+        let event = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+
+        await viewModel.toggleBillPaid(bill: bill)
+
+        await fulfillment(of: [event], timeout: 0.5)
+    }
+
     func testArchiveMemoryEmitsMemoryRefreshEvent() async {
         let center = NotificationCenter()
         let memory = makeMemory(title: "Old note")
