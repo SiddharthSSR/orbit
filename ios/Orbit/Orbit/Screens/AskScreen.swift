@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct AskScreen: View {
+    @EnvironmentObject private var navigation: AppNavigationModel
     @StateObject private var viewModel: AskViewModel
     @State private var isContextPreviewExpanded = false
     @State private var isConfirmingClear = false
@@ -263,6 +264,11 @@ struct AskScreen: View {
         }
         .task {
             await viewModel.loadSessions()
+        }
+        .onChange(of: viewModel.pendingTabNavigation) { _, pendingTab in
+            guard let pendingTab else { return }
+            navigation.select(pendingTab)
+            viewModel.clearPendingTabNavigation()
         }
         .sheet(
             item: Binding(
@@ -629,5 +635,6 @@ struct AskScreen_Previews: PreviewProvider {
             AskScreen(apiClient: MockChatAPIClient())
                 .navigationTitle("Ask")
         }
+        .environmentObject(AppNavigationModel())
     }
 }

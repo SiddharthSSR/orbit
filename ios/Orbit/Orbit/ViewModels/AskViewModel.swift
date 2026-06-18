@@ -92,6 +92,10 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var isExecutingSuggestedAction = false
     @Published private(set) var suggestedActionSuccessMessage: String?
     @Published var suggestedActionErrorMessage: String?
+    /// Set when a suggested action requests navigation to another tab (e.g.
+    /// review_bills opens Bills). The screen observes this, switches tabs, and
+    /// calls `clearPendingTabNavigation()`.
+    @Published private(set) var pendingTabNavigation: AppTab?
 
     var contextConfidence: AskContextConfidence {
         Self.contextConfidence(for: contextPreview)
@@ -282,8 +286,9 @@ final class AskViewModel: ObservableObject {
     }
 
     /// Executes the currently supported suggested actions: save_memory and
-    /// create_todo. Requires an explicit user tap and a valid draft, and is a
-    /// no-op for any other action type (review_bills, unknown). Reuses the
+    /// create_todo (which create records), and review_bills (which navigates to
+    /// the Bills tab without mutating anything). Requires an explicit user tap
+    /// and a valid draft, and is a no-op for any other action type. Reuses the
     /// existing memory and todo create endpoints.
     func executeSelectedSuggestedActionDraft() async {
         guard !isExecutingSuggestedAction,
@@ -316,12 +321,20 @@ final class AskViewModel: ObservableObject {
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Todo created"
                 OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
+            case "review_bills":
+                // Safe navigation only — no API call and no data mutation.
+                clearSuggestedActionPreview()
+                pendingTabNavigation = .bills
             default:
                 return
             }
         } catch {
             suggestedActionErrorMessage = readableMessage(for: error)
         }
+    }
+
+    func clearPendingTabNavigation() {
+        pendingTabNavigation = nil
     }
 
     func dismissSuggestedActionPreview() {

@@ -30,11 +30,26 @@ enum AppTab: String, CaseIterable, Identifiable {
     }
 }
 
+/// Shared, app-wide selected-tab state so screens can navigate between tabs
+/// (e.g. an Ask suggested action opening the Bills tab).
+@MainActor
+final class AppNavigationModel: ObservableObject {
+    @Published var selectedTab: AppTab
+
+    init(selectedTab: AppTab = .today) {
+        self.selectedTab = selectedTab
+    }
+
+    func select(_ tab: AppTab) {
+        selectedTab = tab
+    }
+}
+
 struct RootTabView: View {
-    @State private var selectedTab: AppTab = .today
+    @StateObject private var navigation = AppNavigationModel()
 
     var body: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: $navigation.selectedTab) {
             ForEach(AppTab.allCases) { tab in
                 NavigationStack {
                     screen(for: tab)
@@ -46,6 +61,7 @@ struct RootTabView: View {
                 .tag(tab)
             }
         }
+        .environmentObject(navigation)
     }
 
     @ViewBuilder

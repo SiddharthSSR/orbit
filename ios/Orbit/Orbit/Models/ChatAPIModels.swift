@@ -268,6 +268,9 @@ struct EditableSuggestedActionDraft: Identifiable, Equatable, Sendable {
         if actionType == "create_todo" {
             return "Draft looks valid and ready to create a todo."
         }
+        if actionType == "review_bills" {
+            return "Opens Bills — nothing is changed."
+        }
         if actionType == "unknown" || !Self.supportedActionTypes.contains(actionType) {
             return "Draft is valid for preview, but this action type is not executable."
         }
@@ -275,9 +278,15 @@ struct EditableSuggestedActionDraft: Identifiable, Equatable, Sendable {
     }
 
     /// Executable action types in this MVP (each only once it validates).
-    /// review_bills and unknown remain preview-only.
+    /// `review_bills` executes as safe navigation (no mutation); unknown stays
+    /// preview-only.
     var canExecute: Bool {
         Self.executableActionTypes.contains(actionType) && isValid
+    }
+
+    /// Whether executing this action navigates instead of mutating data.
+    var isNavigationAction: Bool {
+        actionType == "review_bills"
     }
 
     /// Primary button label: an action verb for executable types,
@@ -286,6 +295,7 @@ struct EditableSuggestedActionDraft: Identifiable, Equatable, Sendable {
         switch actionType {
         case "save_memory": "Save to memory"
         case "create_todo": "Create todo"
+        case "review_bills": "Review bills"
         default: "Coming soon"
         }
     }
@@ -295,6 +305,7 @@ struct EditableSuggestedActionDraft: Identifiable, Equatable, Sendable {
         switch actionType {
         case "save_memory": "This will save the draft as a memory."
         case "create_todo": "This will create a todo."
+        case "review_bills": "This will open Bills. Nothing will be changed."
         default: nil
         }
     }
@@ -326,7 +337,7 @@ struct EditableSuggestedActionDraft: Identifiable, Equatable, Sendable {
     }
 
     private static let supportedActionTypes = ["review_bills", "create_todo", "save_memory"]
-    private static let executableActionTypes = ["save_memory", "create_todo"]
+    private static let executableActionTypes = ["save_memory", "create_todo", "review_bills"]
 }
 
 private extension String {

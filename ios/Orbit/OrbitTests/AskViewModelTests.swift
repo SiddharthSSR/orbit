@@ -285,16 +285,32 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertFalse(draft.canExecute)
     }
 
-    func testReviewBillsIsNotExecutable() {
+    func testReviewBillsDraftIsExecutableAsNavigation() {
         let bills = EditableSuggestedActionDraft(
             source: SuggestedActionDraft(
                 action: makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Bills", payload: nil)
             )
         )
 
-        XCTAssertFalse(bills.canExecute)
-        XCTAssertEqual(bills.executionButtonTitle, "Coming soon")
-        XCTAssertNil(bills.executionSafetyText)
+        XCTAssertTrue(bills.canExecute)
+        XCTAssertTrue(bills.isNavigationAction)
+        XCTAssertEqual(bills.executionButtonTitle, "Review bills")
+        XCTAssertEqual(bills.executionSafetyText, "This will open Bills. Nothing will be changed.")
+        // Still read-only — navigation never mutates the draft fields.
+        XCTAssertTrue(bills.isReadOnly)
+    }
+
+    func testUnknownActionRemainsDisabled() {
+        let unknown = EditableSuggestedActionDraft(
+            source: SuggestedActionDraft(
+                action: makeSuggestedAction(type: "future_action", title: "Future", subtitle: "x", payload: nil)
+            )
+        )
+
+        XCTAssertFalse(unknown.canExecute)
+        XCTAssertFalse(unknown.isNavigationAction)
+        XCTAssertEqual(unknown.executionButtonTitle, "Coming soon")
+        XCTAssertNil(unknown.executionSafetyText)
     }
 
     func testExecuteSaveMemoryCallsCreateOnceWithTrimmedTextAndClearsDraft() async throws {
@@ -427,7 +443,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(requests.count, 1)
     }
 
-    func testExecuteReviewBillsDraftCreatesNothing() async {
+    func testExecuteReviewBillsNavigatesToBillsWithoutMutating() async {
         let memoryClient = MockMemoryAPIClient(memoryItems: [])
         let todoClient = MockTodoAPIClient(todos: [])
         let viewModel = makeViewModel(
@@ -441,12 +457,49 @@ final class AskViewModelTests: XCTestCase {
 
         await viewModel.executeSelectedSuggestedActionDraft()
 
+        // Navigation intent set, no record mutations, draft cleared.
+        XCTAssertEqual(viewModel.pendingTabNavigation, .bills)
         let todoRequests = await todoClient.recordedCreateRequests()
         let memoryRequests = await memoryClient.recordedCreateRequests()
         XCTAssertTrue(todoRequests.isEmpty)
         XCTAssertTrue(memoryRequests.isEmpty)
         XCTAssertNil(viewModel.suggestedActionSuccessMessage)
-        XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
+        XCTAssertNil(viewModel.selectedSuggestedAction)
+        XCTAssertNil(viewModel.editableSuggestedActionDraft)
+    }
+
+    func testReviewBillsExecutionEmitsNoRefreshEvents() async {
+        let center = NotificationCenter()
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            notificationCenter: center
+        )
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Upcoming", payload: nil)
+        )
+        let billsEvent = XCTNSNotificationExpectation(name: .orbitBillsDidChange, object: nil, notificationCenter: center)
+        billsEvent.isInverted = true
+        let memoryEvent = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
+        memoryEvent.isInverted = true
+        let todoEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
+        todoEvent.isInverted = true
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        await fulfillment(of: [billsEvent, memoryEvent, todoEvent], timeout: 0.3)
+    }
+
+    func testClearPendingTabNavigationResetsIntent() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        viewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Upcoming", payload: nil)
+        )
+        await viewModel.executeSelectedSuggestedActionDraft()
+        XCTAssertEqual(viewModel.pendingTabNavigation, .bills)
+
+        viewModel.clearPendingTabNavigation()
+
+        XCTAssertNil(viewModel.pendingTabNavigation)
     }
 
     func testExecuteSaveMemorySuccessEmitsMemoryRefreshEvent() async {
@@ -519,25 +572,6 @@ final class AskViewModelTests: XCTestCase {
         await viewModel.executeSelectedSuggestedActionDraft()
 
         await fulfillment(of: [todoEvent], timeout: 0.3)
-    }
-
-    func testReviewBillsDoesNotEmitRefreshEvent() async {
-        let center = NotificationCenter()
-        let viewModel = makeViewModel(
-            MockChatAPIClient(sessions: [], messagesBySession: [:]),
-            notificationCenter: center
-        )
-        viewModel.selectSuggestedAction(
-            makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Upcoming", payload: nil)
-        )
-        let memoryEvent = XCTNSNotificationExpectation(name: .orbitMemoryDidChange, object: nil, notificationCenter: center)
-        memoryEvent.isInverted = true
-        let todoEvent = XCTNSNotificationExpectation(name: .orbitTodoDidChange, object: nil, notificationCenter: center)
-        todoEvent.isInverted = true
-
-        await viewModel.executeSelectedSuggestedActionDraft()
-
-        await fulfillment(of: [memoryEvent, todoEvent], timeout: 0.3)
     }
 
     func testExecuteDoesNotCreateMemoryForInvalidSaveMemoryDraft() async throws {
