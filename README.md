@@ -266,6 +266,17 @@ python scripts/run_ask_eval.py --retrieval-mode hybrid --output eval-results/lat
 python scripts/run_ask_eval.py --ask --output eval-results/openai-run.jsonl --format jsonl --run-label openai-smoke
 ```
 
+Compare keyword and hybrid retrieval quality after generating both JSON baselines:
+
+```bash
+python scripts/compare_ask_eval_runs.py \
+  --keyword eval-results/latest-keyword.json \
+  --hybrid eval-results/latest-hybrid.json \
+  --output eval-results/latest-comparison.json
+```
+
+The comparison reports summary rate deltas and classifies each question as improved, preserved, degraded, or changed. Degradation means hybrid loses expected section coverage or a section-aware expected item; improvement means it gains either signal. Questions present in only one run are marked changed.
+
 Eval retrieval defaults to `keyword`. Hybrid baselines accept `--memory-top-k` (default `5`) and `--min-vector-score` (default `0.0`) and send those settings only to `POST /ask/context-preview`. If `--ask` and hybrid mode are combined, the harness prints a reminder that `/ask` remains keyword-only and keeps its request unchanged.
 
 Eval logs distinguish returned section headers from useful sections with real data, so sections containing only `- None` do not count as matched context. Selected eval questions also declare expected top/absent items and section-aware top items. Logs record case-insensitive global positions, top-five matches, positions within each expected section, top-three section matches, missing expected items, unexpected absence-check hits, retrieval settings, and vector-score annotation counts. A compact run summary reports section matching, section-aware ranking, legacy global ranking, request errors, unexpected absence hits, and hybrid annotation coverage. Section-aware ranking is preferred because it evaluates an item relative to the section where it belongs; global ranking remains informational. Scores do not affect the script exit status—only request errors do.
