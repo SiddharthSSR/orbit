@@ -26,9 +26,11 @@ from app.services.memory_retrieval import MemoryRetrievalService, MemorySearchRe
 class CapturingAIProvider:
     def __init__(self) -> None:
         self.context: str | None = None
+        self.histories: list[list[dict[str, str]]] = []
 
     def generate_answer(self, question, context, history):
         self.context = context
+        self.histories.append(history)
         return "Captured mock answer"
 
 
@@ -562,6 +564,103 @@ def test_ask_with_existing_session_appends_messages(client) -> None:
     messages = client.get(f"/chat/sessions/{first['session']['id']}/messages").json()
     assert [message["role"] for message in messages] == ["user", "assistant", "user", "assistant"]
     assert messages[-2]["content"] == "What should I do next?"
+
+
+def test_first_ask_has_no_recent_conversation_history(client) -> None:
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+
+    response = client.post("/ask", json={"question": "What bills are coming up?"})
+
+    assert response.status_code == 200
+    assert provider.histories == [[]]
+
+
+def test_follow_up_includes_only_prior_messages_from_same_session(client) -> None:
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+    first = client.post("/ask", json={"question": "What bills are coming up?"}).json()
+
+    response = client.post(
+        "/ask",
+        json={"question": "What about the second one?", "session_id": first["session"]["id"]},
+    )
+
+    assert response.status_code == 200
+    assert provider.histories[1] == [
+        {"role": "user", "content": "What bills are coming up?"},
+        {"role": "assistant", "content": "Captured mock answer"},
+    ]
+    assert all("What about the second one?" not in item["content"] for item in provider.histories[1])
+
+
+def test_recent_conversation_is_bounded_and_truncated(client) -> None:
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+    first = client.post("/ask", json={"question": "First question"}).json()
+    session_id = first["session"]["id"]
+    for index in range(4):
+        client.post(
+            "/ask",
+            json={"question": f"Follow-up {index} " + ("detail " * 120), "session_id": session_id},
+        )
+
+    history = provider.histories[-1]
+    assert len(history) == 6
+    assert history[0]["content"].startswith("Follow-up 0")
+    assert all(len(message["content"]) <= 600 for message in history)
+    assert history[0]["content"].endswith("…")
+
+
+def test_new_session_does_not_receive_other_session_history(client) -> None:
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+    client.post("/ask", json={"question": "Private first-session question"})
+
+    response = client.post("/ask", json={"question": "Start fresh"})
+
+    assert response.status_code == 200
+    assert provider.histories[-1] == []
+
+
+def test_follow_up_history_remains_available_without_orbit_context(client) -> None:
+    provider = CapturingAIProvider()
+    app.dependency_overrides[get_ai_provider] = lambda: provider
+    first = client.post("/ask", json={"question": "What bills are coming up?"}).json()
+
+    response = client.post(
+        "/ask",
+        json={
+            "question": "What about the second one?",
+            "session_id": first["session"]["id"],
+            "include_context": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert provider.context == ""
+    assert len(provider.histories[-1]) == 2
+    assert response.json()["context_sections"] == []
+
+
+def test_mock_provider_resolves_second_bill_follow_up(client) -> None:
+    client.post(
+        "/bills",
+        json={"name": "Credit Card Payment", "due_date": "2026-06-14", "amount": 8500},
+    )
+    client.post(
+        "/bills",
+        json={"name": "Furlenco Furniture Rent", "due_date": "2026-06-21", "amount": 12000},
+    )
+    first = client.post("/ask", json={"question": "What bills are coming up?"}).json()
+
+    follow_up = client.post(
+        "/ask",
+        json={"question": "What about the second one?", "session_id": first["session"]["id"]},
+    )
+
+    assert follow_up.status_code == 200
+    assert "Furlenco Furniture Rent" in follow_up.json()["answer"]
 
 
 def test_ask_with_unknown_session_returns_404(client) -> None:

@@ -57,6 +57,8 @@ router = APIRouter()
 
 ASK_SESSION_FALLBACK_TITLE = "New Ask"
 ASK_SESSION_TITLE_MAX_LENGTH = 60
+ASK_RECENT_MESSAGE_LIMIT = 6
+ASK_RECENT_MESSAGE_MAX_LENGTH = 600
 
 
 def get_ai_provider() -> AIProvider:
@@ -100,6 +102,13 @@ def _chat_title_from_question(question: str) -> str:
     if len(title) <= ASK_SESSION_TITLE_MAX_LENGTH:
         return title
     return f"{title[: ASK_SESSION_TITLE_MAX_LENGTH - 1].rstrip()}…"
+
+
+def _compact_chat_message(content: str) -> str:
+    normalized = " ".join(content.split())
+    if len(normalized) <= ASK_RECENT_MESSAGE_MAX_LENGTH:
+        return normalized
+    return f"{normalized[: ASK_RECENT_MESSAGE_MAX_LENGTH - 1].rstrip()}…"
 
 
 def build_orbit_context_for_question(
@@ -204,6 +213,15 @@ def ask(
         if chat_session is None:
             raise HTTPException(status_code=404, detail="Chat session not found")
 
+    history = [
+        {"role": message.role, "content": _compact_chat_message(message.content)}
+        for message in chat_repository.list_recent_messages_for_session(
+            chat_session.id,
+            limit=ASK_RECENT_MESSAGE_LIMIT,
+        )
+        if message.role in {"user", "assistant"}
+    ]
+
     user_message = chat_repository.create_message(
         session_id=chat_session.id,
         role="user",
@@ -217,10 +235,6 @@ def ask(
         memory_top_k=payload.memory_top_k,
         min_vector_score=payload.min_vector_score,
     )
-    history = [
-        {"role": message.role, "content": message.content}
-        for message in chat_repository.list_messages_for_session(chat_session.id)
-    ]
     answer = ai_provider.generate_answer(payload.question, context, history)
     assistant_message = chat_repository.create_message(
         session_id=chat_session.id,

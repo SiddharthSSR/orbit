@@ -14,6 +14,7 @@ SYSTEM_PROMPT = (
     "what is due, about bills, or what to focus on, include overdue items first and never omit an "
     "overdue unpaid bill. If an item is overdue, say so explicitly. "
     "For memory questions, cite the memory item by its title naturally. "
+    "Use the recent conversation block to resolve follow-up references within the current Ask session. "
     "Be concise, and mention uncertainty only when the context is genuinely insufficient; "
     "in that case ask for the missing detail instead of guessing. "
     'Avoid filler phrases such as repeatedly saying "based on the context". '
@@ -44,6 +45,10 @@ class MockAIProvider:
     """
 
     def generate_answer(self, question: str, context: str, history: list[dict[str, str]]) -> str:
+        follow_up_answer = self._answer_follow_up(question, history)
+        if follow_up_answer is not None:
+            return follow_up_answer
+
         sections = self._parse_sections(context)
         useful = {name: items for name in DATA_SECTIONS if (items := sections.get(name))}
         if not useful:
@@ -58,6 +63,32 @@ class MockAIProvider:
         if next_step:
             lines.append(f"Next step: {next_step}")
         return "\n".join(lines)
+
+    def _answer_follow_up(
+        self,
+        question: str,
+        history: list[dict[str, str]],
+    ) -> str | None:
+        normalized_question = question.lower()
+        if "second one" not in normalized_question and "second item" not in normalized_question:
+            return None
+        previous_answer = next(
+            (
+                message.get("content", "")
+                for message in reversed(history)
+                if message.get("role") == "assistant"
+            ),
+            "",
+        )
+        items = [
+            line[2:].strip()
+            for line in previous_answer.splitlines()
+            if line.strip().startswith("- ")
+        ]
+        if len(items) < 2:
+            return None
+        second_item = items[1]
+        return f"The second item was {self._short_label(second_item)}.\n- {second_item}"
 
     def _plan(
         self,
@@ -253,12 +284,21 @@ class OpenAIProvider:
         if context.strip():
             messages.append({"role": "system", "content": f"Orbit context:\n{context.strip()}"})
 
-        for message in history[-10:]:
+        conversation_messages = []
+        for message in history:
             role = message.get("role", "")
-            content = message.get("content", "")
-            if role not in {"user", "assistant", "system"} or not content:
+            content = message.get("content", "").strip()
+            if role not in {"user", "assistant"} or not content:
                 continue
-            messages.append({"role": role, "content": content})
+            conversation_messages.append({"role": role, "content": content})
+        if conversation_messages:
+            messages.append(
+                {
+                    "role": "system",
+                    "content": "Recent conversation in this Ask session follows.",
+                }
+            )
+            messages.extend(conversation_messages)
 
         messages.append({"role": "user", "content": question.strip()})
         return messages

@@ -73,6 +73,11 @@ def test_openai_provider_uses_fake_client_without_network() -> None:
     assert request["messages"][0]["role"] == "system"
     assert "personal second-brain assistant" in request["messages"][0]["content"]
     assert request["messages"][1]["content"] == "Orbit context:\nOpen todos:\n- Plan day"
+    assert request["messages"][2] == {
+        "role": "system",
+        "content": "Recent conversation in this Ask session follows.",
+    }
+    assert request["messages"][3] == {"role": "assistant", "content": "Earlier answer"}
     assert request["messages"][-1] == {"role": "user", "content": "What should I focus on today?"}
 
 
@@ -85,6 +90,19 @@ def test_system_prompt_contains_answer_quality_instructions() -> None:
     assert "next step" in lowered
     assert "do not invent" in lowered
     assert "cite the memory item" in lowered
+    assert "recent conversation" in lowered
+
+
+def test_openai_provider_omits_recent_conversation_block_without_history() -> None:
+    provider = OpenAIProvider(
+        api_key="test-key",
+        model="test-model",
+        client=FakeOpenAIClient(answer="Answer"),
+    )
+
+    messages = provider._build_messages(question="First question", context="", history=[])
+
+    assert all("Recent conversation" not in message["content"] for message in messages)
 
 
 def test_system_prompt_requires_overdue_bills_in_coming_up_answers() -> None:

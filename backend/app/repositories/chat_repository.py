@@ -62,3 +62,17 @@ class ChatRepository:
         if limit is not None:
             statement = statement.limit(limit)
         return list(self.session.scalars(statement).all())
+
+    def list_recent_messages_for_session(
+        self,
+        session_id: UUID | str,
+        *,
+        limit: int,
+    ) -> list[ChatMessageRecord]:
+        statement = (
+            select(ChatMessageRecord)
+            .where(ChatMessageRecord.session_id == str(session_id))
+            .order_by(ChatMessageRecord.created_at.desc())
+            .limit(limit)
+        )
+        return list(reversed(self.session.scalars(statement).all()))
