@@ -195,6 +195,30 @@ final class AskViewModel: ObservableObject {
         previewErrorMessage = nil
     }
 
+    func deleteSession(_ session: ChatSessionDTO) async {
+        errorMessage = nil
+        do {
+            try await apiClient.deleteChatSession(id: session.id)
+            sessions.removeAll { $0.id == session.id }
+            // Only reset the conversation view when the deleted chat is the open one.
+            // The draft question and retrieval preferences are left untouched.
+            if selectedSession?.id == session.id {
+                selectedSession = nil
+                messages = []
+                contextPreview = nil
+                latestRetrievalDiagnostics = nil
+                previewErrorMessage = nil
+            }
+        } catch {
+            errorMessage = readableMessage(for: error)
+        }
+    }
+
+    func clearCurrentSession() async {
+        guard let session = selectedSession else { return }
+        await deleteSession(session)
+    }
+
     private var retrievalMode: RetrievalMode {
         useHybridRetrieval ? .hybrid : .keyword
     }

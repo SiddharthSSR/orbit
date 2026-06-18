@@ -3,6 +3,7 @@ import SwiftUI
 struct AskScreen: View {
     @StateObject private var viewModel: AskViewModel
     @State private var isContextPreviewExpanded = false
+    @State private var isConfirmingClear = false
 
     init(apiClient: any ChatAPIClientProtocol = OrbitAPIClient()) {
         _viewModel = StateObject(wrappedValue: AskViewModel(apiClient: apiClient))
@@ -52,6 +53,13 @@ struct AskScreen: View {
                                 }
                                 .buttonStyle(.bordered)
                                 .tint(viewModel.selectedSession?.id == session.id ? .accentColor : .secondary)
+                                .contextMenu {
+                                    Button(role: .destructive) {
+                                        Task { await viewModel.deleteSession(session) }
+                                    } label: {
+                                        Label("Delete chat", systemImage: "trash")
+                                    }
+                                }
                             }
                         }
                         .padding(.vertical, 4)
@@ -106,7 +114,7 @@ struct AskScreen: View {
                 }
             }
 
-            Section("Conversation") {
+            Section {
                 if viewModel.messages.isEmpty {
                     EmptyStateView(
                         title: "Ask a question",
@@ -128,6 +136,33 @@ struct AskScreen: View {
                         Spacer()
                     }
                 }
+            } header: {
+                HStack {
+                    Text("Conversation")
+                    Spacer()
+                    if viewModel.selectedSession != nil {
+                        Button(role: .destructive) {
+                            isConfirmingClear = true
+                        } label: {
+                            Label("Clear chat", systemImage: "trash")
+                                .font(.caption)
+                        }
+                        .buttonStyle(.borderless)
+                        .textCase(nil)
+                    }
+                }
+            }
+            .confirmationDialog(
+                "Delete this conversation?",
+                isPresented: $isConfirmingClear,
+                titleVisibility: .visible
+            ) {
+                Button("Delete conversation", role: .destructive) {
+                    Task { await viewModel.clearCurrentSession() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This permanently deletes the chat and its messages.")
             }
 
             Section("Inspect context") {

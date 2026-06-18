@@ -240,6 +240,16 @@ def list_chat_messages(session_id: UUID, session: Session = Depends(get_session)
     return chat_repository.list_messages_for_session(session_id)
 
 
+@router.delete("/chat/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["chat"])
+def delete_chat_session(session_id: UUID, session: Session = Depends(get_session)) -> Response:
+    chat_repository = ChatRepository(session)
+    chat_session = chat_repository.get_session(session_id)
+    if chat_session is None:
+        raise HTTPException(status_code=404, detail="Chat session not found")
+    chat_repository.delete_session(chat_session)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
 @router.get("/memory", response_model=list[MemoryRead], tags=["memory"])
 def list_memory_items(
     include_archived: bool = False,

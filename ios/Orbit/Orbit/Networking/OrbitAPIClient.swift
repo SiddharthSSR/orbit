@@ -125,6 +125,7 @@ protocol ChatAPIClientProtocol: Sendable {
     func previewAskContext(_ payload: AskContextPreviewRequest) async throws -> AskContextPreviewResponse
     func listChatSessions() async throws -> [ChatSessionDTO]
     func listMessages(sessionId: UUID) async throws -> [ChatMessageDTO]
+    func deleteChatSession(id: UUID) async throws
 }
 
 enum OrbitAPIError: LocalizedError {
@@ -286,6 +287,10 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
 
     func listMessages(sessionId: UUID) async throws -> [ChatMessageDTO] {
         try await request(path: "/chat/sessions/\(sessionId.uuidString)/messages")
+    }
+
+    func deleteChatSession(id: UUID) async throws {
+        let _: EmptyResponse = try await request(path: "/chat/sessions/\(id.uuidString)", method: "DELETE")
     }
 
     private func request<Response: Decodable>(

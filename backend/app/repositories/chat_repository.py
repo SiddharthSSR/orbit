@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app.core.time import utc_now
@@ -45,6 +45,13 @@ class ChatRepository:
         self.session.commit()
         self.session.refresh(message)
         return message
+
+    def delete_session(self, chat_session: ChatSessionRecord) -> None:
+        self.session.execute(
+            delete(ChatMessageRecord).where(ChatMessageRecord.session_id == chat_session.id)
+        )
+        self.session.delete(chat_session)
+        self.session.commit()
 
     def list_messages_for_session(self, session_id: UUID, *, limit: int | None = None) -> list[ChatMessageRecord]:
         statement = (

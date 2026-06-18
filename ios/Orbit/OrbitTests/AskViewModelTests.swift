@@ -127,6 +127,92 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
 
+    func testDeleteSessionRemovesItFromListAndRecordsOnClient() async {
+        let kept = makeSession(title: "Keep")
+        let removed = makeSession(title: "Remove")
+        let client = MockChatAPIClient(
+            sessions: [kept, removed],
+            messagesBySession: [
+                kept.id: [makeMessage(sessionId: kept.id)],
+                removed.id: [makeMessage(sessionId: removed.id)],
+            ]
+        )
+        let viewModel = makeViewModel(client)
+        await viewModel.loadSessions()
+
+        await viewModel.deleteSession(removed)
+
+        XCTAssertEqual(viewModel.sessions.map(\.id), [kept.id])
+        let deleted = await client.deletedSessions()
+        XCTAssertEqual(deleted, [removed.id])
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testDeletingSelectedSessionClearsConversation() async {
+        let session = makeSession(title: "Active")
+        let client = MockChatAPIClient(
+            sessions: [session],
+            messagesBySession: [session.id: [makeMessage(sessionId: session.id)]]
+        )
+        let viewModel = makeViewModel(client)
+        await viewModel.selectSession(session)
+        XCTAssertFalse(viewModel.messages.isEmpty)
+
+        await viewModel.deleteSession(session)
+
+        XCTAssertNil(viewModel.selectedSession)
+        XCTAssertTrue(viewModel.messages.isEmpty)
+        XCTAssertTrue(viewModel.sessions.isEmpty)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testDeletingUnselectedSessionKeepsCurrentConversation() async {
+        let active = makeSession(title: "Active")
+        let other = makeSession(title: "Other")
+        let client = MockChatAPIClient(
+            sessions: [active, other],
+            messagesBySession: [
+                active.id: [makeMessage(sessionId: active.id)],
+                other.id: [makeMessage(sessionId: other.id)],
+            ]
+        )
+        let viewModel = makeViewModel(client)
+        await viewModel.loadSessions()
+        await viewModel.selectSession(active)
+
+        await viewModel.deleteSession(other)
+
+        XCTAssertEqual(viewModel.selectedSession?.id, active.id)
+        XCTAssertFalse(viewModel.messages.isEmpty)
+        XCTAssertEqual(viewModel.sessions.map(\.id), [active.id])
+    }
+
+    func testClearCurrentSessionDeletesSelectedSession() async {
+        let session = makeSession(title: "Active")
+        let client = MockChatAPIClient(
+            sessions: [session],
+            messagesBySession: [session.id: [makeMessage(sessionId: session.id)]]
+        )
+        let viewModel = makeViewModel(client)
+        await viewModel.selectSession(session)
+
+        await viewModel.clearCurrentSession()
+
+        let deleted = await client.deletedSessions()
+        XCTAssertEqual(deleted, [session.id])
+        XCTAssertNil(viewModel.selectedSession)
+        XCTAssertTrue(viewModel.messages.isEmpty)
+    }
+
+    func testDeleteSessionSetsErrorMessageOnFailure() async {
+        let session = makeSession(title: "Doomed")
+        let viewModel = makeViewModel(FailingChatAPIClient())
+
+        await viewModel.deleteSession(session)
+
+        XCTAssertEqual(viewModel.errorMessage, "Expected chat API failure.")
+    }
+
     func testBlankQuestionIsIgnored() async {
         let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.draftQuestion = "   \n\t "
@@ -487,6 +573,10 @@ private struct FailingChatAPIClient: ChatAPIClientProtocol {
     }
 
     func listMessages(sessionId: UUID) async throws -> [ChatMessageDTO] {
+        throw FailingChatAPIError.expectedFailure
+    }
+
+    func deleteChatSession(id: UUID) async throws {
         throw FailingChatAPIError.expectedFailure
     }
 }

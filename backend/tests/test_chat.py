@@ -551,6 +551,50 @@ def test_list_chat_messages_returns_ordered_messages(client) -> None:
     assert messages[0]["content"] == "How are my projects going?"
 
 
+def test_delete_chat_session_removes_session_and_messages(client) -> None:
+    created = client.post("/ask", json={"question": "What should I focus on today?"}).json()
+    session_id = created["session"]["id"]
+
+    delete_response = client.delete(f"/chat/sessions/{session_id}")
+
+    assert delete_response.status_code == 204
+    assert delete_response.content == b""
+    assert client.get("/chat/sessions").json() == []
+    # Messages for the deleted session are gone (the session lookup now 404s).
+    assert client.get(f"/chat/sessions/{session_id}/messages").status_code == 404
+
+
+def test_delete_chat_session_only_removes_target_session(client) -> None:
+    keep = client.post("/ask", json={"question": "Keep this chat"}).json()
+    remove = client.post("/ask", json={"question": "Remove this chat"}).json()
+
+    delete_response = client.delete(f"/chat/sessions/{remove['session']['id']}")
+
+    assert delete_response.status_code == 204
+    remaining = client.get("/chat/sessions").json()
+    assert [session["id"] for session in remaining] == [keep["session"]["id"]]
+    kept_messages = client.get(f"/chat/sessions/{keep['session']['id']}/messages").json()
+    assert [message["role"] for message in kept_messages] == ["user", "assistant"]
+
+
+def test_delete_missing_chat_session_returns_404(client) -> None:
+    response = client.delete(f"/chat/sessions/{uuid4()}")
+
+    assert response.status_code == 404
+
+
+def test_delete_chat_session_does_not_affect_other_data(client) -> None:
+    client.post("/todos", json={"title": "Keep this todo"})
+    client.post("/memory", json={"title": "Keep AI note", "body": "Retrieval", "tags": ["ai"]})
+    created = client.post("/ask", json={"question": "Temporary chat"}).json()
+
+    delete_response = client.delete(f"/chat/sessions/{created['session']['id']}")
+
+    assert delete_response.status_code == 204
+    assert [todo["title"] for todo in client.get("/todos").json()] == ["Keep this todo"]
+    assert [item["title"] for item in client.get("/memory").json()] == ["Keep AI note"]
+
+
 def test_context_builder_includes_current_orbit_context() -> None:
     engine = create_engine(
         "sqlite://",

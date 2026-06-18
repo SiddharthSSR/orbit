@@ -5,6 +5,7 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
     private var messagesBySession: [UUID: [ChatMessageDTO]]
     private var askRequests: [AskRequest] = []
     private var previewRequests: [AskContextPreviewRequest] = []
+    private var deletedSessionIds: [UUID] = []
 
     init(
         sessions: [ChatSessionDTO] = MockChatAPIClient.previewSessions,
@@ -129,6 +130,19 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
             throw OrbitAPIError.requestFailed(statusCode: 404, message: "Chat session not found")
         }
         return messagesBySession[sessionId, default: []].sorted { $0.createdAt < $1.createdAt }
+    }
+
+    func deleteChatSession(id: UUID) async throws {
+        guard sessions.contains(where: { $0.id == id }) else {
+            throw OrbitAPIError.requestFailed(statusCode: 404, message: "Chat session not found")
+        }
+        deletedSessionIds.append(id)
+        sessions.removeAll { $0.id == id }
+        messagesBySession[id] = nil
+    }
+
+    func deletedSessions() -> [UUID] {
+        deletedSessionIds
     }
 
     private func makeTitle(from question: String) -> String {
