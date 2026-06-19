@@ -44,10 +44,18 @@
 		0B0000A12C18B5D600000001 /* MockChatAPIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000A12C18B5D600000101 /* MockChatAPIClient.swift */; };
 		0B0000A22C18B5D600000001 /* AskViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000A22C18B5D600000101 /* AskViewModel.swift */; };
 		0B0000A32C18B5D600000001 /* AskViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000A32C18B5D600000101 /* AskViewModelTests.swift */; };
+		0B0000B02C18B5D600000001 /* OrbitMockLaunchSmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000B02C18B5D600000101 /* OrbitMockLaunchSmokeTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
 		0B00003A2C18B5D600000101 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 0B00001A2C18B5D600000101 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 0B0000162C18B5D600000101;
+			remoteInfo = Orbit;
+		};
+		0B0000B72C18B5D600000101 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0B00001A2C18B5D600000101 /* Project object */;
 			proxyType = 1;
@@ -96,6 +104,8 @@
 		0B0000A12C18B5D600000101 /* MockChatAPIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockChatAPIClient.swift; sourceTree = "<group>"; };
 		0B0000A22C18B5D600000101 /* AskViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskViewModel.swift; sourceTree = "<group>"; };
 		0B0000A32C18B5D600000101 /* AskViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskViewModelTests.swift; sourceTree = "<group>"; };
+		0B0000B02C18B5D600000101 /* OrbitMockLaunchSmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitMockLaunchSmokeTests.swift; sourceTree = "<group>"; };
+		0B0000B12C18B5D600000101 /* OrbitUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OrbitUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -113,6 +123,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0B0000B52C18B5D600000101 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -121,6 +138,7 @@
 			children = (
 				0B00000F2C18B5D600000101 /* Orbit */,
 				0B0000322C18B5D600000101 /* OrbitTests */,
+				0B0000B22C18B5D600000101 /* OrbitUITests */,
 				0B0000102C18B5D600000101 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -144,6 +162,7 @@
 			children = (
 				0B00000C2C18B5D600000101 /* Orbit.app */,
 				0B0000312C18B5D600000101 /* OrbitTests.xctest */,
+				0B0000B12C18B5D600000101 /* OrbitUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -241,6 +260,14 @@
 			path = OrbitTests;
 			sourceTree = "<group>";
 		};
+		0B0000B22C18B5D600000101 /* OrbitUITests */ = {
+			isa = PBXGroup;
+			children = (
+				0B0000B02C18B5D600000101 /* OrbitMockLaunchSmokeTests.swift */,
+			);
+			path = OrbitUITests;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -279,6 +306,24 @@
 			productReference = 0B0000312C18B5D600000101 /* OrbitTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		0B0000B32C18B5D600000101 /* OrbitUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 0B0000BB2C18B5D600000101 /* Build configuration list for PBXNativeTarget "OrbitUITests" */;
+			buildPhases = (
+				0B0000B42C18B5D600000101 /* Sources */,
+				0B0000B52C18B5D600000101 /* Frameworks */,
+				0B0000B62C18B5D600000101 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				0B0000B82C18B5D600000101 /* PBXTargetDependency */,
+			);
+			name = OrbitUITests;
+			productName = OrbitUITests;
+			productReference = 0B0000B12C18B5D600000101 /* OrbitUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -293,6 +338,10 @@
 						CreatedOnToolsVersion = 16.0;
 					};
 					0B0000362C18B5D600000101 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = 0B0000162C18B5D600000101;
+					};
+					0B0000B32C18B5D600000101 = {
 						CreatedOnToolsVersion = 16.0;
 						TestTargetID = 0B0000162C18B5D600000101;
 					};
@@ -314,6 +363,7 @@
 			targets = (
 				0B0000162C18B5D600000101 /* Orbit */,
 				0B0000362C18B5D600000101 /* OrbitTests */,
+				0B0000B32C18B5D600000101 /* OrbitUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -327,6 +377,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		0B0000342C18B5D600000101 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		0B0000B62C18B5D600000101 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -387,6 +444,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0B0000B42C18B5D600000101 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				0B0000B02C18B5D600000001 /* OrbitMockLaunchSmokeTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -394,6 +459,11 @@
 			isa = PBXTargetDependency;
 			target = 0B0000162C18B5D600000101 /* Orbit */;
 			targetProxy = 0B00003A2C18B5D600000101 /* PBXContainerItemProxy */;
+		};
+		0B0000B82C18B5D600000101 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 0B0000162C18B5D600000101 /* Orbit */;
+			targetProxy = 0B0000B72C18B5D600000101 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -593,6 +663,40 @@
 			};
 			name = Release;
 		};
+		0B0000B92C18B5D600000101 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.orbit.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Orbit;
+			};
+			name = Debug;
+		};
+		0B0000BA2C18B5D600000101 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.example.orbit.uitests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_TARGET_NAME = Orbit;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -619,6 +723,15 @@
 			buildConfigurations = (
 				0B0000372C18B5D600000101 /* Debug */,
 				0B0000382C18B5D600000101 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		0B0000BB2C18B5D600000101 /* Build configuration list for PBXNativeTarget "OrbitUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0B0000B92C18B5D600000101 /* Debug */,
+				0B0000BA2C18B5D600000101 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

@@ -78,6 +78,12 @@ live backend by setting `app.launchArguments = ["--orbit-ui-tests"]` or
 `app.launchEnvironment["ORBIT_USE_MOCKS"] = "1"`. Normal launches continue to
 use `OrbitAPIClient`.
 
+Run the mock UI smoke test (no backend required):
+
+```bash
+xcodebuild test -project ios/Orbit/Orbit.xcodeproj -scheme Orbit -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:OrbitUITests/OrbitMockLaunchSmokeTests
+```
+
 ## Continuous Integration
 
 GitHub Actions runs lightweight validation on pushes to `main` and pull requests:
