@@ -313,6 +313,115 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(unknown.executionSafetyText)
     }
 
+    func testSaveMemoryExecutionNavigatesToInboxAndReloadsCreatedMemory() async throws {
+        let center = NotificationCenter()
+        let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let askViewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: memoryClient,
+            notificationCenter: center
+        )
+        let inboxViewModel = MemoryListViewModel(
+            apiClient: memoryClient,
+            notificationCenter: center
+        )
+        let navigation = AppNavigationModel(selectedTab: .ask)
+        let refreshEvent = XCTNSNotificationExpectation(
+            name: .orbitMemoryDidChange,
+            object: nil,
+            notificationCenter: center
+        )
+        askViewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "Draft", payload: nil)
+        )
+        var draft = try XCTUnwrap(askViewModel.editableSuggestedActionDraft)
+        draft.updateField(id: "Memory text", value: "I like quiet cafes")
+        askViewModel.updateEditableSuggestedActionDraft(draft)
+
+        await askViewModel.executeSelectedSuggestedActionDraft()
+        await fulfillment(of: [refreshEvent], timeout: 0.5)
+
+        XCTAssertEqual(askViewModel.pendingTabNavigation, .inbox)
+        applyPendingNavigation(from: askViewModel, to: navigation)
+        await inboxViewModel.loadMemory(showsLoading: false)
+
+        let requests = await memoryClient.recordedCreateRequests()
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(navigation.selectedTab, .inbox)
+        XCTAssertNil(askViewModel.pendingTabNavigation)
+        XCTAssertEqual(inboxViewModel.memoryItems.map(\.body), ["I like quiet cafes"])
+        XCTAssertNil(inboxViewModel.errorMessage)
+    }
+
+    func testCreateTodoExecutionNavigatesToTodayAndReloadsCreatedTodo() async throws {
+        let center = NotificationCenter()
+        let todoClient = MockTodoAPIClient(todos: [])
+        let askViewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            todoClient: todoClient,
+            notificationCenter: center
+        )
+        let todayViewModel = TodayDashboardViewModel(
+            todoAPIClient: todoClient,
+            billAPIClient: MockBillAPIClient(bills: []),
+            memoryAPIClient: MockMemoryAPIClient(memoryItems: []),
+            moodAPIClient: MockMoodAPIClient(moods: []),
+            notificationCenter: center
+        )
+        let navigation = AppNavigationModel(selectedTab: .ask)
+        let refreshEvent = XCTNSNotificationExpectation(
+            name: .orbitTodoDidChange,
+            object: nil,
+            notificationCenter: center
+        )
+        askViewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Draft", payload: nil)
+        )
+        var draft = try XCTUnwrap(askViewModel.editableSuggestedActionDraft)
+        draft.updateField(id: "Todo title", value: "Call the dentist")
+        askViewModel.updateEditableSuggestedActionDraft(draft)
+
+        await askViewModel.executeSelectedSuggestedActionDraft()
+        await fulfillment(of: [refreshEvent], timeout: 0.5)
+
+        XCTAssertEqual(askViewModel.pendingTabNavigation, .today)
+        applyPendingNavigation(from: askViewModel, to: navigation)
+        await todayViewModel.loadDashboard(showsLoading: false)
+
+        let requests = await todoClient.recordedCreateRequests()
+        XCTAssertEqual(requests.count, 1)
+        XCTAssertEqual(navigation.selectedTab, .today)
+        XCTAssertNil(askViewModel.pendingTabNavigation)
+        XCTAssertEqual(todayViewModel.openTodos.map(\.title), ["Call the dentist"])
+        XCTAssertNil(todayViewModel.errorMessage)
+    }
+
+    func testReviewBillsExecutionSelectsBillsWithoutCreatingRecords() async {
+        let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let todoClient = MockTodoAPIClient(todos: [])
+        let askViewModel = makeViewModel(
+            MockChatAPIClient(sessions: [], messagesBySession: [:]),
+            memoryClient: memoryClient,
+            todoClient: todoClient
+        )
+        let navigation = AppNavigationModel(selectedTab: .ask)
+        askViewModel.selectSuggestedAction(
+            makeSuggestedAction(type: "review_bills", title: "Review bills", subtitle: "Upcoming", payload: nil)
+        )
+
+        await askViewModel.executeSelectedSuggestedActionDraft()
+
+        XCTAssertEqual(askViewModel.pendingTabNavigation, .bills)
+        applyPendingNavigation(from: askViewModel, to: navigation)
+
+        let memoryRequests = await memoryClient.recordedCreateRequests()
+        let todoRequests = await todoClient.recordedCreateRequests()
+        XCTAssertTrue(memoryRequests.isEmpty)
+        XCTAssertTrue(todoRequests.isEmpty)
+        XCTAssertEqual(navigation.selectedTab, .bills)
+        XCTAssertNil(askViewModel.pendingTabNavigation)
+    }
+
     func testExecuteSaveMemoryCallsCreateOnceWithTrimmedTextAndClearsDraft() async throws {
         let memoryClient = MockMemoryAPIClient(memoryItems: [])
         let viewModel = makeViewModel(
@@ -1181,6 +1290,15 @@ final class AskViewModelTests: XCTestCase {
             )
         }
         return EditableSuggestedActionDraft(source: SuggestedActionDraft(action: action))
+    }
+
+    private func applyPendingNavigation(
+        from viewModel: AskViewModel,
+        to navigation: AppNavigationModel
+    ) {
+        guard let tab = viewModel.pendingTabNavigation else { return }
+        navigation.select(tab)
+        viewModel.clearPendingTabNavigation()
     }
 }
 
