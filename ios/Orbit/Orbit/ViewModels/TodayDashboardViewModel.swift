@@ -7,6 +7,8 @@ final class TodayDashboardViewModel: ObservableObject {
     @Published private(set) var memoryItems: [MemoryDTO] = []
     @Published private(set) var latestMood: MoodDTO?
     @Published private(set) var isLoading = false
+    @Published private(set) var completingTodoIDs: Set<UUID> = []
+    @Published private(set) var todoCompletionErrorMessage: String?
     @Published var errorMessage: String?
 
     private let todoAPIClient: any TodoAPIClientProtocol
@@ -37,6 +39,10 @@ final class TodayDashboardViewModel: ObservableObject {
 
     var recentMemoryCount: Int {
         memoryItems.filter { !$0.isArchived }.count
+    }
+
+    func isCompletingTodo(id: UUID) -> Bool {
+        completingTodoIDs.contains(id)
     }
 
     init(
@@ -100,7 +106,10 @@ final class TodayDashboardViewModel: ObservableObject {
     }
 
     func toggleTodoComplete(todo: TodoDTO) async {
-        errorMessage = nil
+        guard completingTodoIDs.insert(todo.id).inserted else { return }
+        todoCompletionErrorMessage = nil
+        defer { completingTodoIDs.remove(todo.id) }
+
         do {
             let updatedTodo = try await todoAPIClient.updateTodo(
                 id: todo.id,
@@ -109,7 +118,7 @@ final class TodayDashboardViewModel: ObservableObject {
             replace(updatedTodo)
             OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
         } catch {
-            errorMessage = readableMessage(for: error)
+            todoCompletionErrorMessage = readableMessage(for: error)
         }
     }
 

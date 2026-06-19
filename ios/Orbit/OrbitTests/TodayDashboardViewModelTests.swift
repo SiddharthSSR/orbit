@@ -57,6 +57,51 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
 
+    func testToggleTodoCompleteTracksInFlightState() async {
+        let todo = makeTodo(title: "File receipt")
+        let client = SuspendedDashboardTodoAPIClient(todo: todo)
+        let viewModel = TodayDashboardViewModel(
+            todoAPIClient: client,
+            billAPIClient: MockBillAPIClient(bills: []),
+            memoryAPIClient: MockMemoryAPIClient(memoryItems: []),
+            moodAPIClient: MockMoodAPIClient(moods: [])
+        )
+        await viewModel.loadDashboard()
+
+        let completion = Task { await viewModel.toggleTodoComplete(todo: todo) }
+        await client.waitUntilUpdateStarts()
+
+        XCTAssertTrue(viewModel.isCompletingTodo(id: todo.id))
+
+        await viewModel.toggleTodoComplete(todo: todo)
+        let updateCallCount = await client.recordedUpdateCallCount()
+        XCTAssertEqual(updateCallCount, 1)
+
+        await client.resumeUpdate()
+        await completion.value
+
+        XCTAssertFalse(viewModel.isCompletingTodo(id: todo.id))
+        XCTAssertTrue(viewModel.openTodos.isEmpty)
+    }
+
+    func testFailedTodoCompletionLeavesTodoVisibleAndShowsInlineError() async {
+        let todo = makeTodo(title: "File receipt")
+        let viewModel = TodayDashboardViewModel(
+            todoAPIClient: FailingUpdateDashboardTodoAPIClient(todo: todo),
+            billAPIClient: MockBillAPIClient(bills: []),
+            memoryAPIClient: MockMemoryAPIClient(memoryItems: []),
+            moodAPIClient: MockMoodAPIClient(moods: [])
+        )
+        await viewModel.loadDashboard()
+
+        await viewModel.toggleTodoComplete(todo: todo)
+
+        XCTAssertEqual(viewModel.openTodos.map(\.title), ["File receipt"])
+        XCTAssertEqual(viewModel.todoCompletionErrorMessage, "Expected todo completion failure.")
+        XCTAssertNil(viewModel.errorMessage)
+        XCTAssertFalse(viewModel.isCompletingTodo(id: todo.id))
+    }
+
     func testToggleBillPaidRemovesPaidBillFromUnpaidList() async {
         let bill = makeBill(name: "Credit card")
         let viewModel = makeViewModel(bills: [bill])
@@ -284,6 +329,79 @@ private struct FailingDashboardTodoAPIClient: TodoAPIClientProtocol {
 
     func deleteTodo(id: UUID) async throws {
         throw FailingDashboardAPIError.expectedFailure
+    }
+}
+
+private actor SuspendedDashboardTodoAPIClient: TodoAPIClientProtocol {
+    private let todo: TodoDTO
+    private var updateStarted = false
+    private var updateCallCount = 0
+    private var updateContinuation: CheckedContinuation<Void, Never>?
+
+    init(todo: TodoDTO) {
+        self.todo = todo
+    }
+
+    func listTodos() async throws -> [TodoDTO] {
+        [todo]
+    }
+
+    func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO {
+        todo
+    }
+
+    func updateTodo(id: UUID, payload: TodoUpdateRequest) async throws -> TodoDTO {
+        updateCallCount += 1
+        updateStarted = true
+        await withCheckedContinuation { continuation in
+            updateContinuation = continuation
+        }
+        var updated = todo
+        updated.isComplete = payload.isComplete ?? updated.isComplete
+        return updated
+    }
+
+    func deleteTodo(id: UUID) async throws {}
+
+    func waitUntilUpdateStarts() async {
+        while !updateStarted {
+            await Task.yield()
+        }
+    }
+
+    func resumeUpdate() {
+        updateContinuation?.resume()
+        updateContinuation = nil
+    }
+
+    func recordedUpdateCallCount() -> Int {
+        updateCallCount
+    }
+}
+
+private struct FailingUpdateDashboardTodoAPIClient: TodoAPIClientProtocol {
+    let todo: TodoDTO
+
+    func listTodos() async throws -> [TodoDTO] {
+        [todo]
+    }
+
+    func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO {
+        todo
+    }
+
+    func updateTodo(id: UUID, payload: TodoUpdateRequest) async throws -> TodoDTO {
+        throw FailingTodoCompletionError.expectedFailure
+    }
+
+    func deleteTodo(id: UUID) async throws {}
+}
+
+private enum FailingTodoCompletionError: LocalizedError {
+    case expectedFailure
+
+    var errorDescription: String? {
+        "Expected todo completion failure."
     }
 }
 

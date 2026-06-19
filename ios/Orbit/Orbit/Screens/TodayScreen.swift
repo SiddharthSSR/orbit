@@ -142,11 +142,15 @@ struct TodayScreen: View {
     }
 
     private var openTodosSection: some View {
-        DashboardSection(title: "Open Todos", systemImage: "checklist") {
+        DashboardSection(
+            title: "Open Todos",
+            systemImage: "checklist",
+            count: dashboardViewModel.openTodoCount
+        ) {
             if dashboardViewModel.openTodos.isEmpty {
                 EmptyStateView(
-                    title: "No open todos",
-                    message: "Completed tasks are out of the way for today.",
+                    title: "You're caught up",
+                    message: "Todos created from Ask will appear here.",
                     systemImage: "checkmark.circle"
                 )
                 .frame(minHeight: 120)
@@ -155,11 +159,27 @@ struct TodayScreen: View {
                     ForEach(dashboardViewModel.openTodos) { todo in
                         TodayTodoRow(
                             todo: todo,
-                            isHighlighted: todo.id == highlightedTodoID
+                            isHighlighted: todo.id == highlightedTodoID,
+                            isCompleting: dashboardViewModel.isCompletingTodo(id: todo.id)
                         ) {
                             Task { await dashboardViewModel.toggleTodoComplete(todo: todo) }
                         }
                     }
+                }
+
+                if let message = dashboardViewModel.todoCompletionErrorMessage {
+                    Label {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Couldn't complete todo")
+                                .font(.subheadline.weight(.semibold))
+                            Text(message)
+                                .font(.caption)
+                        }
+                    } icon: {
+                        Image(systemName: "exclamationmark.circle")
+                    }
+                    .foregroundStyle(.red)
+                    .padding(.top, 4)
                 }
             }
         }
@@ -266,12 +286,27 @@ struct TodayScreen: View {
 private struct DashboardSection<Content: View>: View {
     let title: String
     let systemImage: String
+    var count: Int? = nil
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(title, systemImage: systemImage)
-                .font(.headline)
+            HStack {
+                Label(title, systemImage: systemImage)
+                    .font(.headline)
+
+                Spacer()
+
+                if let count {
+                    Text("\(count) open")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.quaternary, in: Capsule())
+                        .accessibilityLabel(count == 1 ? "1 open todo" : "\(count) open todos")
+                }
+            }
             content
         }
         .padding(.top, 4)
@@ -281,20 +316,42 @@ private struct DashboardSection<Content: View>: View {
 private struct TodayTodoRow: View {
     let todo: TodoDTO
     let isHighlighted: Bool
+    let isCompleting: Bool
     let onToggle: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onToggle) {
-                Image(systemName: "circle")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
+                Group {
+                    if isCompleting {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Image(systemName: "circle")
+                            .font(.title3)
+                    }
+                }
+                .frame(width: 32, height: 32)
+                .foregroundStyle(isHighlighted ? Color.accentColor : .secondary)
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Mark complete")
+            .disabled(isCompleting)
+            .accessibilityLabel("Complete \(todo.title)")
+            .accessibilityValue(isCompleting ? "Completing" : "Not completed")
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(todo.title)
+                HStack(spacing: 8) {
+                    Text(todo.title)
+
+                    if isHighlighted {
+                        Text("New")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.accentColor.opacity(0.12), in: Capsule())
+                    }
+                }
                 if let dueDate = todo.dueDate {
                     Text(dueDate, style: .date)
                         .font(.caption)
