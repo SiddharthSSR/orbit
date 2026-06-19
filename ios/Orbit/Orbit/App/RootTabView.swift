@@ -30,18 +30,47 @@ enum AppTab: String, CaseIterable, Identifiable {
     }
 }
 
+enum AppHighlightTarget: Equatable {
+    case memory(UUID)
+    case todo(UUID)
+}
+
 /// Shared, app-wide selected-tab state so screens can navigate between tabs
 /// (e.g. an Ask suggested action opening the Bills tab).
 @MainActor
 final class AppNavigationModel: ObservableObject {
     @Published var selectedTab: AppTab
+    @Published private(set) var pendingHighlight: AppHighlightTarget?
 
-    init(selectedTab: AppTab = .today) {
+    init(
+        selectedTab: AppTab = .today,
+        pendingHighlight: AppHighlightTarget? = nil
+    ) {
         self.selectedTab = selectedTab
+        self.pendingHighlight = pendingHighlight
     }
 
     func select(_ tab: AppTab) {
         selectedTab = tab
+    }
+
+    func navigate(
+        to tab: AppTab,
+        highlighting target: AppHighlightTarget? = nil
+    ) {
+        pendingHighlight = target
+        selectedTab = tab
+    }
+
+    @discardableResult
+    func consumeHighlight(_ target: AppHighlightTarget) -> Bool {
+        guard pendingHighlight == target else { return false }
+        pendingHighlight = nil
+        return true
+    }
+
+    func clearHighlight() {
+        pendingHighlight = nil
     }
 }
 

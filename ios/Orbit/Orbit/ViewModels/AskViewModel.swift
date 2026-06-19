@@ -96,6 +96,9 @@ final class AskViewModel: ObservableObject {
     /// review_bills opens Bills). The screen observes this, switches tabs, and
     /// calls `clearPendingTabNavigation()`.
     @Published private(set) var pendingTabNavigation: AppTab?
+    /// Optional created-item target handed to `AppNavigationModel` together
+    /// with `pendingTabNavigation`.
+    @Published private(set) var pendingHighlight: AppHighlightTarget?
 
     var contextConfidence: AskContextConfidence {
         Self.contextConfidence(for: contextPreview)
@@ -305,7 +308,7 @@ final class AskViewModel: ObservableObject {
             switch draft.actionType {
             case "save_memory":
                 guard let memoryText = draft.trimmedMemoryText else { return }
-                _ = try await memoryClient.createMemory(
+                let memory = try await memoryClient.createMemory(
                     MemoryCreateRequest(
                         title: Self.memoryTitle(from: memoryText),
                         body: memoryText,
@@ -316,18 +319,21 @@ final class AskViewModel: ObservableObject {
                 suggestedActionSuccessMessage = "Saved to memory"
                 OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
                 // Open Inbox so the user sees the new memory immediately.
+                pendingHighlight = .memory(memory.id)
                 pendingTabNavigation = .inbox
             case "create_todo":
                 guard let title = draft.trimmedTodoTitle else { return }
-                _ = try await todoClient.createTodo(TodoCreateRequest(title: title))
+                let todo = try await todoClient.createTodo(TodoCreateRequest(title: title))
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Todo created"
                 OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
                 // Open Today so the user sees the new todo immediately.
+                pendingHighlight = .todo(todo.id)
                 pendingTabNavigation = .today
             case "review_bills":
                 // Safe navigation only — no API call and no data mutation.
                 clearSuggestedActionPreview()
+                pendingHighlight = nil
                 pendingTabNavigation = .bills
             default:
                 return
@@ -339,6 +345,10 @@ final class AskViewModel: ObservableObject {
 
     func clearPendingTabNavigation() {
         pendingTabNavigation = nil
+    }
+
+    func clearPendingHighlight() {
+        pendingHighlight = nil
     }
 
     func dismissSuggestedActionPreview() {

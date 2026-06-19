@@ -277,8 +277,12 @@ struct AskScreen: View {
         }
         .onChange(of: viewModel.pendingTabNavigation) { _, pendingTab in
             guard let pendingTab else { return }
-            navigation.select(pendingTab)
+            navigation.navigate(
+                to: pendingTab,
+                highlighting: viewModel.pendingHighlight
+            )
             viewModel.clearPendingTabNavigation()
+            viewModel.clearPendingHighlight()
         }
         .sheet(
             item: Binding(

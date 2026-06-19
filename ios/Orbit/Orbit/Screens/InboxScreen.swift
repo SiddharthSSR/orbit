@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct InboxScreen: View {
+    @EnvironmentObject private var navigation: AppNavigationModel
     @StateObject private var memoryViewModel: MemoryListViewModel
+    @State private var highlightedMemoryID: UUID?
     @State private var newTitle = ""
     @State private var newBody = ""
     @State private var newKind = "note"
@@ -83,6 +85,7 @@ struct InboxScreen: View {
                     ForEach(memoryViewModel.memoryItems) { memory in
                         MemoryRow(
                             memory: memory,
+                            isHighlighted: memory.id == highlightedMemoryID,
                             onArchive: {
                                 Task { await memoryViewModel.archiveMemory(memory: memory) }
                             },
@@ -96,11 +99,44 @@ struct InboxScreen: View {
         }
         .task {
             await memoryViewModel.loadMemory()
+            consumePendingHighlightIfLoaded()
+        }
+        .task(id: highlightedMemoryID) {
+            guard let highlightedMemoryID else { return }
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return
+            }
+            guard self.highlightedMemoryID == highlightedMemoryID else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                self.highlightedMemoryID = nil
+            }
+        }
+        .onChange(of: memoryViewModel.memoryItems) { _, _ in
+            consumePendingHighlightIfLoaded()
+        }
+        .onChange(of: navigation.pendingHighlight) { _, _ in
+            consumePendingHighlightIfLoaded()
         }
         .onReceive(
             OrbitRefreshCenter.publisher(for: .orbitMemoryDidChange)
         ) { _ in
-            Task { await memoryViewModel.loadMemory(showsLoading: false) }
+            Task {
+                await memoryViewModel.loadMemory(showsLoading: false)
+                consumePendingHighlightIfLoaded()
+            }
+        }
+    }
+
+    private func consumePendingHighlightIfLoaded() {
+        guard case let .memory(id)? = navigation.pendingHighlight,
+              memoryViewModel.memoryItems.contains(where: { $0.id == id }),
+              navigation.consumeHighlight(.memory(id)) else {
+            return
+        }
+        withAnimation(.easeIn(duration: 0.2)) {
+            highlightedMemoryID = id
         }
     }
 
@@ -138,6 +174,7 @@ struct InboxScreen: View {
 
 private struct MemoryRow: View {
     let memory: MemoryDTO
+    let isHighlighted: Bool
     let onArchive: () -> Void
     let onDelete: () -> Void
 
@@ -188,6 +225,18 @@ private struct MemoryRow: View {
             .font(.subheadline)
         }
         .padding(.vertical, 4)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHighlighted ? Color.accentColor.opacity(0.14) : Color.clear)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(
+                    isHighlighted ? Color.accentColor.opacity(0.65) : Color.clear,
+                    lineWidth: 1.5
+                )
+        }
+        .animation(.easeInOut(duration: 0.2), value: isHighlighted)
     }
 
     private func kindLabel(_ kind: String) -> String {
@@ -205,6 +254,7 @@ struct InboxScreen_Previews: PreviewProvider {
         NavigationStack {
             InboxScreen(apiClient: MockMemoryAPIClient())
                 .navigationTitle("Inbox")
+                .environmentObject(AppNavigationModel())
         }
     }
 }

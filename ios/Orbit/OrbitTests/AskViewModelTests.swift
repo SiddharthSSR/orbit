@@ -342,14 +342,22 @@ final class AskViewModelTests: XCTestCase {
         await fulfillment(of: [refreshEvent], timeout: 0.5)
 
         XCTAssertEqual(askViewModel.pendingTabNavigation, .inbox)
+        guard case let .memory(createdMemoryID)? = askViewModel.pendingHighlight else {
+            return XCTFail("Expected a memory highlight target")
+        }
         applyPendingNavigation(from: askViewModel, to: navigation)
         await inboxViewModel.loadMemory(showsLoading: false)
 
         let requests = await memoryClient.recordedCreateRequests()
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(navigation.selectedTab, .inbox)
+        XCTAssertEqual(navigation.pendingHighlight, .memory(createdMemoryID))
         XCTAssertNil(askViewModel.pendingTabNavigation)
+        XCTAssertNil(askViewModel.pendingHighlight)
         XCTAssertEqual(inboxViewModel.memoryItems.map(\.body), ["I like quiet cafes"])
+        XCTAssertTrue(inboxViewModel.memoryItems.contains { $0.id == createdMemoryID })
+        XCTAssertTrue(navigation.consumeHighlight(.memory(createdMemoryID)))
+        XCTAssertNil(navigation.pendingHighlight)
         XCTAssertNil(inboxViewModel.errorMessage)
     }
 
@@ -385,14 +393,22 @@ final class AskViewModelTests: XCTestCase {
         await fulfillment(of: [refreshEvent], timeout: 0.5)
 
         XCTAssertEqual(askViewModel.pendingTabNavigation, .today)
+        guard case let .todo(createdTodoID)? = askViewModel.pendingHighlight else {
+            return XCTFail("Expected a todo highlight target")
+        }
         applyPendingNavigation(from: askViewModel, to: navigation)
         await todayViewModel.loadDashboard(showsLoading: false)
 
         let requests = await todoClient.recordedCreateRequests()
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(navigation.selectedTab, .today)
+        XCTAssertEqual(navigation.pendingHighlight, .todo(createdTodoID))
         XCTAssertNil(askViewModel.pendingTabNavigation)
+        XCTAssertNil(askViewModel.pendingHighlight)
         XCTAssertEqual(todayViewModel.openTodos.map(\.title), ["Call the dentist"])
+        XCTAssertTrue(todayViewModel.openTodos.contains { $0.id == createdTodoID })
+        XCTAssertTrue(navigation.consumeHighlight(.todo(createdTodoID)))
+        XCTAssertNil(navigation.pendingHighlight)
         XCTAssertNil(todayViewModel.errorMessage)
     }
 
@@ -412,6 +428,7 @@ final class AskViewModelTests: XCTestCase {
         await askViewModel.executeSelectedSuggestedActionDraft()
 
         XCTAssertEqual(askViewModel.pendingTabNavigation, .bills)
+        XCTAssertNil(askViewModel.pendingHighlight)
         applyPendingNavigation(from: askViewModel, to: navigation)
 
         let memoryRequests = await memoryClient.recordedCreateRequests()
@@ -419,6 +436,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(memoryRequests.isEmpty)
         XCTAssertTrue(todoRequests.isEmpty)
         XCTAssertEqual(navigation.selectedTab, .bills)
+        XCTAssertNil(navigation.pendingHighlight)
         XCTAssertNil(askViewModel.pendingTabNavigation)
     }
 
@@ -444,6 +462,9 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertFalse(requests.first?.title.isEmpty ?? true)
         XCTAssertEqual(viewModel.suggestedActionSuccessMessage, "Saved to memory")
         XCTAssertEqual(viewModel.pendingTabNavigation, .inbox)
+        guard case .memory? = viewModel.pendingHighlight else {
+            return XCTFail("Expected a memory highlight target")
+        }
         XCTAssertNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.editableSuggestedActionDraft)
         XCTAssertNil(viewModel.suggestedActionErrorMessage)
@@ -466,6 +487,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.suggestedActionSuccessMessage)
         XCTAssertEqual(viewModel.suggestedActionErrorMessage, "Expected memory API failure.")
         XCTAssertNil(viewModel.pendingTabNavigation)
+        XCTAssertNil(viewModel.pendingHighlight)
         XCTAssertFalse(viewModel.isExecutingSuggestedAction)
     }
 
@@ -493,6 +515,9 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(memoryRequests.isEmpty, "create_todo must not create a memory")
         XCTAssertEqual(viewModel.suggestedActionSuccessMessage, "Todo created")
         XCTAssertEqual(viewModel.pendingTabNavigation, .today)
+        guard case .todo? = viewModel.pendingHighlight else {
+            return XCTFail("Expected a todo highlight target")
+        }
         XCTAssertNil(viewModel.selectedSuggestedAction)
         XCTAssertNil(viewModel.editableSuggestedActionDraft)
         XCTAssertNil(viewModel.suggestedActionErrorMessage)
@@ -515,6 +540,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.suggestedActionSuccessMessage)
         XCTAssertEqual(viewModel.suggestedActionErrorMessage, "Expected todo API failure.")
         XCTAssertNil(viewModel.pendingTabNavigation)
+        XCTAssertNil(viewModel.pendingHighlight)
         XCTAssertFalse(viewModel.isExecutingSuggestedAction)
     }
 
@@ -537,6 +563,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(requests.isEmpty)
         XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
         XCTAssertNil(viewModel.pendingTabNavigation)
+        XCTAssertNil(viewModel.pendingHighlight)
     }
 
     func testRepeatedExecuteDoesNotCreateDuplicateTodo() async {
@@ -573,6 +600,7 @@ final class AskViewModelTests: XCTestCase {
 
         // Navigation intent set, no record mutations, draft cleared.
         XCTAssertEqual(viewModel.pendingTabNavigation, .bills)
+        XCTAssertNil(viewModel.pendingHighlight)
         let todoRequests = await todoClient.recordedCreateRequests()
         let memoryRequests = await memoryClient.recordedCreateRequests()
         XCTAssertTrue(todoRequests.isEmpty)
@@ -616,6 +644,20 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.pendingTabNavigation)
     }
 
+    func testAppNavigationHighlightCanBeCleared() {
+        let todoID = UUID()
+        let navigation = AppNavigationModel(selectedTab: .ask)
+        navigation.navigate(to: .today, highlighting: .todo(todoID))
+
+        XCTAssertEqual(navigation.selectedTab, .today)
+        XCTAssertEqual(navigation.pendingHighlight, .todo(todoID))
+
+        navigation.clearHighlight()
+
+        XCTAssertNil(navigation.pendingHighlight)
+        XCTAssertFalse(navigation.consumeHighlight(.todo(todoID)))
+    }
+
     func testUnknownActionExecutionDoesNotNavigate() async {
         let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
         viewModel.selectSuggestedAction(
@@ -625,6 +667,7 @@ final class AskViewModelTests: XCTestCase {
         await viewModel.executeSelectedSuggestedActionDraft()
 
         XCTAssertNil(viewModel.pendingTabNavigation)
+        XCTAssertNil(viewModel.pendingHighlight)
         XCTAssertNil(viewModel.suggestedActionSuccessMessage)
         // Non-executable action leaves the draft preview untouched.
         XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
@@ -720,6 +763,7 @@ final class AskViewModelTests: XCTestCase {
         let requests = await memoryClient.recordedCreateRequests()
         XCTAssertTrue(requests.isEmpty)
         XCTAssertNil(viewModel.pendingTabNavigation)
+        XCTAssertNil(viewModel.pendingHighlight)
     }
 
     func testRepeatedExecuteDoesNotCreateDuplicateMemory() async throws {
@@ -1297,8 +1341,9 @@ final class AskViewModelTests: XCTestCase {
         to navigation: AppNavigationModel
     ) {
         guard let tab = viewModel.pendingTabNavigation else { return }
-        navigation.select(tab)
+        navigation.navigate(to: tab, highlighting: viewModel.pendingHighlight)
         viewModel.clearPendingTabNavigation()
+        viewModel.clearPendingHighlight()
     }
 }
 

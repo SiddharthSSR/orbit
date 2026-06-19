@@ -1,7 +1,9 @@
 import SwiftUI
 
 struct TodayScreen: View {
+    @EnvironmentObject private var navigation: AppNavigationModel
     @StateObject private var dashboardViewModel: TodayDashboardViewModel
+    @State private var highlightedTodoID: UUID?
     @State private var selectedMood = "focused"
     @State private var selectedEnergy = 3
     @State private var moodNotes = ""
@@ -45,21 +47,60 @@ struct TodayScreen: View {
         .background(Color(.systemGroupedBackground))
         .task {
             await dashboardViewModel.loadDashboard()
+            consumePendingHighlightIfLoaded()
+        }
+        .task(id: highlightedTodoID) {
+            guard let highlightedTodoID else { return }
+            do {
+                try await Task.sleep(for: .seconds(2))
+            } catch {
+                return
+            }
+            guard self.highlightedTodoID == highlightedTodoID else { return }
+            withAnimation(.easeOut(duration: 0.25)) {
+                self.highlightedTodoID = nil
+            }
+        }
+        .onChange(of: dashboardViewModel.todos) { _, _ in
+            consumePendingHighlightIfLoaded()
+        }
+        .onChange(of: navigation.pendingHighlight) { _, _ in
+            consumePendingHighlightIfLoaded()
         }
         .onReceive(
             OrbitRefreshCenter.publisher(for: .orbitMemoryDidChange)
         ) { _ in
-            Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
+            Task {
+                await dashboardViewModel.loadDashboard(showsLoading: false)
+                consumePendingHighlightIfLoaded()
+            }
         }
         .onReceive(
             OrbitRefreshCenter.publisher(for: .orbitTodoDidChange)
         ) { _ in
-            Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
+            Task {
+                await dashboardViewModel.loadDashboard(showsLoading: false)
+                consumePendingHighlightIfLoaded()
+            }
         }
         .onReceive(
             OrbitRefreshCenter.publisher(for: .orbitBillsDidChange)
         ) { _ in
-            Task { await dashboardViewModel.loadDashboard(showsLoading: false) }
+            Task {
+                await dashboardViewModel.loadDashboard(showsLoading: false)
+                consumePendingHighlightIfLoaded()
+            }
+        }
+    }
+
+    private func consumePendingHighlightIfLoaded() {
+        guard case let .todo(id)? = navigation.pendingHighlight,
+              dashboardViewModel.openTodos.contains(where: { $0.id == id }),
+              navigation.consumeHighlight(.todo(id)) else {
+            return
+        }
+        withAnimation(.easeIn(duration: 0.2)) {
+            highlightedTodoID = id
         }
     }
 
@@ -112,7 +153,10 @@ struct TodayScreen: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(dashboardViewModel.openTodos) { todo in
-                        TodayTodoRow(todo: todo) {
+                        TodayTodoRow(
+                            todo: todo,
+                            isHighlighted: todo.id == highlightedTodoID
+                        ) {
                             Task { await dashboardViewModel.toggleTodoComplete(todo: todo) }
                         }
                     }
@@ -236,6 +280,7 @@ private struct DashboardSection<Content: View>: View {
 
 private struct TodayTodoRow: View {
     let todo: TodoDTO
+    let isHighlighted: Bool
     let onToggle: () -> Void
 
     var body: some View {
@@ -260,6 +305,18 @@ private struct TodayTodoRow: View {
             Spacer()
         }
         .padding(.vertical, 8)
+        .background {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHighlighted ? Color.accentColor.opacity(0.14) : Color.clear)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .stroke(
+                    isHighlighted ? Color.accentColor.opacity(0.65) : Color.clear,
+                    lineWidth: 1.5
+                )
+        }
+        .animation(.easeInOut(duration: 0.2), value: isHighlighted)
     }
 }
 
@@ -349,6 +406,7 @@ struct TodayScreen_Previews: PreviewProvider {
                 moodAPIClient: MockMoodAPIClient()
             )
             .navigationTitle("Today")
+            .environmentObject(AppNavigationModel())
         }
     }
 }
