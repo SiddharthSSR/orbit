@@ -70,7 +70,7 @@ The iOS app currently contains a tabbed SwiftUI shell with Today, Inbox, Ask, Pr
 Run iOS unit tests:
 
 ```bash
-xcodebuild test -project ios/Orbit/Orbit.xcodeproj -scheme Orbit -destination 'platform=iOS Simulator,name=iPhone 17'
+xcodebuild test -project ios/Orbit/Orbit.xcodeproj -scheme Orbit -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:OrbitTests
 ```
 
 Future UI tests can launch against stable in-process mock clients instead of a
@@ -92,6 +92,13 @@ GitHub Actions runs lightweight validation on pushes to `main` and pull requests
 - iOS `xcodebuild test` for `OrbitTests`
 - isolated mock-mode UI smoke coverage for `OrbitUITests/OrbitMockLaunchSmokeTests`, with no backend required; failed runs upload the `.xcresult` bundle and xcodebuild log as `orbit-ui-smoke-xcresult`
 - generic iOS Debug build with code signing disabled
+
+Testing checklist:
+
+- Run the `OrbitTests` command above for iOS unit coverage.
+- Run the `OrbitMockLaunchSmokeTests` command above for the UI smoke flow. The test launches the app with `--orbit-ui-tests`, so it uses seeded mock dependencies and needs neither the backend nor an OpenAI key.
+- When the CI UI smoke job fails, download `orbit-ui-smoke-xcresult` from the run's Artifacts section. It contains `OrbitUITests.xcresult` and `orbit-ui-smoke.log` and is retained for seven days.
+- Inspect the uploaded diagnostics before changing the test or workflow. Add retries only after repeated simulator-related failures remain after the explicit `simctl bootstatus` readiness check; do not use retries to hide assertion failures.
 
 ## Run Backend And iOS Together
 
