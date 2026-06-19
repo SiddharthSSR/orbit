@@ -69,6 +69,12 @@ open ios/Orbit/Orbit.xcodeproj
 
 The iOS app currently contains a tabbed SwiftUI shell with Today, Inbox, Ask, Projects, and Bills screens.
 
+Shared visual primitives live in `ios/Orbit/Orbit/Components/OrbitDesignSystem.swift`
+(spacing, corner radius, typography roles, warm-neutral colors, card/surface
+style, section header, capsule badge, and a subtle layered background). New
+screens and future UI refreshes should build on these instead of ad-hoc styling
+so the app stays calm, warm, and consistent across light and dark mode.
+
 Run iOS unit tests:
 
 ```bash

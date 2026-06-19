@@ -44,7 +44,7 @@ struct TodayScreen: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .orbitBackground()
         .task {
             await dashboardViewModel.loadDashboard()
             consumePendingHighlightIfLoaded()
@@ -292,26 +292,16 @@ private struct DashboardSection<Content: View>: View {
     @ViewBuilder let content: Content
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Label(title, systemImage: systemImage)
-                    .font(.headline)
-
-                Spacer()
-
+        VStack(alignment: .leading, spacing: OrbitSpacing.sm) {
+            OrbitSectionHeader(title, systemImage: systemImage) {
                 if let count {
-                    Text("\(count) open")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(.quaternary, in: Capsule())
+                    OrbitBadge(text: "\(count) open")
                         .accessibilityLabel(count == 1 ? "1 open todo" : "\(count) open todos")
                 }
             }
             content
         }
-        .padding(.top, 4)
+        .padding(.top, OrbitSpacing.xxs)
     }
 }
 

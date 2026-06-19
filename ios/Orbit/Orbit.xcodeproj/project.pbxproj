@@ -11,6 +11,7 @@
 		0B0000022C18B5D600000001 /* RootTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000022C18B5D600000101 /* RootTabView.swift */; };
 		0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000052C18B5D600000101 /* EmptyStateView.swift */; };
 		0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000062C18B5D600000101 /* OrbitCard.swift */; };
+		0B0000C02C18B5D600000001 /* OrbitDesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000C02C18B5D600000101 /* OrbitDesignSystem.swift */; };
 		0B0000072C18B5D600000001 /* TodayScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000072C18B5D600000101 /* TodayScreen.swift */; };
 		0B0000082C18B5D600000001 /* InboxScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000082C18B5D600000101 /* InboxScreen.swift */; };
 		0B0000092C18B5D600000001 /* AskScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B0000092C18B5D600000101 /* AskScreen.swift */; };
@@ -69,6 +70,7 @@
 		0B0000022C18B5D600000101 /* RootTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootTabView.swift; sourceTree = "<group>"; };
 		0B0000052C18B5D600000101 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		0B0000062C18B5D600000101 /* OrbitCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitCard.swift; sourceTree = "<group>"; };
+		0B0000C02C18B5D600000101 /* OrbitDesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OrbitDesignSystem.swift; sourceTree = "<group>"; };
 		0B0000072C18B5D600000101 /* TodayScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayScreen.swift; sourceTree = "<group>"; };
 		0B0000082C18B5D600000101 /* InboxScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxScreen.swift; sourceTree = "<group>"; };
 		0B0000092C18B5D600000101 /* AskScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskScreen.swift; sourceTree = "<group>"; };
@@ -222,6 +224,7 @@
 			children = (
 				0B0000052C18B5D600000101 /* EmptyStateView.swift */,
 				0B0000062C18B5D600000101 /* OrbitCard.swift */,
+				0B0000C02C18B5D600000101 /* OrbitDesignSystem.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -421,6 +424,7 @@
 				0B0000A12C18B5D600000001 /* MockChatAPIClient.swift in Sources */,
 				0B0000052C18B5D600000001 /* EmptyStateView.swift in Sources */,
 				0B0000062C18B5D600000001 /* OrbitCard.swift in Sources */,
+				0B0000C02C18B5D600000001 /* OrbitDesignSystem.swift in Sources */,
 				0B0000072C18B5D600000001 /* TodayScreen.swift in Sources */,
 				0B0000082C18B5D600000001 /* InboxScreen.swift in Sources */,
 				0B0000092C18B5D600000001 /* AskScreen.swift in Sources */,
