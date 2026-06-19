@@ -80,10 +80,23 @@ live backend by setting `app.launchArguments = ["--orbit-ui-tests"]` or
 `app.launchEnvironment["ORBIT_USE_MOCKS"] = "1"`. Normal launches continue to
 use `OrbitAPIClient`.
 
-Run the mock UI smoke test (no backend required):
+Run the mock UI smoke test (no backend or OpenAI key required):
 
 ```bash
-xcodebuild test -project ios/Orbit/Orbit.xcodeproj -scheme Orbit -destination 'platform=iOS Simulator,name=iPhone 17' -only-testing:OrbitUITests/OrbitMockLaunchSmokeTests
+scripts/run_ios_ui_smoke.sh
+```
+
+The script dynamically selects whatever iPhone simulator is available on the
+machine (so it does not depend on a specific simulator name), boots it, waits
+for it to be ready, and runs `OrbitUITests/OrbitMockLaunchSmokeTests` in mock
+launch mode. It prints the chosen simulator and writes results to
+`build/reports/` (gitignored): `OrbitUITests.xcresult` and `orbit-ui-smoke.log`.
+
+If you prefer to run `xcodebuild` directly, you can target a simulator you have
+installed (replace the name as needed):
+
+```bash
+xcodebuild test -project ios/Orbit/Orbit.xcodeproj -scheme Orbit -destination 'platform=iOS Simulator,name=iPhone 16' -only-testing:OrbitUITests/OrbitMockLaunchSmokeTests
 ```
 
 ## Continuous Integration
