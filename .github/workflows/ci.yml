@@ -101,13 +101,20 @@ jobs:
         id: simulator
         run: |
           SIMULATOR_NAME="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { gsub(/^[ \t]+|[ \t]+$/, "", $1); print $1; exit }')"
-          if [ -z "$SIMULATOR_NAME" ]; then
+          SIMULATOR_ID="$(xcrun simctl list devices available | awk -F '[()]' '/iPhone/ { print $2; exit }')"
+          if [ -z "$SIMULATOR_NAME" ] || [ -z "$SIMULATOR_ID" ]; then
             echo "No available iPhone simulator found."
             xcrun simctl list devices available
             exit 1
           fi
           echo "name=$SIMULATOR_NAME" >> "$GITHUB_OUTPUT"
-          echo "Using simulator: $SIMULATOR_NAME"
+          echo "id=$SIMULATOR_ID" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $SIMULATOR_NAME ($SIMULATOR_ID)"
+
+      - name: Boot selected iPhone simulator
+        run: |
+          xcrun simctl boot "${{ steps.simulator.outputs.id }}" || true
+          xcrun simctl bootstatus "${{ steps.simulator.outputs.id }}" -b
 
       - name: Run mock UI smoke test
         run: |
@@ -117,7 +124,7 @@ jobs:
           xcodebuild test \
             -project ios/Orbit/Orbit.xcodeproj \
             -scheme Orbit \
-            -destination "platform=iOS Simulator,name=${{ steps.simulator.outputs.name }}" \
+            -destination "platform=iOS Simulator,id=${{ steps.simulator.outputs.id }}" \
             -derivedDataPath /tmp/orbit-ui-derived-data \
             -resultBundlePath build/reports/OrbitUITests.xcresult \
             -only-testing:OrbitUITests/OrbitMockLaunchSmokeTests \
