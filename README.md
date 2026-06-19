@@ -190,6 +190,8 @@ The Ask backend and iOS Ask tab currently use a deterministic mock AI provider. 
 
 Todo and memory suggested-action drafts are deterministically prefilled with cleaned text extracted from the Ask request (or a safe response fallback) and remain editable before explicit execution.
 
+Add new real-world extraction phrases to `backend/tests/fixtures/suggested_action_extraction_cases.json`. The fixture regression test is deterministic and requires neither OpenAI nor an API key.
+
 Context preview defaults to the existing keyword behavior and optionally supports hybrid memory evaluation:
 
 ```bash

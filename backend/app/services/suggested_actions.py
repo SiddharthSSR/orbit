@@ -78,7 +78,7 @@ def build_suggested_actions(
 def _asks_to_save(question: str) -> bool:
     return bool(
         re.search(
-            r"\b(remember (?:that|this)|"
+            r"\b(remember (?:that|this|i)|"
             r"(?:save|store) (?:this|that|to memory|in memory)|"
             r"note that|make (?:a )?note)\b",
             question,

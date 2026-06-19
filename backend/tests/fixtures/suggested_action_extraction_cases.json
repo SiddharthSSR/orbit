@@ -1,0 +1,107 @@
+[
+  {
+    "name": "remember preference with that",
+    "user_message": "remember that I like quiet cafes with plants",
+    "assistant_answer": "I can help you keep track of that.",
+    "context_sections": [],
+    "expected_action_type": "save_memory",
+    "expected_payload": {
+      "memory_text": "I like quiet cafes with plants",
+      "memory_title": "Quiet cafes with plants"
+    }
+  },
+  {
+    "name": "remember preference without that",
+    "user_message": "remember I prefer window seats",
+    "assistant_answer": "Noted.",
+    "context_sections": [],
+    "expected_action_type": "save_memory",
+    "expected_payload": {
+      "memory_text": "I prefer window seats",
+      "memory_title": "Window seats"
+    }
+  },
+  {
+    "name": "save fact with that",
+    "user_message": "save that my gym closes at 10 pm",
+    "assistant_answer": "I can save that detail.",
+    "context_sections": [],
+    "expected_action_type": "save_memory",
+    "expected_payload": {
+      "memory_text": "my gym closes at 10 pm",
+      "memory_title": "My gym closes at 10 pm"
+    }
+  },
+  {
+    "name": "ambiguous save this uses answer fallback",
+    "user_message": "save this",
+    "assistant_answer": "\"The launch checklist is ready.\"",
+    "context_sections": [],
+    "expected_action_type": "save_memory",
+    "expected_payload": {
+      "memory_text": "The launch checklist is ready",
+      "memory_title": "The launch checklist is ready"
+    }
+  },
+  {
+    "name": "todo add task",
+    "user_message": "add a todo to call the dentist tomorrow",
+    "assistant_answer": "I can help with that.",
+    "context_sections": [],
+    "expected_action_type": "create_todo",
+    "expected_payload": {
+      "draft_title": "Call the dentist tomorrow"
+    }
+  },
+  {
+    "name": "todo reminder",
+    "user_message": "remind me to renew my passport",
+    "assistant_answer": "I can help with that.",
+    "context_sections": [],
+    "expected_action_type": "create_todo",
+    "expected_payload": {
+      "draft_title": "Renew my passport"
+    }
+  },
+  {
+    "name": "todo create task for",
+    "user_message": "create a task for booking flights",
+    "assistant_answer": "I can help with that.",
+    "context_sections": [],
+    "expected_action_type": "create_todo",
+    "expected_payload": {
+      "draft_title": "Booking flights"
+    }
+  },
+  {
+    "name": "todo quoted and punctuated",
+    "user_message": "create a task to \"send the signed contract Friday!\"",
+    "assistant_answer": "I can help with that.",
+    "context_sections": [],
+    "expected_action_type": "create_todo",
+    "expected_payload": {
+      "draft_title": "Send the signed contract Friday"
+    }
+  },
+  {
+    "name": "review bills remains navigation only",
+    "user_message": "what bills are coming up?",
+    "assistant_answer": "Your overdue internet bill is due today.",
+    "context_sections": [
+      "Today",
+      "Unpaid bills"
+    ],
+    "expected_action_type": "review_bills",
+    "expected_payload": null
+  },
+  {
+    "name": "normal question has no action",
+    "user_message": "how is Orbit going?",
+    "assistant_answer": "Orbit is progressing steadily.",
+    "context_sections": [
+      "Active projects"
+    ],
+    "expected_action_type": null,
+    "expected_payload": null
+  }
+]
