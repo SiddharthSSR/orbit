@@ -6,8 +6,18 @@ struct AskScreen: View {
     @State private var isContextPreviewExpanded = false
     @State private var isConfirmingClear = false
 
-    init(apiClient: any ChatAPIClientProtocol = OrbitAPIClient()) {
-        _viewModel = StateObject(wrappedValue: AskViewModel(apiClient: apiClient))
+    init(
+        apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
+        memoryClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
+        todoClient: any TodoAPIClientProtocol = OrbitAPIClient()
+    ) {
+        _viewModel = StateObject(
+            wrappedValue: AskViewModel(
+                apiClient: apiClient,
+                memoryClient: memoryClient,
+                todoClient: todoClient
+            )
+        )
     }
 
     var body: some View {
@@ -632,7 +642,11 @@ private struct SuggestedActionPreviewSheet: View {
 struct AskScreen_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            AskScreen(apiClient: MockChatAPIClient())
+            AskScreen(
+                apiClient: MockChatAPIClient(),
+                memoryClient: MockMemoryAPIClient(),
+                todoClient: MockTodoAPIClient()
+            )
                 .navigationTitle("Ask")
         }
         .environmentObject(AppNavigationModel())

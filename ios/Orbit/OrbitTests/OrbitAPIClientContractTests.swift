@@ -1,6 +1,78 @@
 import XCTest
 @testable import Orbit
 
+final class AppLaunchConfigurationTests: XCTestCase {
+    func testUITestArgumentEnablesMockMode() {
+        let configuration = AppLaunchConfiguration(
+            arguments: ["Orbit", "--orbit-ui-tests"],
+            environment: [:]
+        )
+
+        XCTAssertEqual(configuration.mode, .mock)
+    }
+
+    func testMockEnvironmentVariableEnablesMockMode() {
+        let configuration = AppLaunchConfiguration(
+            arguments: ["Orbit"],
+            environment: ["ORBIT_USE_MOCKS": "1"]
+        )
+
+        XCTAssertEqual(configuration.mode, .mock)
+    }
+
+    func testNormalLaunchDefaultsToLiveMode() {
+        let configuration = AppLaunchConfiguration(arguments: ["Orbit"], environment: [:])
+
+        XCTAssertEqual(configuration.mode, .live)
+    }
+
+    func testMockModeBuildsMockDependencyGraph() {
+        let dependencies = AppDependencies.make(
+            for: AppLaunchConfiguration(arguments: ["Orbit", "--orbit-ui-tests"], environment: [:])
+        )
+
+        XCTAssertTrue(dependencies.todoAPIClient is MockTodoAPIClient)
+        XCTAssertTrue(dependencies.billAPIClient is MockBillAPIClient)
+        XCTAssertTrue(dependencies.memoryAPIClient is MockMemoryAPIClient)
+        XCTAssertTrue(dependencies.moodAPIClient is MockMoodAPIClient)
+        XCTAssertTrue(dependencies.projectAPIClient is MockProjectAPIClient)
+        XCTAssertTrue(dependencies.chatAPIClient is MockChatAPIClient)
+    }
+
+    func testLiveModeBuildsRealDependencyGraph() {
+        let dependencies = AppDependencies.make(
+            for: AppLaunchConfiguration(arguments: ["Orbit"], environment: [:])
+        )
+
+        XCTAssertTrue(dependencies.todoAPIClient is OrbitAPIClient)
+        XCTAssertTrue(dependencies.billAPIClient is OrbitAPIClient)
+        XCTAssertTrue(dependencies.memoryAPIClient is OrbitAPIClient)
+        XCTAssertTrue(dependencies.moodAPIClient is OrbitAPIClient)
+        XCTAssertTrue(dependencies.projectAPIClient is OrbitAPIClient)
+        XCTAssertTrue(dependencies.chatAPIClient is OrbitAPIClient)
+    }
+
+    func testMockModeProvidesStableSeedDataAndSuggestedActions() async throws {
+        let dependencies = AppDependencies.mock()
+
+        let todos = try await dependencies.todoAPIClient.listTodos()
+        let bills = try await dependencies.billAPIClient.listBills()
+        let memory = try await dependencies.memoryAPIClient.listMemory(
+            includeArchived: false,
+            kind: nil,
+            tag: nil
+        )
+        let response = try await dependencies.chatAPIClient.ask(
+            AskRequest(question: "remember that I like quiet cafes")
+        )
+
+        XCTAssertTrue(todos.contains { $0.title == "Review today plan" && !$0.isComplete })
+        XCTAssertTrue(bills.contains { $0.name == "Credit card bill" && !$0.isPaid })
+        XCTAssertTrue(memory.contains { $0.title == "AI article link" })
+        XCTAssertEqual(response.suggestedActions?.map(\.type), ["save_memory"])
+    }
+}
+
 final class OrbitAPIClientContractTests: XCTestCase {
     private let decoder = OrbitAPICoding.jsonDecoder
     private let encoder = OrbitAPICoding.jsonEncoder

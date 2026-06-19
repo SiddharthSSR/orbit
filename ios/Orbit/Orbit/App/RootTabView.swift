@@ -47,6 +47,11 @@ final class AppNavigationModel: ObservableObject {
 
 struct RootTabView: View {
     @StateObject private var navigation = AppNavigationModel()
+    private let dependencies: AppDependencies
+
+    init(dependencies: AppDependencies = .live()) {
+        self.dependencies = dependencies
+    }
 
     var body: some View {
         TabView(selection: $navigation.selectedTab) {
@@ -68,21 +73,30 @@ struct RootTabView: View {
     private func screen(for tab: AppTab) -> some View {
         switch tab {
         case .today:
-            TodayScreen()
+            TodayScreen(
+                todoAPIClient: dependencies.todoAPIClient,
+                billAPIClient: dependencies.billAPIClient,
+                memoryAPIClient: dependencies.memoryAPIClient,
+                moodAPIClient: dependencies.moodAPIClient
+            )
         case .inbox:
-            InboxScreen()
+            InboxScreen(apiClient: dependencies.memoryAPIClient)
         case .ask:
-            AskScreen()
+            AskScreen(
+                apiClient: dependencies.chatAPIClient,
+                memoryClient: dependencies.memoryAPIClient,
+                todoClient: dependencies.todoAPIClient
+            )
         case .projects:
-            ProjectsScreen()
+            ProjectsScreen(apiClient: dependencies.projectAPIClient)
         case .bills:
-            BillsScreen()
+            BillsScreen(apiClient: dependencies.billAPIClient)
         }
     }
 }
 
 struct RootTabView_Previews: PreviewProvider {
     static var previews: some View {
-        RootTabView()
+        RootTabView(dependencies: .mock())
     }
 }

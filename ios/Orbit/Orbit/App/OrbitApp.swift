@@ -1,5 +1,70 @@
 import Combine
+import Foundation
 import SwiftUI
+
+struct AppLaunchConfiguration: Equatable, Sendable {
+    enum Mode: Equatable, Sendable {
+        case live
+        case mock
+    }
+
+    static let uiTestArgument = "--orbit-ui-tests"
+    static let mockEnvironmentKey = "ORBIT_USE_MOCKS"
+
+    let mode: Mode
+
+    init(
+        arguments: [String] = ProcessInfo.processInfo.arguments,
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) {
+        mode = arguments.contains(Self.uiTestArgument) || environment[Self.mockEnvironmentKey] == "1"
+            ? .mock
+            : .live
+    }
+}
+
+/// Root dependency graph. Mock actors are shared across tabs so a mutation in
+/// Ask is visible when Inbox or Today reloads during UI tests.
+struct AppDependencies {
+    let todoAPIClient: any TodoAPIClientProtocol
+    let billAPIClient: any BillAPIClientProtocol
+    let memoryAPIClient: any MemoryAPIClientProtocol
+    let moodAPIClient: any MoodAPIClientProtocol
+    let projectAPIClient: any ProjectAPIClientProtocol
+    let chatAPIClient: any ChatAPIClientProtocol
+
+    static func make(for configuration: AppLaunchConfiguration) -> AppDependencies {
+        switch configuration.mode {
+        case .live:
+            live()
+        case .mock:
+            mock()
+        }
+    }
+
+    static func live() -> AppDependencies {
+        let client = OrbitAPIClient()
+        return AppDependencies(
+            todoAPIClient: client,
+            billAPIClient: client,
+            memoryAPIClient: client,
+            moodAPIClient: client,
+            projectAPIClient: client,
+            chatAPIClient: client
+        )
+    }
+
+    static func mock() -> AppDependencies {
+        AppDependencies(
+            todoAPIClient: MockTodoAPIClient(),
+            billAPIClient: MockBillAPIClient(),
+            memoryAPIClient: MockMemoryAPIClient(),
+            moodAPIClient: MockMoodAPIClient(),
+            projectAPIClient: MockProjectAPIClient(),
+            chatAPIClient: MockChatAPIClient()
+        )
+    }
+}
 
 /// App-wide refresh notifications, posted after a successful local mutation so
 /// other screens can reload and stay consistent without a manual refresh.
@@ -46,10 +111,11 @@ enum OrbitRefreshCenter {
 
 @main
 struct OrbitApp: App {
+    private let dependencies = AppDependencies.make(for: AppLaunchConfiguration())
+
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            RootTabView(dependencies: dependencies)
         }
     }
 }
-
