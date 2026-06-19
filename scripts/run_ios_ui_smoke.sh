@@ -148,6 +148,7 @@ xcodebuild test \
   -project "$PROJECT" \
   -scheme "$SCHEME" \
   -destination "platform=iOS Simulator,id=$SIMULATOR_ID" \
+  -parallel-testing-enabled NO \
   -derivedDataPath /tmp/orbit-ui-derived-data \
   -resultBundlePath "$RESULT_BUNDLE" \
   -only-testing:"$TEST_TARGET" \

@@ -91,6 +91,9 @@ suggested-action execution loops end to end:
 - Review Bills: ask → Review bills chip → preview sheet → confirm → navigate to
   Bills with stable seeded content and no mutation.
 
+The shared runner executes these UI tests serially on one simulator to avoid
+XCTest clone-runner launch failures.
+
 ```bash
 # Default: dynamically selects an available iPhone simulator (what CI uses).
 scripts/run_ios_ui_smoke.sh
