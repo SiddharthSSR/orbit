@@ -130,6 +130,7 @@ struct AskScreen: View {
                 TextField("Ask about your day, memory, or projects", text: $viewModel.draftQuestion, axis: .vertical)
                     .lineLimit(3...8)
                     .textInputAutocapitalization(.sentences)
+                    .accessibilityIdentifier("ask.input")
 
                 HStack(spacing: 10) {
                     Button {
