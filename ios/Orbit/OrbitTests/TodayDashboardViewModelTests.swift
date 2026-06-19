@@ -33,6 +33,91 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.openTodoCount, 1)
     }
 
+    func testDisplayedOpenTodosPlacesHighlightedTodoFirst() async {
+        let dueTodo = makeTodo(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+            title: "Due first",
+            dueDate: Date(timeIntervalSince1970: 1_700_000_000)
+        )
+        let highlightedTodo = makeTodo(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+            title: "Just created"
+        )
+        let viewModel = makeViewModel(todos: [dueTodo, highlightedTodo])
+        await viewModel.loadDashboard()
+
+        XCTAssertEqual(
+            viewModel.displayedOpenTodos(highlighting: highlightedTodo.id).map(\.title),
+            ["Just created", "Due first"]
+        )
+    }
+
+    func testDisplayedOpenTodosOrdersDatedTodosBeforeUndatedTodosByDueDate() async {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let later = makeTodo(title: "Later", dueDate: base.addingTimeInterval(86_400))
+        let undated = makeTodo(title: "Undated", createdAt: base.addingTimeInterval(200))
+        let earlier = makeTodo(title: "Earlier", dueDate: base)
+        let viewModel = makeViewModel(todos: [later, undated, earlier])
+        await viewModel.loadDashboard()
+
+        XCTAssertEqual(viewModel.openTodos.map(\.title), ["Earlier", "Later", "Undated"])
+    }
+
+    func testDisplayedOpenTodosUsesCreatedDateThenIDForStableFallbackOrdering() async {
+        let base = Date(timeIntervalSince1970: 1_700_000_000)
+        let lowerID = makeTodo(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000001")!,
+            title: "Lower ID",
+            createdAt: base
+        )
+        let higherID = makeTodo(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000002")!,
+            title: "Higher ID",
+            createdAt: base
+        )
+        let newest = makeTodo(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000003")!,
+            title: "Newest",
+            createdAt: base.addingTimeInterval(1)
+        )
+        let expected = ["Newest", "Lower ID", "Higher ID"]
+        let firstViewModel = makeViewModel(todos: [higherID, newest, lowerID])
+        let secondViewModel = makeViewModel(todos: [lowerID, higherID, newest])
+        await firstViewModel.loadDashboard()
+        await secondViewModel.loadDashboard()
+
+        XCTAssertEqual(firstViewModel.openTodos.map(\.title), expected)
+        XCTAssertEqual(secondViewModel.openTodos.map(\.title), expected)
+    }
+
+    func testTodoUrgencyResolvesRelativeDueDateLabels() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        let today = Date(timeIntervalSince1970: 1_700_006_400)
+
+        XCTAssertEqual(
+            TodoUrgency.resolve(
+                dueDate: calendar.date(byAdding: .day, value: -1, to: today),
+                relativeTo: today,
+                calendar: calendar
+            )?.label,
+            "Overdue"
+        )
+        XCTAssertEqual(
+            TodoUrgency.resolve(dueDate: today, relativeTo: today, calendar: calendar)?.label,
+            "Due today"
+        )
+        XCTAssertEqual(
+            TodoUrgency.resolve(
+                dueDate: calendar.date(byAdding: .day, value: 1, to: today),
+                relativeTo: today,
+                calendar: calendar
+            )?.label,
+            "Due tomorrow"
+        )
+        XCTAssertNil(TodoUrgency.resolve(dueDate: nil, relativeTo: today, calendar: calendar))
+    }
+
     func testUnpaidBillsOnlyExcludesPaidBills() async {
         let viewModel = makeViewModel(bills: [
             makeBill(name: "Unpaid"),
@@ -236,16 +321,22 @@ final class TodayDashboardViewModelTests: XCTestCase {
         )
     }
 
-    private func makeTodo(title: String, isComplete: Bool = false) -> TodoDTO {
+    private func makeTodo(
+        id: UUID = UUID(),
+        title: String,
+        dueDate: Date? = nil,
+        isComplete: Bool = false,
+        createdAt: Date = Date(timeIntervalSince1970: 1_700_000_000)
+    ) -> TodoDTO {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         return TodoDTO(
-            id: UUID(),
+            id: id,
             title: title,
             notes: nil,
-            dueDate: nil,
+            dueDate: dueDate,
             projectId: nil,
             isComplete: isComplete,
-            createdAt: now,
+            createdAt: createdAt,
             updatedAt: now
         )
     }

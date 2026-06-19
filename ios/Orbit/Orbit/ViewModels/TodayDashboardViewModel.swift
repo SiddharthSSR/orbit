@@ -1,5 +1,48 @@
 import Foundation
 
+enum TodoUrgency: Equatable {
+    case overdue
+    case today
+    case tomorrow
+    case upcoming(Date)
+
+    static func resolve(
+        dueDate: Date?,
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> TodoUrgency? {
+        guard let dueDate else { return nil }
+
+        let today = calendar.startOfDay(for: now)
+        let dueDay = calendar.startOfDay(for: dueDate)
+
+        if dueDay < today {
+            return .overdue
+        }
+        if dueDay == today {
+            return .today
+        }
+        if let tomorrow = calendar.date(byAdding: .day, value: 1, to: today),
+           dueDay == tomorrow {
+            return .tomorrow
+        }
+        return .upcoming(dueDate)
+    }
+
+    var label: String {
+        switch self {
+        case .overdue:
+            "Overdue"
+        case .today:
+            "Due today"
+        case .tomorrow:
+            "Due tomorrow"
+        case let .upcoming(date):
+            "Due \(date.formatted(date: .abbreviated, time: .omitted))"
+        }
+    }
+}
+
 @MainActor
 final class TodayDashboardViewModel: ObservableObject {
     @Published private(set) var todos: [TodoDTO] = []
@@ -18,7 +61,39 @@ final class TodayDashboardViewModel: ObservableObject {
     private let notificationCenter: NotificationCenter
 
     var openTodos: [TodoDTO] {
-        Array(todos.filter { !$0.isComplete }.prefix(5))
+        displayedOpenTodos()
+    }
+
+    func displayedOpenTodos(highlighting highlightedTodoID: UUID? = nil) -> [TodoDTO] {
+        Array(
+            todos
+                .filter { !$0.isComplete }
+                .sorted { lhs, rhs in
+                    if lhs.id == highlightedTodoID, rhs.id != highlightedTodoID {
+                        return true
+                    }
+                    if rhs.id == highlightedTodoID, lhs.id != highlightedTodoID {
+                        return false
+                    }
+
+                    switch (lhs.dueDate, rhs.dueDate) {
+                    case let (lhsDue?, rhsDue?) where lhsDue != rhsDue:
+                        return lhsDue < rhsDue
+                    case (_?, nil):
+                        return true
+                    case (nil, _?):
+                        return false
+                    default:
+                        break
+                    }
+
+                    if lhs.createdAt != rhs.createdAt {
+                        return lhs.createdAt > rhs.createdAt
+                    }
+                    return lhs.id.uuidString < rhs.id.uuidString
+                }
+                .prefix(5)
+        )
     }
 
     var unpaidBills: [BillDTO] {

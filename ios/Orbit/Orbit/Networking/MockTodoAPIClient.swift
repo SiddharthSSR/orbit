@@ -69,7 +69,7 @@ actor MockTodoAPIClient: TodoAPIClientProtocol {
             id: UUID(),
             title: "Review today plan",
             notes: nil,
-            dueDate: nil,
+            dueDate: Calendar.current.startOfDay(for: Date()),
             projectId: nil,
             isComplete: false,
             createdAt: Date(),

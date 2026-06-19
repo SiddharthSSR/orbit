@@ -156,7 +156,9 @@ struct TodayScreen: View {
                 .frame(minHeight: 120)
             } else {
                 VStack(spacing: 0) {
-                    ForEach(dashboardViewModel.openTodos) { todo in
+                    ForEach(
+                        dashboardViewModel.displayedOpenTodos(highlighting: highlightedTodoID)
+                    ) { todo in
                         TodayTodoRow(
                             todo: todo,
                             isHighlighted: todo.id == highlightedTodoID,
@@ -352,10 +354,14 @@ private struct TodayTodoRow: View {
                             .background(Color.accentColor.opacity(0.12), in: Capsule())
                     }
                 }
-                if let dueDate = todo.dueDate {
-                    Text(dueDate, style: .date)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                if let urgency = TodoUrgency.resolve(dueDate: todo.dueDate) {
+                    Text(urgency.label)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(urgency.tint)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(urgency.tint.opacity(0.1), in: Capsule())
                 }
             }
 
@@ -374,6 +380,19 @@ private struct TodayTodoRow: View {
                 )
         }
         .animation(.easeInOut(duration: 0.2), value: isHighlighted)
+    }
+}
+
+private extension TodoUrgency {
+    var tint: Color {
+        switch self {
+        case .overdue:
+            .red
+        case .today:
+            .orange
+        case .tomorrow, .upcoming:
+            .secondary
+        }
     }
 }
 
