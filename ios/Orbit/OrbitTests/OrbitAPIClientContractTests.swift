@@ -65,11 +65,27 @@ final class AppLaunchConfigurationTests: XCTestCase {
         let response = try await dependencies.chatAPIClient.ask(
             AskRequest(question: "remember that I like quiet cafes")
         )
+        let todoResponse = try await dependencies.chatAPIClient.ask(
+            AskRequest(question: "add a todo to call the dentist tomorrow")
+        )
 
         XCTAssertTrue(todos.contains { $0.title == "Review today plan" && !$0.isComplete })
         XCTAssertTrue(bills.contains { $0.name == "Credit card bill" && !$0.isPaid })
         XCTAssertTrue(memory.contains { $0.title == "AI article link" })
         XCTAssertEqual(response.suggestedActions?.map(\.type), ["save_memory"])
+        XCTAssertEqual(
+            response.suggestedActions?.first?.payload?["memory_text"],
+            "I like quiet cafes"
+        )
+        XCTAssertEqual(
+            response.suggestedActions?.first?.payload?["memory_title"],
+            "Quiet cafes"
+        )
+        XCTAssertEqual(todoResponse.suggestedActions?.map(\.type), ["create_todo"])
+        XCTAssertEqual(
+            todoResponse.suggestedActions?.first?.payload?["draft_title"],
+            "Call the dentist tomorrow"
+        )
     }
 }
 

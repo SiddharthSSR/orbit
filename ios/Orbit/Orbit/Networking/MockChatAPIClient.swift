@@ -61,7 +61,10 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
         messagesBySession[session.id, default: []].append(contentsOf: [userMessage, assistantMessage])
         sessions.sort { $0.updatedAt > $1.updatedAt }
         let contextSections = payload.includeContext ? ["Today", "Open todos", "Recent memory"] : []
-        let suggestedActions = makeSuggestedActions(for: payload.question)
+        let suggestedActions = makeSuggestedActions(
+            for: payload.question,
+            answer: assistantContent
+        )
 
         return AskResponse(
             session: session,
@@ -171,16 +174,29 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
         return "\(prefix)…"
     }
 
-    private func makeSuggestedActions(for question: String) -> [SuggestedActionDTO] {
+    private func makeSuggestedActions(
+        for question: String,
+        answer: String
+    ) -> [SuggestedActionDTO] {
         let normalized = question.lowercased()
-        if normalized.contains("remember that") || normalized.contains("remember this") {
+        if normalized.contains("remember that") ||
+            normalized.contains("remember this") ||
+            normalized.contains("save this") ||
+            normalized.contains("store this") {
+            let memoryText = extractedText(
+                from: question,
+                after: ["remember that", "remember this", "save this", "store this"]
+            ) ?? cleanedPayloadText(answer)
             return [
                 SuggestedActionDTO(
                     id: "save-memory",
                     type: "save_memory",
                     title: "Save to memory",
                     subtitle: "Keep this detail in Orbit memory",
-                    payload: nil
+                    payload: [
+                        "memory_text": memoryText,
+                        "memory_title": memoryTitle(from: memoryText),
+                    ]
                 )
             ]
         }
@@ -195,18 +211,72 @@ actor MockChatAPIClient: ChatAPIClientProtocol {
                 )
             ]
         }
-        if normalized.contains("todo") || normalized.contains("task") || normalized.contains("follow up") {
+        if normalized.contains("todo") ||
+            normalized.contains("task") ||
+            normalized.contains("follow up") ||
+            normalized.contains("remind me to") {
+            let todoTitle = lightlyCapitalized(
+                extractedText(
+                    from: question,
+                    after: [
+                        "add a todo to",
+                        "add todo to",
+                        "create a todo to",
+                        "create a task to",
+                        "remind me to",
+                    ]
+                ) ?? cleanedPayloadText(question)
+            )
             return [
                 SuggestedActionDTO(
                     id: "create-todo",
                     type: "create_todo",
                     title: "Create a todo",
-                    subtitle: "Turn this into a follow-up task",
-                    payload: nil
+                    subtitle: todoTitle,
+                    payload: ["draft_title": todoTitle]
                 )
             ]
         }
         return []
+    }
+
+    private func extractedText(
+        from value: String,
+        after markers: [String]
+    ) -> String? {
+        for marker in markers {
+            guard let range = value.range(of: marker, options: [.caseInsensitive]) else {
+                continue
+            }
+            let extracted = cleanedPayloadText(String(value[range.upperBound...]))
+            if !extracted.isEmpty {
+                return extracted
+            }
+        }
+        return nil
+    }
+
+    private func cleanedPayloadText(_ value: String) -> String {
+        value
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
+            .trimmingCharacters(
+                in: CharacterSet(charactersIn: " \t\n:;,.-–—!?\"'“”‘’")
+            )
+    }
+
+    private func memoryTitle(from memoryText: String) -> String {
+        let preferences = ["I like ", "I love ", "I prefer ", "I enjoy "]
+        let titleSource = preferences.first(where: {
+            memoryText.lowercased().hasPrefix($0.lowercased())
+        }).map { String(memoryText.dropFirst($0.count)) } ?? memoryText
+        return lightlyCapitalized(titleSource.split(separator: " ").prefix(8).joined(separator: " "))
+    }
+
+    private func lightlyCapitalized(_ value: String) -> String {
+        guard let first = value.first else { return value }
+        return first.uppercased() + String(value.dropFirst())
     }
 
     private func diagnostics(

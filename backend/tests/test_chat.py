@@ -96,7 +96,12 @@ def test_ask_without_context_can_return_save_memory_action(client) -> None:
     )
 
     assert response.status_code == 200
-    assert [action["type"] for action in response.json()["suggested_actions"]] == ["save_memory"]
+    actions = response.json()["suggested_actions"]
+    assert [action["type"] for action in actions] == ["save_memory"]
+    assert actions[0]["payload"] == {
+        "memory_text": "I like quiet cafes",
+        "memory_title": "Quiet cafes",
+    }
 
 
 def test_ask_with_due_bill_returns_review_bills_action(client) -> None:

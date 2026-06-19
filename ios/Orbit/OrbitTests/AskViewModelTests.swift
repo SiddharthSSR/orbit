@@ -124,15 +124,44 @@ final class AskViewModelTests: XCTestCase {
             action: makeSuggestedAction(
                 type: "save_memory",
                 title: "Save to memory",
-                subtitle: "I like quiet cafes",
-                payload: nil
+                subtitle: "Keep this detail in Orbit memory",
+                payload: [
+                    "memory_text": "I like quiet cafes with plants",
+                    "memory_title": "Quiet cafes with plants",
+                ]
             )
         )
 
         XCTAssertEqual(draft.title, "Save memory draft")
         XCTAssertEqual(draft.fields.first?.label, "Memory text")
-        XCTAssertEqual(draft.fields.first?.value, "I like quiet cafes")
+        XCTAssertEqual(draft.fields.first?.value, "I like quiet cafes with plants")
         XCTAssertEqual(draft.fields.first?.futureEditable, true)
+    }
+
+    func testSaveMemoryActionWithoutPayloadFallsBackToSubtitle() {
+        let draft = SuggestedActionDraft(
+            action: makeSuggestedAction(
+                type: "save_memory",
+                title: "Save to memory",
+                subtitle: "Fallback memory text",
+                payload: nil
+            )
+        )
+
+        XCTAssertEqual(draft.fields.first?.value, "Fallback memory text")
+    }
+
+    func testCreateTodoActionWithoutPayloadFallsBackToSubtitle() {
+        let draft = SuggestedActionDraft(
+            action: makeSuggestedAction(
+                type: "create_todo",
+                title: "Create a todo",
+                subtitle: "Fallback todo title",
+                payload: nil
+            )
+        )
+
+        XCTAssertEqual(draft.fields.first?.value, "Fallback todo title")
     }
 
     func testReviewBillsActionMapsToReadOnlyReviewDraft() {
