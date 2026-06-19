@@ -105,7 +105,7 @@ GitHub Actions runs lightweight validation on pushes to `main` and pull requests
 
 - backend dependency install with `uv`, `pytest`, and an Alembic `upgrade head` smoke test against temporary SQLite
 - iOS `xcodebuild test` for `OrbitTests`
-- isolated mock-mode UI smoke coverage for `OrbitUITests/OrbitMockLaunchSmokeTests`, with no backend required; failed runs upload the `.xcresult` bundle and xcodebuild log as `orbit-ui-smoke-xcresult`
+- isolated mock-mode UI smoke coverage via the same `scripts/run_ios_ui_smoke.sh` runner used locally, with no backend required; failed runs upload the `.xcresult` bundle and xcodebuild log as `orbit-ui-smoke-xcresult`
 - generic iOS Debug build with code signing disabled
 
 Testing checklist:
