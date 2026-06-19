@@ -87,6 +87,9 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var latestRetrievalDiagnostics: RetrievalDiagnostics?
     @Published private(set) var answerContextSummaries: [UUID: String] = [:]
     @Published private(set) var answerSuggestedActions: [UUID: [SuggestedActionDTO]] = [:]
+    @Published private(set) var suggestedActionExecutionStatuses: [
+        SuggestedActionExecutionKey: SuggestedActionExecutionStatus
+    ] = [:]
     @Published private(set) var selectedSuggestedAction: SuggestedActionDTO?
     @Published private(set) var editableSuggestedActionDraft: EditableSuggestedActionDraft?
     @Published private(set) var isExecutingSuggestedAction = false
@@ -113,6 +116,7 @@ final class AskViewModel: ObservableObject {
     private let todoClient: any TodoAPIClientProtocol
     private let notificationCenter: NotificationCenter
     private let preferences: AskRetrievalPreferences
+    private var selectedSuggestedActionMessageID: UUID?
 
     init(
         apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
@@ -157,6 +161,7 @@ final class AskViewModel: ObservableObject {
             messages = try await apiClient.listMessages(sessionId: session.id)
             answerContextSummaries = [:]
             answerSuggestedActions = [:]
+            suggestedActionExecutionStatuses = [:]
         } catch {
             errorMessage = readableMessage(for: error)
         }
@@ -232,6 +237,7 @@ final class AskViewModel: ObservableObject {
         latestRetrievalDiagnostics = nil
         answerContextSummaries = [:]
         answerSuggestedActions = [:]
+        suggestedActionExecutionStatuses = [:]
         clearSuggestedActionPreview()
         suggestedActionSuccessMessage = nil
         previewErrorMessage = nil
@@ -251,6 +257,7 @@ final class AskViewModel: ObservableObject {
                 latestRetrievalDiagnostics = nil
                 answerContextSummaries = [:]
                 answerSuggestedActions = [:]
+                suggestedActionExecutionStatuses = [:]
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = nil
                 previewErrorMessage = nil
@@ -275,9 +282,23 @@ final class AskViewModel: ObservableObject {
         return answerSuggestedActions[message.id, default: []]
     }
 
-    func selectSuggestedAction(_ action: SuggestedActionDTO) {
+    func suggestedActionExecutionStatus(
+        for message: ChatMessageDTO,
+        action: SuggestedActionDTO
+    ) -> SuggestedActionExecutionStatus? {
+        guard message.role == "assistant" else { return nil }
+        return suggestedActionExecutionStatuses[
+            SuggestedActionExecutionKey(messageID: message.id, action: action)
+        ]
+    }
+
+    func selectSuggestedAction(
+        _ action: SuggestedActionDTO,
+        messageID: UUID? = nil
+    ) {
         suggestedActionSuccessMessage = nil
         selectedSuggestedAction = action
+        selectedSuggestedActionMessageID = messageID
         editableSuggestedActionDraft = EditableSuggestedActionDraft(
             source: SuggestedActionDraft(action: action)
         )
@@ -315,6 +336,7 @@ final class AskViewModel: ObservableObject {
                         kind: "note"
                     )
                 )
+                markSelectedSuggestedActionCompleted("Saved to memory")
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Saved to memory"
                 OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
@@ -324,6 +346,7 @@ final class AskViewModel: ObservableObject {
             case "create_todo":
                 guard let title = draft.trimmedTodoTitle else { return }
                 let todo = try await todoClient.createTodo(TodoCreateRequest(title: title))
+                markSelectedSuggestedActionCompleted("Todo created")
                 clearSuggestedActionPreview()
                 suggestedActionSuccessMessage = "Todo created"
                 OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
@@ -332,6 +355,7 @@ final class AskViewModel: ObservableObject {
                 pendingTabNavigation = .today
             case "review_bills":
                 // Safe navigation only — no API call and no data mutation.
+                markSelectedSuggestedActionCompleted("Opened Bills")
                 clearSuggestedActionPreview()
                 pendingHighlight = nil
                 pendingTabNavigation = .bills
@@ -357,8 +381,22 @@ final class AskViewModel: ObservableObject {
 
     private func clearSuggestedActionPreview() {
         selectedSuggestedAction = nil
+        selectedSuggestedActionMessageID = nil
         editableSuggestedActionDraft = nil
         suggestedActionErrorMessage = nil
+    }
+
+    private func markSelectedSuggestedActionCompleted(_ displayText: String) {
+        guard let selectedSuggestedAction,
+              let selectedSuggestedActionMessageID else {
+            return
+        }
+        suggestedActionExecutionStatuses[
+            SuggestedActionExecutionKey(
+                messageID: selectedSuggestedActionMessageID,
+                action: selectedSuggestedAction
+            )
+        ] = .completed(displayText: displayText)
     }
 
     /// Derives a short, non-empty memory title from the saved text.

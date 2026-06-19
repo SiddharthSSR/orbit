@@ -103,6 +103,29 @@ struct SuggestedActionDTO: Decodable, Identifiable, Hashable, Sendable {
     }
 }
 
+struct SuggestedActionExecutionKey: Hashable, Sendable {
+    let messageID: UUID
+    let actionID: String
+    let actionType: String
+
+    init(messageID: UUID, action: SuggestedActionDTO) {
+        self.messageID = messageID
+        self.actionID = action.id
+        self.actionType = action.type
+    }
+}
+
+enum SuggestedActionExecutionStatus: Equatable, Sendable {
+    case completed(displayText: String)
+
+    var displayText: String {
+        switch self {
+        case let .completed(displayText):
+            displayText
+        }
+    }
+}
+
 /// UI-only representation of a suggested action awaiting future confirmation.
 /// Drafts are derived in memory from response metadata and are never persisted.
 struct SuggestedActionDraft: Identifiable, Equatable, Sendable {

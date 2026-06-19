@@ -313,6 +313,73 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(unknown.executionSafetyText)
     }
 
+    func testSaveMemorySuccessRecordsStatusForSelectedMessageAction() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "save_memory",
+            title: "Save to memory",
+            subtitle: "I like quiet cafes",
+            payload: nil
+        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        XCTAssertEqual(
+            viewModel.suggestedActionExecutionStatus(for: message, action: action),
+            .completed(displayText: "Saved to memory")
+        )
+    }
+
+    func testCreateTodoSuccessRecordsStatusForSelectedMessageAction() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "create_todo",
+            title: "Create a todo",
+            subtitle: "Call the dentist",
+            payload: nil
+        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        XCTAssertEqual(
+            viewModel.suggestedActionExecutionStatus(for: message, action: action),
+            .completed(displayText: "Todo created")
+        )
+    }
+
+    func testReviewBillsSuccessRecordsStatusOnlyForSelectedMessageAction() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let otherMessage = makeMessage(sessionId: message.sessionId, role: "assistant")
+        let action = makeSuggestedAction(
+            type: "review_bills",
+            title: "Review bills",
+            subtitle: "Upcoming",
+            payload: nil
+        )
+        let otherAction = SuggestedActionDTO(
+            id: "review-bills-other",
+            type: action.type,
+            title: action.title,
+            subtitle: action.subtitle,
+            payload: action.payload
+        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
+
+        await viewModel.executeSelectedSuggestedActionDraft()
+
+        XCTAssertEqual(
+            viewModel.suggestedActionExecutionStatus(for: message, action: action),
+            .completed(displayText: "Opened Bills")
+        )
+        XCTAssertNil(viewModel.suggestedActionExecutionStatus(for: message, action: otherAction))
+        XCTAssertNil(viewModel.suggestedActionExecutionStatus(for: otherMessage, action: action))
+    }
+
     func testSaveMemoryExecutionNavigatesToInboxAndReloadsCreatedMemory() async throws {
         let center = NotificationCenter()
         let memoryClient = MockMemoryAPIClient(memoryItems: [])
@@ -472,13 +539,18 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testExecuteSaveMemoryFailureKeepsDraftAndShowsError() async throws {
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "save_memory",
+            title: "Save to memory",
+            subtitle: "I like quiet cafes",
+            payload: nil
+        )
         let viewModel = makeViewModel(
             MockChatAPIClient(sessions: [], messagesBySession: [:]),
             memoryClient: FailingMemoryAPIClient()
         )
-        viewModel.selectSuggestedAction(
-            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "I like quiet cafes", payload: nil)
-        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
 
         await viewModel.executeSelectedSuggestedActionDraft()
 
@@ -488,6 +560,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.suggestedActionErrorMessage, "Expected memory API failure.")
         XCTAssertNil(viewModel.pendingTabNavigation)
         XCTAssertNil(viewModel.pendingHighlight)
+        XCTAssertNil(viewModel.suggestedActionExecutionStatus(for: message, action: action))
         XCTAssertFalse(viewModel.isExecutingSuggestedAction)
     }
 
@@ -525,13 +598,18 @@ final class AskViewModelTests: XCTestCase {
     }
 
     func testExecuteCreateTodoFailureKeepsDraftAndShowsError() async {
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "create_todo",
+            title: "Create a todo",
+            subtitle: "Call the dentist",
+            payload: nil
+        )
         let viewModel = makeViewModel(
             MockChatAPIClient(sessions: [], messagesBySession: [:]),
             todoClient: FailingTodoAPIClient()
         )
-        viewModel.selectSuggestedAction(
-            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Call the dentist", payload: nil)
-        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
 
         await viewModel.executeSelectedSuggestedActionDraft()
 
@@ -541,18 +619,24 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.suggestedActionErrorMessage, "Expected todo API failure.")
         XCTAssertNil(viewModel.pendingTabNavigation)
         XCTAssertNil(viewModel.pendingHighlight)
+        XCTAssertNil(viewModel.suggestedActionExecutionStatus(for: message, action: action))
         XCTAssertFalse(viewModel.isExecutingSuggestedAction)
     }
 
     func testExecuteDoesNotCreateTodoForInvalidCreateTodoDraft() async throws {
         let todoClient = MockTodoAPIClient(todos: [])
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "create_todo",
+            title: "Create a todo",
+            subtitle: "Draft",
+            payload: nil
+        )
         let viewModel = makeViewModel(
             MockChatAPIClient(sessions: [], messagesBySession: [:]),
             todoClient: todoClient
         )
-        viewModel.selectSuggestedAction(
-            makeSuggestedAction(type: "create_todo", title: "Create a todo", subtitle: "Draft", payload: nil)
-        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
         var draft = try XCTUnwrap(viewModel.editableSuggestedActionDraft)
         draft.updateField(id: "Todo title", value: "   ")
         viewModel.updateEditableSuggestedActionDraft(draft)
@@ -564,6 +648,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
         XCTAssertNil(viewModel.pendingTabNavigation)
         XCTAssertNil(viewModel.pendingHighlight)
+        XCTAssertNil(viewModel.suggestedActionExecutionStatus(for: message, action: action))
     }
 
     func testRepeatedExecuteDoesNotCreateDuplicateTodo() async {
@@ -658,17 +743,86 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertFalse(navigation.consumeHighlight(.todo(todoID)))
     }
 
+    func testStartNewSessionClearsSuggestedActionExecutionStatuses() async {
+        let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "review_bills",
+            title: "Review bills",
+            subtitle: "Upcoming",
+            payload: nil
+        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
+        await viewModel.executeSelectedSuggestedActionDraft()
+        XCTAssertFalse(viewModel.suggestedActionExecutionStatuses.isEmpty)
+
+        viewModel.startNewSession()
+
+        XCTAssertTrue(viewModel.suggestedActionExecutionStatuses.isEmpty)
+    }
+
+    func testSessionSwitchClearsSuggestedActionExecutionStatuses() async {
+        let session = makeSession(title: "Other chat")
+        let viewModel = makeViewModel(
+            MockChatAPIClient(sessions: [session], messagesBySession: [session.id: []])
+        )
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "review_bills",
+            title: "Review bills",
+            subtitle: "Upcoming",
+            payload: nil
+        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
+        await viewModel.executeSelectedSuggestedActionDraft()
+        XCTAssertFalse(viewModel.suggestedActionExecutionStatuses.isEmpty)
+
+        await viewModel.selectSession(session)
+
+        XCTAssertTrue(viewModel.suggestedActionExecutionStatuses.isEmpty)
+    }
+
+    func testDeletingSelectedSessionClearsSuggestedActionExecutionStatuses() async {
+        let session = makeSession(title: "Active")
+        let client = MockChatAPIClient(
+            sessions: [session],
+            messagesBySession: [session.id: [makeMessage(sessionId: session.id)]]
+        )
+        let viewModel = makeViewModel(client)
+        await viewModel.selectSession(session)
+        let message = makeMessage(sessionId: session.id, role: "assistant")
+        let action = makeSuggestedAction(
+            type: "review_bills",
+            title: "Review bills",
+            subtitle: "Upcoming",
+            payload: nil
+        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
+        await viewModel.executeSelectedSuggestedActionDraft()
+        XCTAssertFalse(viewModel.suggestedActionExecutionStatuses.isEmpty)
+
+        await viewModel.deleteSession(session)
+
+        XCTAssertTrue(viewModel.suggestedActionExecutionStatuses.isEmpty)
+    }
+
     func testUnknownActionExecutionDoesNotNavigate() async {
         let viewModel = makeViewModel(MockChatAPIClient(sessions: [], messagesBySession: [:]))
-        viewModel.selectSuggestedAction(
-            makeSuggestedAction(type: "future_action", title: "Future", subtitle: "x", payload: nil)
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "future_action",
+            title: "Future",
+            subtitle: "x",
+            payload: nil
         )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
 
         await viewModel.executeSelectedSuggestedActionDraft()
 
         XCTAssertNil(viewModel.pendingTabNavigation)
         XCTAssertNil(viewModel.pendingHighlight)
         XCTAssertNil(viewModel.suggestedActionSuccessMessage)
+        XCTAssertNil(viewModel.suggestedActionExecutionStatus(for: message, action: action))
         // Non-executable action leaves the draft preview untouched.
         XCTAssertNotNil(viewModel.editableSuggestedActionDraft)
     }
@@ -747,13 +901,18 @@ final class AskViewModelTests: XCTestCase {
 
     func testExecuteDoesNotCreateMemoryForInvalidSaveMemoryDraft() async throws {
         let memoryClient = MockMemoryAPIClient(memoryItems: [])
+        let message = makeMessage(sessionId: UUID(), role: "assistant")
+        let action = makeSuggestedAction(
+            type: "save_memory",
+            title: "Save to memory",
+            subtitle: "Draft",
+            payload: nil
+        )
         let viewModel = makeViewModel(
             MockChatAPIClient(sessions: [], messagesBySession: [:]),
             memoryClient: memoryClient
         )
-        viewModel.selectSuggestedAction(
-            makeSuggestedAction(type: "save_memory", title: "Save to memory", subtitle: "Draft", payload: nil)
-        )
+        viewModel.selectSuggestedAction(action, messageID: message.id)
         var draft = try XCTUnwrap(viewModel.editableSuggestedActionDraft)
         draft.updateField(id: "Memory text", value: "   ")
         viewModel.updateEditableSuggestedActionDraft(draft)
@@ -764,6 +923,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertTrue(requests.isEmpty)
         XCTAssertNil(viewModel.pendingTabNavigation)
         XCTAssertNil(viewModel.pendingHighlight)
+        XCTAssertNil(viewModel.suggestedActionExecutionStatus(for: message, action: action))
     }
 
     func testRepeatedExecuteDoesNotCreateDuplicateMemory() async throws {

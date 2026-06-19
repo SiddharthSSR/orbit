@@ -173,7 +173,18 @@ struct AskScreen: View {
                             message: message,
                             contextSummary: viewModel.contextSummary(for: message),
                             suggestedActions: viewModel.suggestedActions(for: message),
-                            onSuggestedActionTapped: viewModel.selectSuggestedAction
+                            executionStatus: { action in
+                                viewModel.suggestedActionExecutionStatus(
+                                    for: message,
+                                    action: action
+                                )
+                            },
+                            onSuggestedActionTapped: { action in
+                                viewModel.selectSuggestedAction(
+                                    action,
+                                    messageID: message.id
+                                )
+                            }
                         )
                     }
                 }
@@ -424,6 +435,7 @@ private struct ChatMessageRow: View {
     let message: ChatMessageDTO
     let contextSummary: String?
     let suggestedActions: [SuggestedActionDTO]
+    let executionStatus: (SuggestedActionDTO) -> SuggestedActionExecutionStatus?
     let onSuggestedActionTapped: (SuggestedActionDTO) -> Void
 
     var body: some View {
@@ -453,15 +465,27 @@ private struct ChatMessageRow: View {
                         .foregroundStyle(.secondary)
                     FlowLayout(spacing: 6) {
                         ForEach(suggestedActions) { action in
-                            Button {
-                                onSuggestedActionTapped(action)
-                            } label: {
-                                Label(action.title, systemImage: actionIcon(for: action))
-                                    .font(.caption.weight(.medium))
+                            VStack(alignment: .leading, spacing: 4) {
+                                Button {
+                                    onSuggestedActionTapped(action)
+                                } label: {
+                                    Label(action.title, systemImage: actionIcon(for: action))
+                                        .font(.caption.weight(.medium))
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .accessibilityLabel("Suggested action: \(action.title)")
+
+                                if let status = executionStatus(action) {
+                                    Label(status.displayText, systemImage: "checkmark.circle.fill")
+                                        .font(.caption2.weight(.medium))
+                                        .foregroundStyle(.green)
+                                        .padding(.horizontal, 7)
+                                        .padding(.vertical, 3)
+                                        .background(Color.green.opacity(0.1), in: Capsule())
+                                        .accessibilityLabel("Completed: \(status.displayText)")
+                                }
                             }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                            .accessibilityLabel("Suggested action: \(action.title)")
                         }
                     }
                 }
