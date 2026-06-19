@@ -74,6 +74,63 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         )
     }
 
+    /// End-to-end mock-mode coverage of the save_memory suggested-action loop:
+    /// ask -> Save to memory chip -> preview sheet (with extracted text) ->
+    /// execute -> navigate to Inbox with the new memory. Runs entirely on seeded
+    /// mock clients (no backend, no OpenAI).
+    @MainActor
+    func testSaveMemorySuggestedActionFlowNavigatesToInboxWithNewMemory() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let askTab = app.tabBars.buttons["Ask"]
+        XCTAssertTrue(askTab.waitForExistence(timeout: 5))
+        askTab.tap()
+
+        // A prompt the deterministic mock maps to a save_memory suggested action
+        // whose extracted memory text is "I like quiet cafes with plants".
+        let expectedMemory = "I like quiet cafes with plants"
+        let input = askInput(in: app)
+        XCTAssertTrue(input.waitForExistence(timeout: 5), "Ask input field not found")
+        input.tap()
+        input.typeText("remember that \(expectedMemory)")
+
+        let sendButton = app.buttons["Send"]
+        XCTAssertTrue(sendButton.waitForExistence(timeout: 3))
+        sendButton.tap()
+
+        // The reply echoes the (longer) prompt, which can leave the chip under the
+        // on-screen keyboard. Scroll the transcript up so the chip is clear before
+        // tapping it; otherwise the tap can land on the keyboard.
+        let chip = app.buttons["Suggested action: Save to memory"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 8), "Save to memory chip did not appear")
+        app.swipeUp()
+        revealAndTap(chip, in: app, label: "Save to memory suggested action chip")
+
+        // The preview sheet shows the extracted memory text in its editable field
+        // (a vertical TextField, exposed as a text field or text view by context).
+        let valuePredicate = NSPredicate(format: "value == %@", expectedMemory)
+        let memoryFieldShown =
+            app.textFields.element(matching: valuePredicate).waitForExistence(timeout: 5) ||
+            app.textViews.element(matching: valuePredicate).waitForExistence(timeout: 2)
+        XCTAssertTrue(memoryFieldShown, "Extracted memory text not shown in the preview sheet")
+
+        // The preview sheet's primary button confirms and executes the action.
+        revealAndTap(app.buttons["Save to memory"], in: app,
+                     label: "Save to memory execute button")
+
+        // Executing navigates to Inbox, where the new memory appears.
+        XCTAssertTrue(
+            app.staticTexts[expectedMemory].waitForExistence(timeout: 8),
+            "Created memory did not appear in Inbox"
+        )
+        XCTAssertTrue(
+            app.tabBars.buttons["Inbox"].isSelected,
+            "Execution did not navigate to the Inbox tab"
+        )
+    }
+
     /// The Ask composer uses a vertical `TextField` (backed by a text view), so
     /// resolve whichever element kind exposes the `ask.input` identifier.
     @MainActor
