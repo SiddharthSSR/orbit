@@ -83,14 +83,27 @@ use `OrbitAPIClient`.
 Run the mock UI smoke test (no backend or OpenAI key required):
 
 ```bash
+# Default: dynamically selects an available iPhone simulator (what CI uses).
 scripts/run_ios_ui_smoke.sh
+
+# Pin a specific simulator by exact name for local debugging.
+scripts/run_ios_ui_smoke.sh --simulator "iPhone 16 Pro"
+
+# Or pin by UDID (see `xcrun simctl list devices available`).
+scripts/run_ios_ui_smoke.sh --udid <SIMULATOR_UDID>
+
+# Usage and examples.
+scripts/run_ios_ui_smoke.sh --help
 ```
 
-The script dynamically selects whatever iPhone simulator is available on the
-machine (so it does not depend on a specific simulator name), boots it, waits
-for it to be ready, and runs `OrbitUITests/OrbitMockLaunchSmokeTests` in mock
-launch mode. It prints the chosen simulator and writes results to
-`build/reports/` (gitignored): `OrbitUITests.xcresult` and `orbit-ui-smoke.log`.
+With no arguments the script dynamically selects whatever iPhone simulator is
+available on the machine (so it does not depend on a specific simulator name);
+`--simulator`/`--udid` pin one instead and are mutually exclusive. In all modes
+it boots the simulator, waits for it to be ready, runs
+`OrbitUITests/OrbitMockLaunchSmokeTests` in mock launch mode, prints the chosen
+simulator, and writes results to `build/reports/` (gitignored):
+`OrbitUITests.xcresult` and `orbit-ui-smoke.log`. CI runs this same script in its
+default dynamic mode.
 
 If you prefer to run `xcodebuild` directly, you can target a simulator you have
 installed (replace the name as needed):
