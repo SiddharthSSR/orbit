@@ -8,6 +8,8 @@ This repository is a monorepo with:
 - `backend/` - FastAPI backend
 - `docs/` - product and engineering documentation
 
+Current project health and the recommended next MVP block are recorded in [`docs/checkpoints/mvp-3-32-project-health.md`](docs/checkpoints/mvp-3-32-project-health.md).
+
 Authentication is intentionally not implemented yet.
 
 ## Backend Setup
