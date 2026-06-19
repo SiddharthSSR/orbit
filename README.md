@@ -81,13 +81,15 @@ live backend by setting `app.launchArguments = ["--orbit-ui-tests"]` or
 use `OrbitAPIClient`.
 
 Run the mock UI smoke tests (no backend or OpenAI key required). The suite in
-`OrbitMockLaunchSmokeTests` covers baseline content across tabs plus two
+`OrbitMockLaunchSmokeTests` covers baseline content across tabs plus three
 suggested-action execution loops end to end:
 
 - Create Todo: ask → Create a todo chip → preview sheet → execute → navigate to
   Today with the new todo.
 - Save to Memory: ask → Save to memory chip → preview sheet (with the extracted
   memory text) → execute → navigate to Inbox with the new memory.
+- Review Bills: ask → Review bills chip → preview sheet → confirm → navigate to
+  Bills with stable seeded content and no mutation.
 
 ```bash
 # Default: dynamically selects an available iPhone simulator (what CI uses).

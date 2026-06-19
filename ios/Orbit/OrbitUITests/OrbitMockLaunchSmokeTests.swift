@@ -111,9 +111,17 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         // The preview sheet shows the extracted memory text in its editable field
         // (a vertical TextField, exposed as a text field or text view by context).
         let valuePredicate = NSPredicate(format: "value == %@", expectedMemory)
-        let memoryFieldShown =
-            app.textFields.element(matching: valuePredicate).waitForExistence(timeout: 5) ||
-            app.textViews.element(matching: valuePredicate).waitForExistence(timeout: 2)
+        let memoryTextField = app.textFields.element(matching: valuePredicate)
+        let memoryTextView = app.textViews.element(matching: valuePredicate)
+        var memoryFieldShown =
+            memoryTextField.waitForExistence(timeout: 5) ||
+            memoryTextView.waitForExistence(timeout: 2)
+        var memoryFieldRevealAttempts = 0
+        while !memoryFieldShown && memoryFieldRevealAttempts < 8 {
+            swipeUpInForegroundContent(in: app)
+            memoryFieldShown = memoryTextField.exists || memoryTextView.exists
+            memoryFieldRevealAttempts += 1
+        }
         XCTAssertTrue(memoryFieldShown, "Extracted memory text not shown in the preview sheet")
 
         // The preview sheet's primary button confirms and executes the action.
@@ -128,6 +136,46 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(
             app.tabBars.buttons["Inbox"].isSelected,
             "Execution did not navigate to the Inbox tab"
+        )
+    }
+
+    /// End-to-end mock-mode coverage of the review_bills suggested-action loop:
+    /// ask -> Review bills chip -> preview sheet -> confirm -> navigate to Bills.
+    /// The action is navigation-only and runs entirely on seeded mock clients.
+    @MainActor
+    func testReviewBillsSuggestedActionNavigatesToBills() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let askTab = app.tabBars.buttons["Ask"]
+        XCTAssertTrue(askTab.waitForExistence(timeout: 5))
+        askTab.tap()
+
+        // The deterministic mock maps any bill prompt to review_bills.
+        let input = askInput(in: app)
+        XCTAssertTrue(input.waitForExistence(timeout: 5), "Ask input field not found")
+        input.tap()
+        input.typeText("review my bills")
+
+        let sendButton = app.buttons["Send"]
+        XCTAssertTrue(sendButton.waitForExistence(timeout: 3))
+        sendButton.tap()
+
+        revealAndTap(app.buttons["Suggested action: Review bills"], in: app,
+                     label: "Review bills suggested action chip")
+
+        // Explicit confirmation opens Bills without mutating mock data.
+        revealAndTap(app.buttons["Review bills"], in: app,
+                     label: "Review bills confirm button")
+
+        XCTAssertTrue(
+            app.staticTexts["Credit card bill"].waitForExistence(timeout: 8),
+            "Seeded bill did not appear after navigation"
+        )
+        XCTAssertTrue(
+            app.tabBars.buttons["Bills"].isSelected,
+            "Execution did not navigate to the Bills tab"
         )
     }
 
@@ -151,13 +199,33 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) {
-        XCTAssertTrue(element.waitForExistence(timeout: 8), "\(label) did not appear", file: file, line: line)
+        var appeared = element.waitForExistence(timeout: 8)
         var attempts = 0
+        while !appeared && attempts < 8 {
+            swipeUpInForegroundContent(in: app)
+            appeared = element.waitForExistence(timeout: 1)
+            attempts += 1
+        }
+        XCTAssertTrue(appeared, "\(label) did not appear", file: file, line: line)
+
+        attempts = 0
         while !element.isHittable && attempts < 8 {
-            app.swipeUp()
+            swipeUpInForegroundContent(in: app)
             attempts += 1
         }
         XCTAssertTrue(element.isHittable, "\(label) was not hittable after scrolling", file: file, line: line)
         element.tap()
+    }
+
+    /// Swipe the foremost SwiftUI list when a preview sheet is presented;
+    /// otherwise fall back to scrolling the app transcript.
+    @MainActor
+    private func swipeUpInForegroundContent(in app: XCUIApplication) {
+        let collectionViews = app.collectionViews
+        if collectionViews.count > 1 {
+            collectionViews.element(boundBy: collectionViews.count - 1).swipeUp()
+        } else {
+            app.swipeUp()
+        }
     }
 }
