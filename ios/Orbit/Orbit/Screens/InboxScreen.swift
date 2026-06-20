@@ -97,6 +97,8 @@ struct InboxScreen: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .orbitBackground()
         .task {
             await memoryViewModel.loadMemory()
             consumePendingHighlightIfLoaded()
@@ -179,14 +181,12 @@ private struct MemoryRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
             HStack(alignment: .firstTextBaseline) {
                 Text(memory.title)
-                    .font(.headline)
-                Spacer(minLength: 8)
-                Text(kindLabel(memory.kind))
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(OrbitTypography.cardTitle)
+                Spacer(minLength: OrbitSpacing.xs)
+                OrbitBadge(text: kindLabel(memory.kind))
             }
 
             Text(memory.body)
@@ -224,18 +224,26 @@ private struct MemoryRow: View {
             }
             .font(.subheadline)
         }
-        .padding(.vertical, 4)
-        .background {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isHighlighted ? Color.accentColor.opacity(0.14) : Color.clear)
-        }
+        .padding(OrbitSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(isHighlighted ? Color.accentColor.opacity(0.12) : OrbitColor.surface)
+        .clipShape(RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
+            RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous)
                 .stroke(
-                    isHighlighted ? Color.accentColor.opacity(0.65) : Color.clear,
-                    lineWidth: 1.5
+                    isHighlighted ? Color.accentColor.opacity(0.6) : OrbitColor.border,
+                    lineWidth: isHighlighted ? 1.5 : 1
                 )
         }
+        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+        .listRowInsets(EdgeInsets(
+            top: OrbitSpacing.xs,
+            leading: OrbitSpacing.md,
+            bottom: OrbitSpacing.xs,
+            trailing: OrbitSpacing.md
+        ))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
         .animation(.easeInOut(duration: 0.2), value: isHighlighted)
     }
 

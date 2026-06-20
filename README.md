@@ -74,7 +74,7 @@ Shared visual primitives live in `ios/Orbit/Orbit/Components/OrbitDesignSystem.s
 style, section header, capsule badge, and a subtle layered background). New
 screens and future UI refreshes should build on these instead of ad-hoc styling
 so the app stays calm, warm, and consistent across light and dark mode. The
-Today and Ask screens have started adopting these primitives.
+Today, Ask, and Inbox screens have started adopting these primitives.
 
 Run iOS unit tests:
 
