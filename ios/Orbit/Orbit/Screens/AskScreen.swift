@@ -25,7 +25,7 @@ struct AskScreen: View {
             Section {
                 HStack {
                     Label("Ask Orbit", systemImage: "sparkles")
-                        .font(.headline)
+                        .font(OrbitTypography.sectionTitle)
                     Spacer()
                     Button {
                         viewModel.startNewSession()
@@ -262,14 +262,9 @@ struct AskScreen: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     } else {
-                        FlowLayout(spacing: 8) {
+                        FlowLayout(spacing: OrbitSpacing.xs) {
                             ForEach(preview.contextSections, id: \.self) { section in
-                                Text(section)
-                                    .font(.caption.weight(.medium))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 6)
-                                    .background(Color(.secondarySystemGroupedBackground))
-                                    .clipShape(Capsule())
+                                OrbitBadge(text: section, tint: .accentColor)
                             }
                         }
                     }
@@ -284,6 +279,8 @@ struct AskScreen: View {
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .orbitBackground()
         .task {
             await viewModel.loadSessions()
         }
@@ -443,6 +440,7 @@ private struct ChatMessageRow: View {
         bubble
             .frame(maxWidth: .infinity, alignment: isAssistant ? .leading : .trailing)
         .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
     }
 
     private var bubble: some View {
@@ -492,14 +490,15 @@ private struct ChatMessageRow: View {
                 }
             }
         }
-        .padding(12)
+        .padding(OrbitSpacing.sm)
         .frame(maxWidth: 360, alignment: .leading)
-        .background(isAssistant ? Color(.secondarySystemGroupedBackground) : Color.accentColor.opacity(0.14))
+        .background(isAssistant ? OrbitColor.surface : Color.accentColor.opacity(0.14))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(isAssistant ? Color(.separator).opacity(0.4) : Color.accentColor.opacity(0.18))
+            RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous)
+                .stroke(isAssistant ? OrbitColor.border : Color.accentColor.opacity(0.25))
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous))
+        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
     }
 
     @ViewBuilder
