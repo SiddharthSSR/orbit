@@ -98,6 +98,13 @@ Editorial headings follow a deliberate rule so the serif stays special:
 - Inbox and Bills intentionally do not have mastheads; only add one to a screen
   when there is a clear editorial reason, not by default.
 
+Navigation uses a custom floating dock (`OrbitFloatingDock` in `RootTabView`): a
+deep charcoal capsule with a soft shadow and compact icon+label items. It hides
+the native tab bar but keeps the underlying `TabView` and `AppNavigationModel.selectedTab`
+as the single source of truth, so programmatic tab navigation still works. Each
+dock item exposes its tab title as an accessibility label with a selected trait,
+so UI smoke verifies tab switching via `app.buttons["…"]` and `.isSelected`.
+
 Run iOS unit tests:
 
 ```bash

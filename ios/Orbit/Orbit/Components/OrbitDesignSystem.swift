@@ -95,6 +95,15 @@ enum OrbitColor {
 
     /// Brand accent (defers to the system/app accent).
     static let accent = Color.accentColor
+
+    /// Deep warm charcoal used for the floating navigation dock — a deliberate
+    /// dark contrast element that sits above the warm paper background in both
+    /// light and dark mode.
+    static let dock = Color(uiColor: UIColor { trait in
+        trait.userInterfaceStyle == .dark
+            ? UIColor(red: 0.16, green: 0.16, blue: 0.17, alpha: 1)
+            : UIColor(red: 0.13, green: 0.12, blue: 0.12, alpha: 1)
+    })
 }
 
 // MARK: - Surfaces

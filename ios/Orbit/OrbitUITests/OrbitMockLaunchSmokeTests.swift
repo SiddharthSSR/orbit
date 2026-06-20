@@ -12,17 +12,17 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
             app.staticTexts["You have 1 open todos, 1 unpaid bills, and 3 recent captures."].exists
         )
 
-        let askTab = app.tabBars.buttons["Ask"]
+        let askTab = app.buttons["Ask"]
         XCTAssertTrue(askTab.exists)
         askTab.tap()
         XCTAssertTrue(app.buttons["Chat: What should I focus on today?"].waitForExistence(timeout: 3))
 
-        let inboxTab = app.tabBars.buttons["Inbox"]
+        let inboxTab = app.buttons["Inbox"]
         XCTAssertTrue(inboxTab.exists)
         inboxTab.tap()
         XCTAssertTrue(app.staticTexts["AI article link"].waitForExistence(timeout: 3))
 
-        let billsTab = app.tabBars.buttons["Bills"]
+        let billsTab = app.buttons["Bills"]
         XCTAssertTrue(billsTab.exists)
         billsTab.tap()
         XCTAssertTrue(app.staticTexts["Credit card bill"].waitForExistence(timeout: 3))
@@ -38,7 +38,7 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         app.launchArguments = ["--orbit-ui-tests"]
         app.launch()
 
-        let askTab = app.tabBars.buttons["Ask"]
+        let askTab = app.buttons["Ask"]
         XCTAssertTrue(askTab.waitForExistence(timeout: 5))
         askTab.tap()
 
@@ -69,7 +69,7 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
             "Created todo did not appear on Today"
         )
         XCTAssertTrue(
-            app.tabBars.buttons["Today"].isSelected,
+            app.buttons["Today"].isSelected,
             "Execution did not navigate to the Today tab"
         )
     }
@@ -84,7 +84,7 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         app.launchArguments = ["--orbit-ui-tests"]
         app.launch()
 
-        let askTab = app.tabBars.buttons["Ask"]
+        let askTab = app.buttons["Ask"]
         XCTAssertTrue(askTab.waitForExistence(timeout: 5))
         askTab.tap()
 
@@ -134,7 +134,7 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
             "Created memory did not appear in Inbox"
         )
         XCTAssertTrue(
-            app.tabBars.buttons["Inbox"].isSelected,
+            app.buttons["Inbox"].isSelected,
             "Execution did not navigate to the Inbox tab"
         )
     }
@@ -148,7 +148,7 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         app.launchArguments = ["--orbit-ui-tests"]
         app.launch()
 
-        let askTab = app.tabBars.buttons["Ask"]
+        let askTab = app.buttons["Ask"]
         XCTAssertTrue(askTab.waitForExistence(timeout: 5))
         askTab.tap()
 
@@ -174,7 +174,7 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
             "Seeded bill did not appear after navigation"
         )
         XCTAssertTrue(
-            app.tabBars.buttons["Bills"].isSelected,
+            app.buttons["Bills"].isSelected,
             "Execution did not navigate to the Bills tab"
         )
     }

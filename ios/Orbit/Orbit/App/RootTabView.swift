@@ -83,17 +83,22 @@ struct RootTabView: View {
     }
 
     var body: some View {
+        // Keep the native TabView for content switching and per-tab state, but
+        // hide its system bar and present a custom floating dock so the chrome
+        // matches Orbit's warm editorial direction. `selectedTab` stays the
+        // single source of truth, so programmatic navigation still works.
         TabView(selection: $navigation.selectedTab) {
             ForEach(AppTab.allCases) { tab in
                 NavigationStack {
                     screen(for: tab)
                         .navigationTitle(tab.title)
                 }
-                .tabItem {
-                    Label(tab.title, systemImage: tab.systemImage)
-                }
                 .tag(tab)
+                .toolbar(.hidden, for: .tabBar)
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            OrbitFloatingDock(selection: $navigation.selectedTab)
         }
         .environmentObject(navigation)
     }
@@ -121,6 +126,65 @@ struct RootTabView: View {
         case .bills:
             BillsScreen(apiClient: dependencies.billAPIClient)
         }
+    }
+}
+
+/// A restrained floating navigation dock: a deep charcoal capsule with a soft
+/// shadow, compact icon+label items, and a calm highlighted active state. It
+/// drives `selectedTab` directly, and each item exposes its tab title as an
+/// accessibility label with a selected trait so navigation stays testable.
+private struct OrbitFloatingDock: View {
+    @Binding var selection: AppTab
+
+    var body: some View {
+        HStack(spacing: 0) {
+            ForEach(AppTab.allCases) { tab in
+                dockItem(tab)
+            }
+        }
+        .padding(.horizontal, OrbitSpacing.xs)
+        .padding(.vertical, OrbitSpacing.xxs)
+        .background(
+            Capsule(style: .continuous)
+                .fill(OrbitColor.dock)
+                .overlay(
+                    Capsule(style: .continuous)
+                        .stroke(Color.white.opacity(0.08), lineWidth: 1)
+                )
+                .shadow(color: .black.opacity(0.22), radius: 12, x: 0, y: 6)
+        )
+        .padding(.horizontal, OrbitSpacing.lg)
+        .padding(.bottom, OrbitSpacing.xxs)
+    }
+
+    private func dockItem(_ tab: AppTab) -> some View {
+        let isSelected = selection == tab
+        return Button {
+            selection = tab
+        } label: {
+            VStack(spacing: 3) {
+                Image(systemName: tab.systemImage)
+                    .font(.system(size: 17, weight: .semibold))
+                Text(tab.title)
+                    .font(.system(size: 10, weight: .medium))
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, OrbitSpacing.xs)
+            .foregroundStyle(
+                isSelected ? Color(white: 0.98) : Color.white.opacity(0.55)
+            )
+            .background {
+                if isSelected {
+                    Capsule(style: .continuous)
+                        .fill(Color.white.opacity(0.14))
+                }
+            }
+            .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .animation(.easeInOut(duration: 0.18), value: isSelected)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(isSelected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
