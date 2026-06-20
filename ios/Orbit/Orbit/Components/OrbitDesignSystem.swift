@@ -116,6 +116,54 @@ extension View {
     }
 }
 
+/// Full-width "floating card" surface for list rows (Inbox memories, Bills,
+/// etc.): surface fill, continuous corners, a hairline border, and a soft
+/// shadow, with an optional accent highlight for freshly created items. Pair
+/// with `.orbitListCardRow()` when the card is a `List` row.
+struct OrbitFloatingCardStyle: ViewModifier {
+    var isHighlighted: Bool = false
+    var padding: CGFloat = OrbitSpacing.md
+
+    func body(content: Content) -> some View {
+        content
+            .padding(padding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(isHighlighted ? Color.accentColor.opacity(0.12) : OrbitColor.surface)
+            .clipShape(RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous)
+                    .stroke(
+                        isHighlighted ? Color.accentColor.opacity(0.6) : OrbitColor.border,
+                        lineWidth: isHighlighted ? 1.5 : 1
+                    )
+            }
+            .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+    }
+}
+
+extension View {
+    /// Applies the Orbit full-width floating card surface (for list rows).
+    func orbitFloatingCard(
+        isHighlighted: Bool = false,
+        padding: CGFloat = OrbitSpacing.md
+    ) -> some View {
+        modifier(OrbitFloatingCardStyle(isHighlighted: isHighlighted, padding: padding))
+    }
+
+    /// Strips default `List` row chrome so an `orbitFloatingCard` reads as a
+    /// standalone card floating on the Orbit background, with calm vertical gaps.
+    func orbitListCardRow() -> some View {
+        listRowInsets(EdgeInsets(
+            top: OrbitSpacing.xs,
+            leading: OrbitSpacing.md,
+            bottom: OrbitSpacing.xs,
+            trailing: OrbitSpacing.md
+        ))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+    }
+}
+
 /// Subtle, layered app background. A warm neutral base with a barely-there
 /// top highlight — enough to add depth without a loud gradient.
 struct OrbitBackground: View {

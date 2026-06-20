@@ -69,12 +69,16 @@ open ios/Orbit/Orbit.xcodeproj
 
 The iOS app currently contains a tabbed SwiftUI shell with Today, Inbox, Ask, Projects, and Bills screens.
 
-Shared visual primitives live in `ios/Orbit/Orbit/Components/OrbitDesignSystem.swift`
-(spacing, corner radius, typography roles, warm-neutral colors, card/surface
-style, section header, capsule badge, and a subtle layered background). New
-screens and future UI refreshes should build on these instead of ad-hoc styling
-so the app stays calm, warm, and consistent across light and dark mode. The
-Today, Ask, Inbox, and Bills screens have started adopting these primitives.
+Shared visual primitives live in `ios/Orbit/Orbit/Components/OrbitDesignSystem.swift`.
+Orbit's UI direction is a warm editorial personal OS: soft paper backgrounds,
+rounded surfaces, thin warm borders, soft shadows, small capsule badges, calm
+metadata, and minimal animation. The file provides spacing/radius/typography
+scales, warm-neutral colors, a layered background (`.orbitBackground()`), a
+capsule badge (`OrbitBadge`), a section header (`OrbitSectionHeader`), and card
+surfaces (`.orbitCardStyle()`, plus `.orbitFloatingCard()` + `.orbitListCardRow()`
+for full-width list-row cards). Reach for these primitives before writing ad-hoc
+card/badge/list styling so the app stays consistent across light and dark mode.
+The Today, Ask, Inbox, and Bills screens already adopt them.
 
 Run iOS unit tests:
 

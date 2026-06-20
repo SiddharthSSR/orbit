@@ -168,23 +168,8 @@ private struct BillRow: View {
             .buttonStyle(.borderless)
             .accessibilityLabel("Delete bill")
         }
-        .padding(OrbitSpacing.md)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(OrbitColor.surface)
-        .clipShape(RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous))
-        .overlay {
-            RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous)
-                .stroke(OrbitColor.border, lineWidth: 1)
-        }
-        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
-        .listRowInsets(EdgeInsets(
-            top: OrbitSpacing.xs,
-            leading: OrbitSpacing.md,
-            bottom: OrbitSpacing.xs,
-            trailing: OrbitSpacing.md
-        ))
-        .listRowSeparator(.hidden)
-        .listRowBackground(Color.clear)
+        .orbitFloatingCard()
+        .orbitListCardRow()
     }
 
     private var status: BillStatus {
