@@ -48,7 +48,7 @@ struct BillsScreen: View {
                 }
             }
 
-            Section("Upcoming") {
+            Section {
                 if billViewModel.isLoading {
                     HStack {
                         Spacer()
@@ -76,8 +76,12 @@ struct BillsScreen: View {
                         )
                     }
                 }
+            } header: {
+                upcomingHeader
             }
         }
+        .scrollContentBackground(.hidden)
+        .orbitBackground()
         .task {
             await billViewModel.loadBills()
         }
@@ -86,6 +90,19 @@ struct BillsScreen: View {
         ) { _ in
             Task { await billViewModel.loadBills(showsLoading: false) }
         }
+    }
+
+    private var unpaidCount: Int {
+        billViewModel.bills.filter { !$0.isPaid }.count
+    }
+
+    private var upcomingHeader: some View {
+        OrbitSectionHeader("Upcoming payments") {
+            if unpaidCount > 0 {
+                OrbitBadge(text: unpaidCount == 1 ? "1 due" : "\(unpaidCount) due", tint: .orange)
+            }
+        }
+        .textCase(nil)
     }
 
     private func createBill() async {
@@ -112,7 +129,7 @@ private struct BillRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: OrbitSpacing.sm) {
             Button(action: onTogglePaid) {
                 Image(systemName: bill.isPaid ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
@@ -121,24 +138,22 @@ private struct BillRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(bill.isPaid ? "Mark unpaid" : "Mark paid")
 
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(bill.name)
-                        .font(.headline)
-                    Spacer(minLength: 8)
-                    Text(bill.isPaid ? "Paid" : "Unpaid")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(bill.isPaid ? .green : .orange)
+                        .font(OrbitTypography.cardTitle)
+                    Spacer(minLength: OrbitSpacing.xs)
+                    OrbitBadge(text: status.label, tint: status.tint)
+                }
+
+                if let amount = bill.amount {
+                    Text(amount, format: .currency(code: bill.currency))
+                        .font(.title3.weight(.semibold))
                 }
 
                 Text("Due \(bill.dueDate.formatted(date: .abbreviated, time: .omitted))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-
-                if let amount = bill.amount {
-                    Text(amount, format: .currency(code: bill.currency))
-                        .font(.subheadline.weight(.semibold))
-                }
 
                 if let notes = bill.notes, !notes.isEmpty {
                     Text(notes)
@@ -153,7 +168,57 @@ private struct BillRow: View {
             .buttonStyle(.borderless)
             .accessibilityLabel("Delete bill")
         }
-        .padding(.vertical, 4)
+        .padding(OrbitSpacing.md)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(OrbitColor.surface)
+        .clipShape(RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: OrbitRadius.md, style: .continuous)
+                .stroke(OrbitColor.border, lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.04), radius: 5, x: 0, y: 2)
+        .listRowInsets(EdgeInsets(
+            top: OrbitSpacing.xs,
+            leading: OrbitSpacing.md,
+            bottom: OrbitSpacing.xs,
+            trailing: OrbitSpacing.md
+        ))
+        .listRowSeparator(.hidden)
+        .listRowBackground(Color.clear)
+    }
+
+    private var status: BillStatus {
+        BillStatus.resolve(isPaid: bill.isPaid, dueDate: bill.dueDate)
+    }
+}
+
+/// Calm, status-oriented label for a bill, derived only from the existing
+/// `isPaid` flag and `dueDate` (no new data fields or behavior).
+private enum BillStatus {
+    case paid
+    case dueSoon
+    case upcoming
+
+    var label: String {
+        switch self {
+        case .paid: "Paid"
+        case .dueSoon: "Due soon"
+        case .upcoming: "Upcoming"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .paid: .green
+        case .dueSoon: .orange
+        case .upcoming: .secondary
+        }
+    }
+
+    static func resolve(isPaid: Bool, dueDate: Date) -> BillStatus {
+        if isPaid { return .paid }
+        let dueSoonThreshold = Calendar.current.date(byAdding: .day, value: 3, to: Date()) ?? Date()
+        return dueDate <= dueSoonThreshold ? .dueSoon : .upcoming
     }
 }
 
