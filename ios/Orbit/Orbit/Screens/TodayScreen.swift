@@ -129,7 +129,7 @@ struct TodayScreen: View {
     private var summaryCard: some View {
         OrbitCard {
             Label("Daily Plan", systemImage: "calendar")
-                .font(.headline)
+                .font(OrbitTypography.cardTitle)
             Text(
                 "You have \(dashboardViewModel.openTodoCount) open todos, \(dashboardViewModel.unpaidBillCount) unpaid bills, and \(dashboardViewModel.recentMemoryCount) recent captures."
             )
@@ -150,7 +150,7 @@ struct TodayScreen: View {
     private func errorCard(_ message: String) -> some View {
         OrbitCard {
             Label("Could not load Today", systemImage: "exclamationmark.triangle")
-                .font(.headline)
+                .font(OrbitTypography.cardTitle)
             Text(message)
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
