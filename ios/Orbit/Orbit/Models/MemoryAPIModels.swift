@@ -6,6 +6,7 @@ struct MemoryDTO: Decodable, Identifiable, Hashable, Sendable {
     var body: String
     var kind: String
     var sourceUrl: String?
+    var projectId: UUID? = nil
     var tags: [String]
     var isArchived: Bool
     var createdAt: Date
@@ -17,8 +18,25 @@ struct MemoryCreateRequest: Encodable, Sendable {
     var body: String
     var kind: String = "note"
     var sourceUrl: String?
+    var projectId: UUID? = nil
     var tags: [String] = []
     var isArchived: Bool = false
+}
+
+/// Focused PATCH body for assigning or removing a memory's project.
+/// Unlike `encodeIfPresent`, encoding the Optional directly preserves an
+/// explicit JSON null so the backend can distinguish unlink from omission.
+struct MemoryProjectLinkRequest: Encodable, Sendable {
+    var projectId: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case projectId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(projectId, forKey: .projectId)
+    }
 }
 
 struct MemoryUpdateRequest: Encodable, Sendable {

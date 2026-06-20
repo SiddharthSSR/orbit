@@ -28,6 +28,38 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Credit card bill"].waitForExistence(timeout: 3))
     }
 
+    @MainActor
+    func testInboxMemoryCanLinkAndUnlinkProject() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let inboxTab = app.buttons["Inbox"]
+        XCTAssertTrue(inboxTab.waitForExistence(timeout: 5))
+        inboxTab.tap()
+        XCTAssertTrue(app.staticTexts["AI article link"].waitForExistence(timeout: 5))
+
+        let projectMenu = app.buttons["Project for AI article link"]
+        revealAndTap(projectMenu, in: app, label: "AI article project menu")
+        let orbitProject = app.buttons["Orbit"]
+        XCTAssertTrue(orbitProject.waitForExistence(timeout: 3), "Orbit project option did not appear")
+        orbitProject.tap()
+
+        let linkedProject = app.staticTexts["Project: Orbit"]
+        XCTAssertTrue(linkedProject.waitForExistence(timeout: 5), "Linked project label did not appear")
+
+        revealAndTap(projectMenu, in: app, label: "AI article project menu after linking")
+        let unlink = app.buttons["Unlinked"]
+        XCTAssertTrue(unlink.waitForExistence(timeout: 3), "Unlinked option did not appear")
+        unlink.tap()
+
+        let removed = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: linkedProject
+        )
+        wait(for: [removed], timeout: 5)
+    }
+
     /// End-to-end mock-mode coverage of the create_todo suggested-action loop:
     /// ask -> suggested action chip -> preview sheet -> execute -> navigate to
     /// Today with the new todo highlighted. Runs entirely on seeded mock

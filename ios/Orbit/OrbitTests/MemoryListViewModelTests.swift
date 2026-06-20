@@ -17,6 +17,34 @@ final class MemoryListViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
 
+    func testLoadProjectsLoadsNonArchivedProjects() async {
+        let active = makeProject(name: "Orbit")
+        let archived = makeProject(name: "Old project", status: "archived")
+        let viewModel = MemoryListViewModel(
+            apiClient: MockMemoryAPIClient(memoryItems: []),
+            projectAPIClient: MockProjectAPIClient(projects: [active, archived])
+        )
+
+        await viewModel.loadProjects()
+
+        XCTAssertEqual(viewModel.projects.map(\.name), ["Orbit"])
+        XCTAssertNil(viewModel.projectLoadErrorMessage)
+    }
+
+    func testProjectLoadingFailureDoesNotBreakLoadedMemory() async {
+        let viewModel = MemoryListViewModel(
+            apiClient: MockMemoryAPIClient(memoryItems: [makeMemory(title: "Keep visible")]),
+            projectAPIClient: FailingInboxProjectAPIClient()
+        )
+
+        await viewModel.loadMemory()
+        await viewModel.loadProjects()
+
+        XCTAssertEqual(viewModel.memoryItems.map(\.title), ["Keep visible"])
+        XCTAssertEqual(viewModel.projectLoadErrorMessage, "Expected project API failure.")
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
     func testCreateMemoryAddsItem() async {
         let viewModel = MemoryListViewModel(apiClient: MockMemoryAPIClient(memoryItems: []))
 
@@ -55,6 +83,62 @@ final class MemoryListViewModelTests: XCTestCase {
         await viewModel.archiveMemory(memory: memory)
 
         XCTAssertTrue(viewModel.memoryItems.isEmpty)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    func testUpdateProjectLinkUpdatesLocalMemoryAndCanUnlink() async {
+        let center = NotificationCenter()
+        let project = makeProject(name: "Orbit")
+        let memory = makeMemory(title: "Project note")
+        let viewModel = MemoryListViewModel(
+            apiClient: MockMemoryAPIClient(memoryItems: [memory]),
+            projectAPIClient: MockProjectAPIClient(projects: [project]),
+            notificationCenter: center
+        )
+        await viewModel.loadMemory()
+        await viewModel.loadProjects()
+
+        let linkEvent = XCTNSNotificationExpectation(
+            name: .orbitMemoryDidChange,
+            object: nil,
+            notificationCenter: center
+        )
+        await viewModel.updateProjectLink(memory: memory, projectID: project.id)
+        await fulfillment(of: [linkEvent], timeout: 0.5)
+
+        XCTAssertEqual(viewModel.memoryItems.first?.projectId, project.id)
+        XCTAssertEqual(viewModel.projectName(for: project.id), "Orbit")
+        XCTAssertNil(viewModel.projectLinkErrorMessages[memory.id])
+
+        let linkedMemory = try? XCTUnwrap(viewModel.memoryItems.first)
+        if let linkedMemory {
+            let unlinkEvent = XCTNSNotificationExpectation(
+                name: .orbitMemoryDidChange,
+                object: nil,
+                notificationCenter: center
+            )
+            await viewModel.updateProjectLink(memory: linkedMemory, projectID: nil)
+            await fulfillment(of: [unlinkEvent], timeout: 0.5)
+        }
+
+        XCTAssertNil(viewModel.memoryItems.first?.projectId)
+    }
+
+    func testFailedProjectLinkKeepsMemoryAndShowsRowError() async {
+        let memory = makeMemory(title: "Keep visible")
+        let viewModel = MemoryListViewModel(
+            apiClient: FailingProjectLinkMemoryAPIClient(memory: memory)
+        )
+        await viewModel.loadMemory()
+
+        await viewModel.updateProjectLink(memory: memory, projectID: UUID())
+
+        XCTAssertEqual(viewModel.memoryItems.map(\.title), ["Keep visible"])
+        XCTAssertNil(viewModel.memoryItems.first?.projectId)
+        XCTAssertEqual(
+            viewModel.projectLinkErrorMessages[memory.id],
+            "Expected project link failure."
+        )
         XCTAssertNil(viewModel.errorMessage)
     }
 
@@ -155,6 +239,7 @@ final class MemoryListViewModelTests: XCTestCase {
         body: String = "Body",
         kind: String = "note",
         tags: [String] = [],
+        projectId: UUID? = nil,
         isArchived: Bool = false
     ) -> MemoryDTO {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
@@ -164,8 +249,23 @@ final class MemoryListViewModelTests: XCTestCase {
             body: body,
             kind: kind,
             sourceUrl: nil,
+            projectId: projectId,
             tags: tags,
             isArchived: isArchived,
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+
+    private func makeProject(name: String, status: String = "active") -> ProjectDTO {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        return ProjectDTO(
+            id: UUID(),
+            name: name,
+            description: nil,
+            status: status,
+            area: nil,
+            tags: [],
             createdAt: now,
             updatedAt: now
         )
@@ -185,8 +285,73 @@ private struct FailingMemoryAPIClient: MemoryAPIClientProtocol {
         throw FailingMemoryAPIError.expectedFailure
     }
 
+    func updateMemoryProject(id: UUID, payload: MemoryProjectLinkRequest) async throws -> MemoryDTO {
+        throw FailingMemoryAPIError.expectedFailure
+    }
+
     func deleteMemory(id: UUID) async throws {
         throw FailingMemoryAPIError.expectedFailure
+    }
+}
+
+private struct FailingProjectLinkMemoryAPIClient: MemoryAPIClientProtocol {
+    let memory: MemoryDTO
+
+    func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO] {
+        [memory]
+    }
+
+    func createMemory(_ payload: MemoryCreateRequest) async throws -> MemoryDTO {
+        memory
+    }
+
+    func updateMemory(id: UUID, payload: MemoryUpdateRequest) async throws -> MemoryDTO {
+        memory
+    }
+
+    func updateMemoryProject(id: UUID, payload: MemoryProjectLinkRequest) async throws -> MemoryDTO {
+        throw FailingProjectLinkMemoryAPIError.expectedFailure
+    }
+
+    func deleteMemory(id: UUID) async throws {}
+}
+
+private enum FailingProjectLinkMemoryAPIError: LocalizedError {
+    case expectedFailure
+
+    var errorDescription: String? {
+        "Expected project link failure."
+    }
+}
+
+private struct FailingInboxProjectAPIClient: ProjectAPIClientProtocol {
+    func listProjects(
+        includeArchived: Bool,
+        status: String?,
+        area: String?,
+        tag: String?
+    ) async throws -> [ProjectDTO] {
+        throw FailingInboxProjectAPIError.expectedFailure
+    }
+
+    func createProject(_ payload: ProjectCreateRequest) async throws -> ProjectDTO {
+        throw FailingInboxProjectAPIError.expectedFailure
+    }
+
+    func updateProject(id: UUID, payload: ProjectUpdateRequest) async throws -> ProjectDTO {
+        throw FailingInboxProjectAPIError.expectedFailure
+    }
+
+    func deleteProject(id: UUID) async throws {
+        throw FailingInboxProjectAPIError.expectedFailure
+    }
+}
+
+private enum FailingInboxProjectAPIError: LocalizedError {
+    case expectedFailure
+
+    var errorDescription: String? {
+        "Expected project API failure."
     }
 }
 

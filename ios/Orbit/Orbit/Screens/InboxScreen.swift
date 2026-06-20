@@ -12,8 +12,16 @@ struct InboxScreen: View {
 
     private let kindOptions = ["note", "idea", "link", "project_update"]
 
-    init(apiClient: any MemoryAPIClientProtocol = OrbitAPIClient()) {
-        _memoryViewModel = StateObject(wrappedValue: MemoryListViewModel(apiClient: apiClient))
+    init(
+        apiClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
+        projectAPIClient: any ProjectAPIClientProtocol = OrbitAPIClient()
+    ) {
+        _memoryViewModel = StateObject(
+            wrappedValue: MemoryListViewModel(
+                apiClient: apiClient,
+                projectAPIClient: projectAPIClient
+            )
+        )
     }
 
     var body: some View {
@@ -66,6 +74,20 @@ struct InboxScreen: View {
                 }
             }
 
+            if let projectErrorMessage = memoryViewModel.projectLoadErrorMessage {
+                Section {
+                    VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+                        Label(projectErrorMessage, systemImage: "folder.badge.questionmark")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                        Button("Retry projects") {
+                            Task { await memoryViewModel.loadProjects() }
+                        }
+                    }
+                    .padding(.vertical, OrbitSpacing.xxs)
+                }
+            }
+
             Section {
                 if memoryViewModel.isLoading {
                     HStack {
@@ -85,7 +107,19 @@ struct InboxScreen: View {
                     ForEach(memoryViewModel.memoryItems) { memory in
                         MemoryRow(
                             memory: memory,
+                            projects: memoryViewModel.projects,
+                            projectName: memoryViewModel.projectName(for: memory.projectId),
+                            projectLinkErrorMessage: memoryViewModel.projectLinkErrorMessages[memory.id],
+                            isUpdatingProject: memoryViewModel.updatingProjectMemoryIDs.contains(memory.id),
                             isHighlighted: memory.id == highlightedMemoryID,
+                            onProjectSelected: { projectID in
+                                Task {
+                                    await memoryViewModel.updateProjectLink(
+                                        memory: memory,
+                                        projectID: projectID
+                                    )
+                                }
+                            },
                             onArchive: {
                                 Task { await memoryViewModel.archiveMemory(memory: memory) }
                             },
@@ -109,6 +143,7 @@ struct InboxScreen: View {
         .task {
             await memoryViewModel.loadMemory()
             consumePendingHighlightIfLoaded()
+            await memoryViewModel.loadProjects()
         }
         .task(id: highlightedMemoryID) {
             guard let highlightedMemoryID else { return }
@@ -183,7 +218,12 @@ struct InboxScreen: View {
 
 private struct MemoryRow: View {
     let memory: MemoryDTO
+    let projects: [ProjectDTO]
+    let projectName: String?
+    let projectLinkErrorMessage: String?
+    let isUpdatingProject: Bool
     let isHighlighted: Bool
+    let onProjectSelected: (UUID?) -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
 
@@ -216,6 +256,17 @@ private struct MemoryRow: View {
                         .lineLimit(2)
                 }
 
+                if let projectName {
+                    Label("Project: \(projectName)", systemImage: "folder")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityIdentifier("Linked project for \(memory.title)")
+                } else if memory.projectId != nil {
+                    Label("Linked project", systemImage: "folder")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 Label(
                     "Captured \(memory.createdAt.formatted(date: .abbreviated, time: .omitted))",
                     systemImage: "clock"
@@ -226,6 +277,17 @@ private struct MemoryRow: View {
             .padding(.top, OrbitSpacing.xxs)
 
             HStack {
+                Menu {
+                    projectButton(name: "Unlinked", projectID: nil)
+                    ForEach(projects) { project in
+                        projectButton(name: project.name, projectID: project.id)
+                    }
+                } label: {
+                    Label("Project", systemImage: "folder")
+                }
+                .disabled(isUpdatingProject)
+                .accessibilityLabel("Project for \(memory.title)")
+
                 Button(action: onArchive) {
                     Label("Archive", systemImage: "archivebox")
                 }
@@ -240,10 +302,29 @@ private struct MemoryRow: View {
                 .accessibilityLabel("Delete memory item")
             }
             .font(.subheadline)
+
+            if let projectLinkErrorMessage {
+                Label(projectLinkErrorMessage, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
         .orbitFloatingCard(isHighlighted: isHighlighted)
         .orbitListCardRow()
         .animation(.easeInOut(duration: 0.2), value: isHighlighted)
+    }
+
+    @ViewBuilder
+    private func projectButton(name: String, projectID: UUID?) -> some View {
+        Button {
+            onProjectSelected(projectID)
+        } label: {
+            if memory.projectId == projectID {
+                Label(name, systemImage: "checkmark")
+            } else {
+                Text(name)
+            }
+        }
     }
 
     /// The source URL's host for a calm archive-style label, falling back to the
@@ -266,7 +347,10 @@ private struct MemoryRow: View {
 struct InboxScreen_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            InboxScreen(apiClient: MockMemoryAPIClient())
+            InboxScreen(
+                apiClient: MockMemoryAPIClient(),
+                projectAPIClient: MockProjectAPIClient()
+            )
                 .navigationTitle("Inbox")
                 .environmentObject(AppNavigationModel())
         }

@@ -114,7 +114,10 @@ struct RootTabView: View {
                 moodAPIClient: dependencies.moodAPIClient
             )
         case .inbox:
-            InboxScreen(apiClient: dependencies.memoryAPIClient)
+            InboxScreen(
+                apiClient: dependencies.memoryAPIClient,
+                projectAPIClient: dependencies.projectAPIClient
+            )
         case .ask:
             AskScreen(
                 apiClient: dependencies.chatAPIClient,

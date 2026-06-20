@@ -555,6 +555,7 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(requests.first?.body, "I like quiet cafes")
         XCTAssertEqual(requests.first?.kind, "note")
+        XCTAssertNil(requests.first?.projectId)
         XCTAssertFalse(requests.first?.title.isEmpty ?? true)
         XCTAssertEqual(viewModel.suggestedActionSuccessMessage, "Saved to memory")
         XCTAssertEqual(viewModel.pendingTabNavigation, .inbox)
@@ -1629,6 +1630,10 @@ private struct FailingMemoryAPIClient: MemoryAPIClientProtocol {
     }
 
     func updateMemory(id: UUID, payload: MemoryUpdateRequest) async throws -> MemoryDTO {
+        throw FailingMemoryAPIError.expectedFailure
+    }
+
+    func updateMemoryProject(id: UUID, payload: MemoryProjectLinkRequest) async throws -> MemoryDTO {
         throw FailingMemoryAPIError.expectedFailure
     }
 

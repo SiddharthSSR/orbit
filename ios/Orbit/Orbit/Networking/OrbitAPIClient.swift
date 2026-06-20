@@ -103,6 +103,7 @@ protocol MemoryAPIClientProtocol: Sendable {
     func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO]
     func createMemory(_ payload: MemoryCreateRequest) async throws -> MemoryDTO
     func updateMemory(id: UUID, payload: MemoryUpdateRequest) async throws -> MemoryDTO
+    func updateMemoryProject(id: UUID, payload: MemoryProjectLinkRequest) async throws -> MemoryDTO
     func deleteMemory(id: UUID) async throws
 }
 
@@ -206,6 +207,10 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
     }
 
     func updateMemory(id: UUID, payload: MemoryUpdateRequest) async throws -> MemoryDTO {
+        try await request(path: "/memory/\(id.uuidString)", method: "PATCH", body: payload)
+    }
+
+    func updateMemoryProject(id: UUID, payload: MemoryProjectLinkRequest) async throws -> MemoryDTO {
         try await request(path: "/memory/\(id.uuidString)", method: "PATCH", body: payload)
     }
 

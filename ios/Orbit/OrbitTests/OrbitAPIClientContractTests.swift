@@ -148,6 +148,7 @@ final class OrbitAPIClientContractTests: XCTestCase {
           "body": "Save this for weekend reading.",
           "kind": "article",
           "source_url": "https://example.com/ai",
+          "project_id": "55555555-5555-5555-5555-555555555555",
           "tags": ["ai", "reading"],
           "is_archived": false,
           "created_at": "2026-06-16T10:11:12Z",
@@ -158,6 +159,7 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(memory.title, "AI article")
         XCTAssertEqual(memory.kind, "article")
         XCTAssertEqual(memory.sourceUrl, "https://example.com/ai")
+        XCTAssertEqual(memory.projectId?.uuidString, "55555555-5555-5555-5555-555555555555")
         XCTAssertEqual(memory.tags, ["ai", "reading"])
         XCTAssertFalse(memory.isArchived)
     }
@@ -408,6 +410,23 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(json["source_url"] as? String, "https://example.com/worldlens")
         XCTAssertEqual(json["tags"] as? [String], ["worldlens", "review"])
         XCTAssertEqual(json["is_archived"] as? Bool, false)
+    }
+
+    func testEncodesMemoryProjectLinkWithSnakeCase() throws {
+        let payload = MemoryProjectLinkRequest(
+            projectId: UUID(uuidString: "55555555-5555-5555-5555-555555555555")
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["project_id"] as? String, "55555555-5555-5555-5555-555555555555")
+    }
+
+    func testEncodesMemoryProjectUnlinkAsExplicitNull() throws {
+        let json = try encodeJSONObject(MemoryProjectLinkRequest(projectId: nil))
+
+        XCTAssertTrue(json.keys.contains("project_id"))
+        XCTAssertTrue(json["project_id"] is NSNull)
     }
 
     func testEncodesMoodCreateRequestWithSnakeCaseAndDateOnly() throws {

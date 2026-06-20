@@ -36,12 +36,25 @@ actor MockMemoryAPIClient: MemoryAPIClientProtocol {
             body: payload.body,
             kind: payload.kind,
             sourceUrl: payload.sourceUrl,
+            projectId: payload.projectId,
             tags: payload.tags,
             isArchived: payload.isArchived,
             createdAt: now,
             updatedAt: now
         )
         memoryItems.insert(memory, at: 0)
+        return memory
+    }
+
+    func updateMemoryProject(id: UUID, payload: MemoryProjectLinkRequest) async throws -> MemoryDTO {
+        guard let index = memoryItems.firstIndex(where: { $0.id == id }) else {
+            throw OrbitAPIError.requestFailed(statusCode: 404, message: "Memory item not found")
+        }
+
+        var memory = memoryItems[index]
+        memory.projectId = payload.projectId
+        memory.updatedAt = Date()
+        memoryItems[index] = memory
         return memory
     }
 

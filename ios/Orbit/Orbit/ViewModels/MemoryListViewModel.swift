@@ -5,18 +5,39 @@ final class MemoryListViewModel: ObservableObject {
     @Published private(set) var memoryItems: [MemoryDTO] = []
     @Published private(set) var isLoading = false
     @Published var errorMessage: String?
+    @Published private(set) var projects: [ProjectDTO] = []
+    @Published private(set) var projectLoadErrorMessage: String?
+    @Published private(set) var updatingProjectMemoryIDs: Set<UUID> = []
+    @Published private(set) var projectLinkErrorMessages: [UUID: String] = [:]
     @Published var activeKindFilter: String?
     @Published var activeTagFilter: String?
 
     private let apiClient: any MemoryAPIClientProtocol
+    private let projectAPIClient: any ProjectAPIClientProtocol
     private let notificationCenter: NotificationCenter
 
     init(
         apiClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
+        projectAPIClient: any ProjectAPIClientProtocol = OrbitAPIClient(),
         notificationCenter: NotificationCenter = .default
     ) {
         self.apiClient = apiClient
+        self.projectAPIClient = projectAPIClient
         self.notificationCenter = notificationCenter
+    }
+
+    func loadProjects() async {
+        projectLoadErrorMessage = nil
+        do {
+            projects = try await projectAPIClient.listProjects(
+                includeArchived: false,
+                status: nil,
+                area: nil,
+                tag: nil
+            )
+        } catch {
+            projectLoadErrorMessage = readableMessage(for: error)
+        }
     }
 
     func loadMemory(showsLoading: Bool = true) async {
@@ -96,6 +117,30 @@ final class MemoryListViewModel: ObservableObject {
         } catch {
             errorMessage = readableMessage(for: error)
         }
+    }
+
+    func updateProjectLink(memory: MemoryDTO, projectID: UUID?) async {
+        guard !updatingProjectMemoryIDs.contains(memory.id) else { return }
+
+        updatingProjectMemoryIDs.insert(memory.id)
+        projectLinkErrorMessages[memory.id] = nil
+        defer { updatingProjectMemoryIDs.remove(memory.id) }
+
+        do {
+            let updatedMemory = try await apiClient.updateMemoryProject(
+                id: memory.id,
+                payload: MemoryProjectLinkRequest(projectId: projectID)
+            )
+            replace(updatedMemory)
+            OrbitRefreshCenter.postMemoryDidChange(on: notificationCenter)
+        } catch {
+            projectLinkErrorMessages[memory.id] = readableMessage(for: error)
+        }
+    }
+
+    func projectName(for projectID: UUID?) -> String? {
+        guard let projectID else { return nil }
+        return projects.first(where: { $0.id == projectID })?.name
     }
 
     func deleteMemory(memory: MemoryDTO) async {
