@@ -66,7 +66,7 @@ struct InboxScreen: View {
                 }
             }
 
-            Section("Captured") {
+            Section {
                 if memoryViewModel.isLoading {
                     HStack {
                         Spacer()
@@ -95,6 +95,13 @@ struct InboxScreen: View {
                         )
                     }
                 }
+            } header: {
+                OrbitSectionHeader("Captured") {
+                    if !memoryViewModel.memoryItems.isEmpty {
+                        OrbitBadge(text: "\(memoryViewModel.memoryItems.count) saved")
+                    }
+                }
+                .textCase(nil)
             }
         }
         .scrollContentBackground(.hidden)
@@ -194,19 +201,29 @@ private struct MemoryRow: View {
                 .foregroundStyle(.secondary)
                 .lineLimit(3)
 
-            if let sourceUrl = memory.sourceUrl, !sourceUrl.isEmpty {
-                Text(sourceUrl)
-                    .font(.footnote)
-                    .foregroundStyle(.blue)
-                    .lineLimit(1)
-            }
+            VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
+                if let sourceHost {
+                    Label(sourceHost, systemImage: "link")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
 
-            if !memory.tags.isEmpty {
-                Text(memory.tags.joined(separator: " · "))
-                    .font(.caption)
-                    .foregroundStyle(.tertiary)
-                    .lineLimit(2)
+                if !memory.tags.isEmpty {
+                    Label(memory.tags.joined(separator: " · "), systemImage: "tag")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                }
+
+                Label(
+                    "Captured \(memory.createdAt.formatted(date: .abbreviated, time: .omitted))",
+                    systemImage: "clock"
+                )
+                .font(.caption)
+                .foregroundStyle(.tertiary)
             }
+            .padding(.top, OrbitSpacing.xxs)
 
             HStack {
                 Button(action: onArchive) {
@@ -227,6 +244,13 @@ private struct MemoryRow: View {
         .orbitFloatingCard(isHighlighted: isHighlighted)
         .orbitListCardRow()
         .animation(.easeInOut(duration: 0.2), value: isHighlighted)
+    }
+
+    /// The source URL's host for a calm archive-style label, falling back to the
+    /// raw string. Display-only — the value and behavior are unchanged.
+    private var sourceHost: String? {
+        guard let sourceUrl = memory.sourceUrl, !sourceUrl.isEmpty else { return nil }
+        return URL(string: sourceUrl)?.host ?? sourceUrl
     }
 
     private func kindLabel(_ kind: String) -> String {
