@@ -107,17 +107,14 @@ struct TodayScreen: View {
         }
     }
 
+    // Today's home greeting reuses the shared editorial masthead at hero
+    // prominence; the greeting/date content stays Today-specific.
     private var greetingHero: some View {
-        VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
-            Text(greeting)
-                .font(OrbitTypography.displayTitle)
-                .foregroundStyle(.primary)
-            Text(Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                .font(OrbitTypography.caption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .accessibilityElement(children: .combine)
+        OrbitScreenMasthead(
+            greeting,
+            subtitle: Date().formatted(.dateTime.weekday(.wide).month(.wide).day()),
+            prominence: .hero
+        )
     }
 
     private var greeting: String {

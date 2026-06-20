@@ -207,23 +207,49 @@ struct OrbitBadge: View {
     }
 }
 
+/// Editorial prominence for `OrbitScreenMasthead`. `standard` is the screen-level
+/// header used by most screens (e.g. Ask); `hero` is the larger home greeting
+/// used by Today.
+enum OrbitMastheadProminence {
+    case standard
+    case hero
+
+    var titleFont: Font {
+        switch self {
+        case .standard: OrbitTypography.displayHeading
+        case .hero: OrbitTypography.displayTitle
+        }
+    }
+}
+
 /// Warm editorial masthead for the top of a screen: a serif display title with
 /// an optional calm sans subtitle. This is the one place per screen the serif
 /// display role is used, so it reads as an emotional/editorial moment rather
 /// than decoration. Labels, metadata, and controls stay in the sans roles.
+///
+/// Use `prominence: .hero` for the home greeting (Today) and `.standard`
+/// (default) for screen-level editorial headers. Reserve mastheads for screens
+/// that genuinely benefit from an editorial header — do not add one to every
+/// screen by default.
 struct OrbitScreenMasthead: View {
     let title: String
     var subtitle: String?
+    var prominence: OrbitMastheadProminence
 
-    init(_ title: String, subtitle: String? = nil) {
+    init(
+        _ title: String,
+        subtitle: String? = nil,
+        prominence: OrbitMastheadProminence = .standard
+    ) {
         self.title = title
         self.subtitle = subtitle
+        self.prominence = prominence
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
             Text(title)
-                .font(OrbitTypography.displayHeading)
+                .font(prominence.titleFont)
                 .foregroundStyle(.primary)
             if let subtitle {
                 Text(subtitle)

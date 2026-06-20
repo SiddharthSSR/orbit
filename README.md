@@ -82,6 +82,19 @@ for full-width list-row cards). Reach for these primitives before writing ad-hoc
 card/badge/list styling so the app stays consistent across light and dark mode.
 The Today, Ask, Inbox, and Bills screens already adopt them.
 
+Editorial headings follow a deliberate rule so the serif stays special:
+
+- The serif display roles (`OrbitTypography.displayTitle` / `displayHeading`) are
+  for emotional/editorial headings only — never for labels, metadata, controls,
+  or body text.
+- `OrbitScreenMasthead` is the shared screen-level editorial header. Use
+  `prominence: .hero` for the home greeting (Today) and `.standard` for other
+  screen headers (Ask).
+- Today keeps a specialized greeting hero, but it renders through the shared
+  masthead rather than bespoke styling.
+- Inbox and Bills intentionally do not have mastheads; only add one to a screen
+  when there is a clear editorial reason, not by default.
+
 Run iOS unit tests:
 
 ```bash
