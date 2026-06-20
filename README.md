@@ -80,7 +80,7 @@ capsule badge (`OrbitBadge`), a section header (`OrbitSectionHeader`), and card
 surfaces (`.orbitCardStyle()`, plus `.orbitFloatingCard()` + `.orbitListCardRow()`
 for full-width list-row cards). Reach for these primitives before writing ad-hoc
 card/badge/list styling so the app stays consistent across light and dark mode.
-The Today, Ask, Inbox, and Bills screens already adopt them. Inbox/Memory leans
+The Today, Ask, Inbox, Bills, and Projects screens already adopt them. Inbox/Memory leans
 into an archive feel — captured items are warm paper cards with a kind badge and
 calm metadata (source host, tags, capture date) under a count-badged section
 header.

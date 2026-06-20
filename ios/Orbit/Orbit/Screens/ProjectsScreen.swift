@@ -106,7 +106,7 @@ struct ProjectsScreen: View {
                 }
             }
 
-            Section("Projects") {
+            Section {
                 if projectViewModel.isLoading {
                     HStack {
                         Spacer()
@@ -143,8 +143,17 @@ struct ProjectsScreen: View {
                         )
                     }
                 }
+            } header: {
+                OrbitSectionHeader("Projects") {
+                    if !projectViewModel.projects.isEmpty {
+                        OrbitBadge(text: "\(projectViewModel.projects.count) shown")
+                    }
+                }
+                .textCase(nil)
             }
         }
+        .scrollContentBackground(.hidden)
+        .orbitBackground()
         .task {
             await projectViewModel.loadProjects()
         }
@@ -186,14 +195,12 @@ private struct ProjectRow: View {
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
             HStack(alignment: .firstTextBaseline) {
                 Text(project.name)
-                    .font(.headline)
-                Spacer(minLength: 8)
-                Text(project.status.capitalized)
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(statusColor(project.status))
+                    .font(OrbitTypography.cardTitle)
+                Spacer(minLength: OrbitSpacing.xs)
+                OrbitBadge(text: project.status.capitalized, tint: statusColor(project.status))
             }
 
             if let description = project.description, !description.isEmpty {
@@ -210,7 +217,7 @@ private struct ProjectRow: View {
             }
 
             if !project.tags.isEmpty {
-                Text(project.tags.joined(separator: " · "))
+                Label(project.tags.joined(separator: " · "), systemImage: "tag")
                     .font(.caption)
                     .foregroundStyle(.tertiary)
                     .lineLimit(2)
@@ -247,7 +254,8 @@ private struct ProjectRow: View {
             .buttonStyle(.borderless)
             .font(.subheadline)
         }
-        .padding(.vertical, 4)
+        .orbitFloatingCard()
+        .orbitListCardRow()
     }
 
     private func statusColor(_ status: String) -> Color {
