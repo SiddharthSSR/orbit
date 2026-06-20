@@ -29,6 +29,8 @@ struct TodayScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
+                greetingHero
+
                 summaryCard
 
                 if dashboardViewModel.isLoading {
@@ -44,6 +46,7 @@ struct TodayScreen: View {
             }
             .padding()
         }
+        .navigationBarTitleDisplayMode(.inline)
         .orbitBackground()
         .task {
             await dashboardViewModel.loadDashboard()
@@ -101,6 +104,28 @@ struct TodayScreen: View {
         }
         withAnimation(.easeIn(duration: 0.2)) {
             highlightedTodoID = id
+        }
+    }
+
+    private var greetingHero: some View {
+        VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
+            Text(greeting)
+                .font(OrbitTypography.displayTitle)
+                .foregroundStyle(.primary)
+            Text(Date().formatted(.dateTime.weekday(.wide).month(.wide).day()))
+                .font(OrbitTypography.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var greeting: String {
+        switch Calendar.current.component(.hour, from: Date()) {
+        case 5..<12: "Good morning"
+        case 12..<17: "Good afternoon"
+        case 17..<22: "Good evening"
+        default: "Good night"
         }
     }
 
