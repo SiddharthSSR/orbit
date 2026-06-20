@@ -306,6 +306,8 @@ def create_memory_item(
     item: MemoryCreate,
     session: Session = Depends(get_session),
 ) -> MemoryRead:
+    if item.project_id is not None and ProjectRepository(session).get(item.project_id) is None:
+        raise HTTPException(status_code=404, detail="Project not found")
     memory_item = MemoryItemRepository(session).create(item)
     if not memory_item.is_archived:
         _auto_index_memory_item(session, memory_item)
@@ -438,6 +440,12 @@ def update_memory_item(
     memory_item = memory_repository.get(memory_id)
     if memory_item is None:
         raise HTTPException(status_code=404, detail="Memory item not found")
+    if (
+        "project_id" in payload.model_fields_set
+        and payload.project_id is not None
+        and ProjectRepository(session).get(payload.project_id) is None
+    ):
+        raise HTTPException(status_code=404, detail="Project not found")
     updated_memory_item = memory_repository.update(memory_item, payload)
     if updated_memory_item.is_archived:
         MemoryEmbeddingRepository(session).delete_for_memory_item(updated_memory_item.id)
@@ -579,6 +587,7 @@ def delete_project(project_id: UUID, session: Session = Depends(get_session)) ->
     project = project_repository.get(project_id)
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found")
+    MemoryItemRepository(session).clear_project_links(project_id)
     project_repository.delete(project)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 

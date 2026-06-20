@@ -44,6 +44,77 @@ def test_get_memory_by_id(client) -> None:
     assert response.json()["title"] == "Inbox item"
 
 
+def test_create_memory_with_valid_project(client) -> None:
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+
+    response = client.post(
+        "/memory",
+        json={"title": "Decision", "body": "Ship linking", "project_id": project["id"]},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["project_id"] == project["id"]
+
+
+def test_create_memory_rejects_unknown_project(client) -> None:
+    response = client.post(
+        "/memory",
+        json={"title": "Decision", "body": "Ship linking", "project_id": str(uuid4())},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Project not found"
+
+
+def test_patch_memory_links_changes_and_unlinks_project(client) -> None:
+    first_project = client.post("/projects", json={"name": "Orbit"}).json()
+    second_project = client.post("/projects", json={"name": "WorldLens"}).json()
+    memory = client.post("/memory", json={"title": "Note", "body": "Project note"}).json()
+
+    linked = client.patch(
+        f"/memory/{memory['id']}",
+        json={"project_id": first_project["id"]},
+    )
+    changed = client.patch(
+        f"/memory/{memory['id']}",
+        json={"project_id": second_project["id"]},
+    )
+    unlinked = client.patch(f"/memory/{memory['id']}", json={"project_id": None})
+
+    assert linked.status_code == 200
+    assert linked.json()["project_id"] == first_project["id"]
+    assert changed.status_code == 200
+    assert changed.json()["project_id"] == second_project["id"]
+    assert unlinked.status_code == 200
+    assert unlinked.json()["project_id"] is None
+
+
+def test_patch_memory_omitting_project_preserves_link(client) -> None:
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+    memory = client.post(
+        "/memory",
+        json={"title": "Note", "body": "Project note", "project_id": project["id"]},
+    ).json()
+
+    response = client.patch(f"/memory/{memory['id']}", json={"title": "Updated note"})
+
+    assert response.status_code == 200
+    assert response.json()["project_id"] == project["id"]
+
+
+def test_patch_memory_rejects_unknown_project(client) -> None:
+    memory = client.post("/memory", json={"title": "Note", "body": "Project note"}).json()
+
+    response = client.patch(
+        f"/memory/{memory['id']}",
+        json={"project_id": str(uuid4())},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Project not found"
+    assert client.get(f"/memory/{memory['id']}").json()["project_id"] is None
+
+
 def test_patch_memory_title_body_and_tags(client) -> None:
     created = client.post("/memory", json={"title": "Draft", "body": "Old body", "tags": [" inbox "]}).json()
 
@@ -270,6 +341,56 @@ def test_non_content_update_does_not_create_duplicate_embedding(client, db_sessi
     assert embeddings[0].content_hash == original.content_hash
 
 
+def test_project_link_update_does_not_change_text_hash_or_regenerate_embedding(
+    client,
+    db_session,
+    monkeypatch,
+) -> None:
+    provider = CountingMockEmbeddingProvider()
+    monkeypatch.setattr(routes, "build_embedding_provider", lambda _settings: provider)
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+    created = client.post(
+        "/memory",
+        json={"title": "Stable Note", "body": "Unchanged content", "tags": ["stable"]},
+    ).json()
+    repository = MemoryEmbeddingRepository(db_session)
+    original = repository.get(
+        memory_item_id=created["id"],
+        provider=provider.provider_name,
+        model=provider.model,
+    )
+    assert original is not None
+    original_hash = original.content_hash
+    original_embedding = original.embedding
+
+    before_context = client.post(
+        "/ask/context-preview",
+        json={"question": "What is in the stable note?"},
+    ).json()["context"]
+    response = client.patch(
+        f"/memory/{created['id']}",
+        json={"project_id": project["id"]},
+    )
+    after_context = client.post(
+        "/ask/context-preview",
+        json={"question": "What is in the stable note?"},
+    ).json()["context"]
+    db_session.expire_all()
+    updated = repository.get(
+        memory_item_id=created["id"],
+        provider=provider.provider_name,
+        model=provider.model,
+    )
+
+    assert response.status_code == 200
+    assert updated is not None
+    assert provider.embed_calls == 1
+    assert updated.id == original.id
+    assert updated.content_hash == original_hash
+    assert updated.embedding == original_embedding
+    assert after_context == before_context
+
+
 def test_archive_and_delete_remove_memory_embeddings(client, db_session) -> None:
     archived = client.post(
         "/memory",
@@ -408,3 +529,13 @@ class FailingMockEmbeddingProvider:
 
     def embed(self, text: str) -> list[float]:
         raise RuntimeError("mock embedding outage")
+
+
+class CountingMockEmbeddingProvider(MockEmbeddingProvider):
+    def __init__(self) -> None:
+        super().__init__()
+        self.embed_calls = 0
+
+    def embed(self, text: str) -> list[float]:
+        self.embed_calls += 1
+        return super().embed(text)

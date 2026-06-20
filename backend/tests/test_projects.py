@@ -133,6 +133,38 @@ def test_delete_project(client) -> None:
     assert get_response.status_code == 404
 
 
+def test_delete_project_clears_linked_memory(client) -> None:
+    project = client.post("/projects", json={"name": "Delete me"}).json()
+    memory = client.post(
+        "/memory",
+        json={"title": "Keep me", "body": "Project note", "project_id": project["id"]},
+    ).json()
+
+    delete_response = client.delete(f"/projects/{project['id']}")
+    memory_response = client.get(f"/memory/{memory['id']}")
+
+    assert delete_response.status_code == 204
+    assert memory_response.status_code == 200
+    assert memory_response.json()["project_id"] is None
+
+
+def test_archive_project_preserves_linked_memory(client) -> None:
+    project = client.post("/projects", json={"name": "Archive me"}).json()
+    memory = client.post(
+        "/memory",
+        json={"title": "Keep link", "body": "Project note", "project_id": project["id"]},
+    ).json()
+
+    archive_response = client.patch(
+        f"/projects/{project['id']}",
+        json={"status": "archived"},
+    )
+    memory_response = client.get(f"/memory/{memory['id']}")
+
+    assert archive_response.status_code == 200
+    assert memory_response.json()["project_id"] == project["id"]
+
+
 def test_unknown_project_returns_404(client) -> None:
     missing_id = uuid4()
 

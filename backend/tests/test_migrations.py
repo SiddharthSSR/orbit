@@ -30,6 +30,42 @@ def test_alembic_upgrade_head_creates_expected_tables(tmp_path) -> None:
     } == {"uq_memory_embeddings_item_provider_model"}
     embedding_columns = {column["name"] for column in inspect(engine).get_columns("memory_embeddings")}
     assert {"status", "error_message", "last_attempted_at", "indexed_at"} <= embedding_columns
+    memory_columns = {column["name"]: column for column in inspect(engine).get_columns("memory_items")}
+    assert memory_columns["project_id"]["nullable"] is True
+    assert "ix_memory_items_project_id" in {
+        index["name"] for index in inspect(engine).get_indexes("memory_items")
+    }
+
+
+def test_memory_project_link_migration_preserves_existing_memory(tmp_path) -> None:
+    database_path = tmp_path / "orbit-memory-project-migration.db"
+    database_url = f"sqlite:///{database_path}"
+    alembic_config = Config("alembic.ini")
+    alembic_config.set_main_option("sqlalchemy.url", database_url)
+    command.upgrade(alembic_config, "0004_embedding_status")
+
+    engine = create_engine(database_url)
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO memory_items "
+                "(id, title, body, kind, source_url, tags, is_archived, created_at, updated_at) "
+                "VALUES ('memory-1', 'Existing note', 'Preserve me', 'note', NULL, '[]', 0, "
+                "'2026-06-20 00:00:00', '2026-06-20 00:00:00')"
+            )
+        )
+    engine.dispose()
+
+    command.upgrade(alembic_config, "head")
+
+    engine = create_engine(database_url)
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("SELECT title, project_id FROM memory_items WHERE id = 'memory-1'")
+        ).one()
+
+    assert row.title == "Existing note"
+    assert row.project_id is None
 
 
 def test_embedding_status_migration_preserves_existing_embeddings_as_indexed(tmp_path) -> None:

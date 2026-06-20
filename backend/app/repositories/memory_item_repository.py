@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
 from app.core.time import utc_now
@@ -17,6 +17,7 @@ class MemoryItemRepository:
             body=payload.body,
             kind=payload.kind,
             source_url=payload.source_url,
+            project_id=str(payload.project_id) if payload.project_id else None,
             is_archived=payload.is_archived,
         )
         memory_item.tags = payload.tags
@@ -54,6 +55,8 @@ class MemoryItemRepository:
     def update(self, memory_item: MemoryRecord, payload: MemoryUpdate) -> MemoryRecord:
         updates = payload.model_dump(exclude_unset=True)
         tags = updates.pop("tags", None)
+        if "project_id" in updates and updates["project_id"] is not None:
+            updates["project_id"] = str(updates["project_id"])
 
         for field, value in updates.items():
             setattr(memory_item, field, value)
@@ -65,6 +68,13 @@ class MemoryItemRepository:
         self.session.commit()
         self.session.refresh(memory_item)
         return memory_item
+
+    def clear_project_links(self, project_id: UUID | str) -> None:
+        self.session.execute(
+            update(MemoryRecord)
+            .where(MemoryRecord.project_id == str(project_id))
+            .values(project_id=None, updated_at=utc_now())
+        )
 
     def delete(self, memory_item: MemoryRecord) -> None:
         self.session.delete(memory_item)

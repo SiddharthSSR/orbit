@@ -23,6 +23,7 @@ class MemoryRecord(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     kind: Mapped[str] = mapped_column(String(40), nullable=False, default="note")
     source_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    project_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     tags_json: Mapped[str] = mapped_column("tags", Text, nullable=False, default="[]")
     is_archived: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, default=utc_now)
@@ -103,6 +104,7 @@ class MemoryCreate(MemoryBase):
     body: str = Field(min_length=1)
     kind: MemoryKind = "note"
     source_url: str | None = None
+    project_id: UUID | None = None
     tags: list[str] = Field(default_factory=list)
     is_archived: bool = False
 
@@ -112,6 +114,7 @@ class MemoryUpdate(MemoryBase):
     body: str | None = Field(default=None, min_length=1)
     kind: MemoryKind | None = None
     source_url: str | None = None
+    project_id: UUID | None = None
     tags: list[str] | None = None
     is_archived: bool | None = None
 
@@ -124,6 +127,7 @@ class MemoryRead(BaseModel):
     body: str
     kind: str
     source_url: str | None = None
+    project_id: UUID | None = None
     tags: list[str] = Field(default_factory=list)
     is_archived: bool
     created_at: datetime
