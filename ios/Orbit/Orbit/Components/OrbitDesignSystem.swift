@@ -40,10 +40,11 @@ enum OrbitRadius {
     static let pill: CGFloat = 999
 }
 
-/// Typography roles. Headers use a rounded design for a warmer, more personal
-/// tone while body copy stays in the system default for legibility.
+/// Typography roles. Most of the app uses a rounded design for a warm, personal
+/// tone, with body copy in the system default for legibility. Serif display
+/// roles are reserved for a few emotional/editorial headings.
 enum OrbitTypography {
-    /// Prominent screen-level heading.
+    /// Prominent screen-level heading (rounded sans).
     static let screenTitle = Font.system(.largeTitle, design: .rounded).weight(.semibold)
     /// Section header inside a screen.
     static let sectionTitle = Font.system(.headline, design: .rounded)
@@ -55,6 +56,18 @@ enum OrbitTypography {
     static let caption = Font.caption
     /// Small emphasized label used inside badges and chips.
     static let badge = Font.caption.weight(.semibold)
+
+    // MARK: Serif display
+    //
+    // Editorial serif headings using the built-in system serif design ("New
+    // York" — no custom font files). Use ONLY for emotional/editorial moments
+    // such as a screen hero or greeting. Labels, metadata, controls, and body
+    // text must stay in the rounded/sans roles above so the serif stays special.
+
+    /// Large editorial hero heading (e.g. a Today greeting).
+    static let displayTitle = Font.system(.largeTitle, design: .serif)
+    /// Medium editorial heading for emotional section moments.
+    static let displayHeading = Font.system(.title2, design: .serif)
 }
 
 /// Semantic colors with built-in light/dark variants. Warm neutrals keep the
@@ -241,6 +254,14 @@ struct OrbitDesignSystem_Previews: PreviewProvider {
     static var previews: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: OrbitSpacing.lg) {
+                VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
+                    Text("Good evening")
+                        .font(OrbitTypography.displayTitle)
+                    Text("A serif moment, reserved for editorial headings.")
+                        .font(OrbitTypography.caption)
+                        .foregroundStyle(.secondary)
+                }
+
                 OrbitSectionHeader("Open Todos", systemImage: "checklist") {
                     OrbitBadge(text: "3 open")
                 }

@@ -73,7 +73,9 @@ Shared visual primitives live in `ios/Orbit/Orbit/Components/OrbitDesignSystem.s
 Orbit's UI direction is a warm editorial personal OS: soft paper backgrounds,
 rounded surfaces, thin warm borders, soft shadows, small capsule badges, calm
 metadata, and minimal animation. The file provides spacing/radius/typography
-scales, warm-neutral colors, a layered background (`.orbitBackground()`), a
+scales (including a serif display role for emotional/editorial headings only,
+using the built-in system serif — no custom font files), warm-neutral colors, a
+layered background (`.orbitBackground()`), a
 capsule badge (`OrbitBadge`), a section header (`OrbitSectionHeader`), and card
 surfaces (`.orbitCardStyle()`, plus `.orbitFloatingCard()` + `.orbitListCardRow()`
 for full-width list-row cards). Reach for these primitives before writing ad-hoc
