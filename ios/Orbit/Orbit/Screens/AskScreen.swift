@@ -23,9 +23,8 @@ struct AskScreen: View {
     var body: some View {
         List {
             Section {
-                HStack {
-                    Label("Ask Orbit", systemImage: "sparkles")
-                        .font(OrbitTypography.sectionTitle)
+                HStack(alignment: .top) {
+                    OrbitScreenMasthead("Ask Orbit", subtitle: "Search across your day and memory")
                     Spacer()
                     Button {
                         viewModel.startNewSession()
@@ -281,6 +280,7 @@ struct AskScreen: View {
         }
         .scrollContentBackground(.hidden)
         .orbitBackground()
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadSessions()
         }

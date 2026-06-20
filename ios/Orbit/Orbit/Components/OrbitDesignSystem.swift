@@ -207,6 +207,35 @@ struct OrbitBadge: View {
     }
 }
 
+/// Warm editorial masthead for the top of a screen: a serif display title with
+/// an optional calm sans subtitle. This is the one place per screen the serif
+/// display role is used, so it reads as an emotional/editorial moment rather
+/// than decoration. Labels, metadata, and controls stay in the sans roles.
+struct OrbitScreenMasthead: View {
+    let title: String
+    var subtitle: String?
+
+    init(_ title: String, subtitle: String? = nil) {
+        self.title = title
+        self.subtitle = subtitle
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
+            Text(title)
+                .font(OrbitTypography.displayHeading)
+                .foregroundStyle(.primary)
+            if let subtitle {
+                Text(subtitle)
+                    .font(OrbitTypography.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 /// Consistent section header with an icon, a title, and an optional trailing
 /// accessory (e.g. a count badge).
 struct OrbitSectionHeader<Accessory: View>: View {
