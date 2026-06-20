@@ -153,8 +153,12 @@ private struct OrbitFloatingDock: View {
                 )
                 .shadow(color: .black.opacity(0.22), radius: 12, x: 0, y: 6)
         )
-        .padding(.horizontal, OrbitSpacing.lg)
-        .padding(.bottom, OrbitSpacing.xxs)
+        // Cap the width and center so the dock stays a tidy pill on wide
+        // (iPad / landscape) layouts instead of stretching edge to edge.
+        .frame(maxWidth: 460)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, OrbitSpacing.md)
+        .padding(.bottom, OrbitSpacing.xs)
     }
 
     private func dockItem(_ tab: AppTab) -> some View {
@@ -167,9 +171,14 @@ private struct OrbitFloatingDock: View {
                     .font(.system(size: 17, weight: .semibold))
                 Text(tab.title)
                     .font(.system(size: 10, weight: .medium))
+                    // Fixed compact sizing keeps the dock from breaking under
+                    // large Dynamic Type; scale/clip rather than wrap or overflow.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, OrbitSpacing.xs)
+            // Guarantee a comfortable tap target regardless of label length.
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .padding(.vertical, OrbitSpacing.xxs)
             .foregroundStyle(
                 isSelected ? Color(white: 0.98) : Color.white.opacity(0.55)
             )
@@ -179,7 +188,7 @@ private struct OrbitFloatingDock: View {
                         .fill(Color.white.opacity(0.14))
                 }
             }
-            .contentShape(Capsule(style: .continuous))
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.18), value: isSelected)

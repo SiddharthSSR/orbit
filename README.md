@@ -103,7 +103,10 @@ deep charcoal capsule with a soft shadow and compact icon+label items. It hides
 the native tab bar but keeps the underlying `TabView` and `AppNavigationModel.selectedTab`
 as the single source of truth, so programmatic tab navigation still works. Each
 dock item exposes its tab title as an accessibility label with a selected trait,
-so UI smoke verifies tab switching via `app.buttons["…"]` and `.isSelected`.
+so UI smoke verifies tab switching via `app.buttons["…"]` and `.isSelected`. The
+dock is hardened for edge cases: labels stay single-line and scale down instead
+of wrapping, each item keeps a comfortable (≥44pt) tap target, and the pill caps
+its width and centers on wide (iPad/landscape) layouts.
 
 Run iOS unit tests:
 

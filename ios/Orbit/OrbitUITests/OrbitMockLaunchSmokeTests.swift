@@ -53,9 +53,12 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(sendButton.waitForExistence(timeout: 3))
         sendButton.tap()
 
-        // The assistant reply includes the create_todo chip; open its sheet.
-        revealAndTap(app.buttons["Suggested action: Create a todo"], in: app,
-                     label: "Create a todo suggested action chip")
+        // The assistant reply includes the create_todo chip; the floating dock
+        // and keyboard can leave it near the bottom, so scroll it clear first.
+        let chip = app.buttons["Suggested action: Create a todo"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 8), "Create a todo chip did not appear")
+        app.swipeUp()
+        revealAndTap(chip, in: app, label: "Create a todo suggested action chip")
 
         // The preview sheet's primary button confirms and executes the action.
         revealAndTap(app.buttons["Create todo"], in: app,
@@ -162,8 +165,11 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(sendButton.waitForExistence(timeout: 3))
         sendButton.tap()
 
-        revealAndTap(app.buttons["Suggested action: Review bills"], in: app,
-                     label: "Review bills suggested action chip")
+        // Scroll the chip clear of the floating dock / keyboard before tapping.
+        let chip = app.buttons["Suggested action: Review bills"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 8), "Review bills chip did not appear")
+        app.swipeUp()
+        revealAndTap(chip, in: app, label: "Review bills suggested action chip")
 
         // Explicit confirmation opens Bills without mutating mock data.
         revealAndTap(app.buttons["Review bills"], in: app,
