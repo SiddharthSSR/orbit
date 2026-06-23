@@ -594,6 +594,19 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(json["retrieval_mode"] as? String, "keyword")
         XCTAssertEqual(json["memory_top_k"] as? Int, 5)
         XCTAssertEqual(json["min_vector_score"] as? Double, 0.0)
+        // Unscoped preview must not send a project_id.
+        XCTAssertFalse(json.keys.contains("project_id"))
+    }
+
+    func testEncodesProjectScopedAskContextPreviewRequest() throws {
+        let payload = AskContextPreviewRequest(
+            question: "What is the latest on Orbit?",
+            projectId: UUID(uuidString: "55555555-5555-5555-5555-555555555555")
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["project_id"] as? String, "55555555-5555-5555-5555-555555555555")
     }
 
     func testNonSuccessAPIResponseMapsToReadableRequestFailedError() async throws {

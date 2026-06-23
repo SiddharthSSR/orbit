@@ -251,6 +251,13 @@ struct AskScreen: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(contextConfidenceColor)
 
+                        if let projectName = viewModel.previewProjectName {
+                            Label("Using project context: \(projectName)", systemImage: "folder")
+                                .font(.footnote.weight(.medium))
+                                .foregroundStyle(.secondary)
+                                .accessibilityIdentifier("ask.preview.projectScope")
+                        }
+
                         Text(contextSummary(for: preview))
                             .font(.footnote)
                             .foregroundStyle(.secondary)

@@ -88,6 +88,9 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var availableProjects: [ProjectDTO] = []
     @Published private(set) var selectedProjectID: UUID?
     @Published private(set) var projectLoadErrorMessage: String?
+    /// The project scope the currently displayed context preview was run with,
+    /// so the preview can label itself accurately.
+    @Published private(set) var previewProjectID: UUID?
     @Published private(set) var answerContextSummaries: [UUID: String] = [:]
     @Published private(set) var answerSuggestedActions: [UUID: [SuggestedActionDTO]] = [:]
     @Published private(set) var suggestedActionExecutionStatuses: [
@@ -172,17 +175,35 @@ final class AskViewModel: ObservableObject {
     }
 
     /// Opt-in: scope subsequent Ask requests to one project's linked memories.
+    /// Changing the scope invalidates any displayed context preview so the
+    /// preview never shows a scope that no longer matches the selector.
     func selectProjectScope(_ projectID: UUID?) {
+        guard selectedProjectID != projectID else { return }
         selectedProjectID = projectID
+        invalidateContextPreview()
     }
 
     func clearProjectScope() {
+        guard selectedProjectID != nil else { return }
         selectedProjectID = nil
+        invalidateContextPreview()
+    }
+
+    private func invalidateContextPreview() {
+        contextPreview = nil
+        previewProjectID = nil
+        previewErrorMessage = nil
     }
 
     var selectedProjectName: String? {
         guard let selectedProjectID else { return nil }
         return availableProjects.first(where: { $0.id == selectedProjectID })?.name
+    }
+
+    /// Name of the project the displayed preview was scoped to, if any.
+    var previewProjectName: String? {
+        guard let previewProjectID else { return nil }
+        return availableProjects.first(where: { $0.id == previewProjectID })?.name
     }
 
     func selectSession(_ session: ChatSessionDTO) async {
@@ -261,6 +282,7 @@ final class AskViewModel: ObservableObject {
                 )
             )
             latestRetrievalDiagnostics = contextPreview?.retrievalDiagnostics
+            previewProjectID = selectedProjectID
         } catch {
             previewErrorMessage = readableMessage(for: error)
         }

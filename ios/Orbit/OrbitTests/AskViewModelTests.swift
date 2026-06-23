@@ -72,6 +72,49 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(request?.projectId)
     }
 
+    func testScopedPreviewSendsSelectedProjectID() async {
+        let project = makeScopeProject(name: "Orbit")
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = makeViewModel(client, projectAPIClient: MockProjectAPIClient(projects: [project]))
+        await viewModel.loadProjects()
+        viewModel.selectProjectScope(project.id)
+        viewModel.draftQuestion = "What is the latest?"
+
+        await viewModel.previewContext()
+
+        let request = await client.lastPreviewRequest()
+        XCTAssertEqual(request?.projectId, project.id)
+        XCTAssertEqual(viewModel.previewProjectName, "Orbit")
+    }
+
+    func testUnscopedPreviewOmitsProjectID() async {
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = makeViewModel(client)
+        viewModel.draftQuestion = "What did I save about AI?"
+
+        await viewModel.previewContext()
+
+        let request = await client.lastPreviewRequest()
+        XCTAssertNotNil(request)
+        XCTAssertNil(request?.projectId)
+        XCTAssertNil(viewModel.previewProjectName)
+    }
+
+    func testChangingProjectScopeInvalidatesDisplayedPreview() async {
+        let project = makeScopeProject(name: "Orbit")
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = makeViewModel(client, projectAPIClient: MockProjectAPIClient(projects: [project]))
+        await viewModel.loadProjects()
+        viewModel.draftQuestion = "What did I save about AI?"
+        await viewModel.previewContext()
+        XCTAssertNotNil(viewModel.contextPreview)
+
+        viewModel.selectProjectScope(project.id)
+
+        XCTAssertNil(viewModel.contextPreview)
+        XCTAssertNil(viewModel.previewProjectName)
+    }
+
     func testLoadSessionsLoadsMockSessions() async {
         let sessions = [makeSession(title: "Focus today"), makeSession(title: "Bills")]
         let viewModel = makeViewModel(MockChatAPIClient(sessions: sessions, messagesBySession: [:]))

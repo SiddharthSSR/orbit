@@ -98,6 +98,47 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
     }
 
     @MainActor
+    func testAskContextPreviewReflectsProjectScope() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let askTab = app.buttons["Ask"]
+        XCTAssertTrue(askTab.waitForExistence(timeout: 5))
+        askTab.tap()
+
+        // Scope Ask to the Orbit project via the sheet picker.
+        let scopeControl = app.buttons["ask.projectScope"]
+        XCTAssertTrue(scopeControl.waitForExistence(timeout: 5))
+        scopeControl.tap()
+        let orbitOption = app.buttons["Orbit"]
+        XCTAssertTrue(orbitOption.waitForExistence(timeout: 5))
+        orbitOption.tap()
+
+        // Enter a question and trigger the context preview.
+        let input = askInput(in: app)
+        XCTAssertTrue(input.waitForExistence(timeout: 5), "Ask input field not found")
+        input.tap()
+        input.typeText("What is the latest?")
+
+        let previewButton = app.buttons["Preview"]
+        XCTAssertTrue(previewButton.waitForExistence(timeout: 5))
+        previewButton.tap()
+
+        // The preview output indicates it is scoped to the project.
+        let previewScope = app.staticTexts["ask.preview.projectScope"]
+        var attempts = 0
+        while !previewScope.exists && attempts < 6 {
+            app.swipeUp()
+            attempts += 1
+        }
+        XCTAssertTrue(
+            previewScope.waitForExistence(timeout: 5),
+            "Context preview did not indicate project scope"
+        )
+    }
+
+    @MainActor
     func testTodayTodoCanLinkAndUnlinkProject() {
         let app = XCUIApplication()
         app.launchArguments = ["--orbit-ui-tests"]
