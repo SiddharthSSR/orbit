@@ -399,9 +399,7 @@ private struct TodayTodoRow: View {
                     }
 
                     if let projectName {
-                        Label("Project: \(projectName)", systemImage: "folder")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        LinkedProjectLabel(projectName: projectName)
                     }
                 }
 

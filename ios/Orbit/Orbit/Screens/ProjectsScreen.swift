@@ -390,7 +390,7 @@ private struct ProjectDetailScreen: View {
                     .listRowBackground(Color.clear)
                 } else {
                     ForEach(linkedTodos) { todo in
-                        ProjectLinkedTodoRow(todo: todo)
+                        ProjectLinkedTodoRow(todo: todo, projectName: project.name)
                     }
                 }
             } header: {
@@ -595,6 +595,7 @@ private struct ProjectActivitySummaryCard: View {
 
 private struct ProjectLinkedTodoRow: View {
     let todo: TodoDTO
+    var projectName: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
@@ -620,6 +621,10 @@ private struct ProjectLinkedTodoRow: View {
                     .font(.caption)
                     .foregroundStyle(urgencyTint(urgency))
                     .padding(.top, OrbitSpacing.xxs)
+            }
+
+            if let projectName {
+                LinkedProjectLabel(projectName: projectName)
             }
         }
         .orbitFloatingCard()

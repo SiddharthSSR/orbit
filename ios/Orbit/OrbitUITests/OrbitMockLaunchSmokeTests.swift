@@ -49,6 +49,8 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Linked todos"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Draft project brief"].waitForExistence(timeout: 5))
+        // Linked-todo rows now show the project name for consistency with Today.
+        XCTAssertTrue(app.staticTexts["Project: Orbit"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Linked memories"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["AI article link"].waitForExistence(timeout: 5))
     }

@@ -257,9 +257,7 @@ private struct MemoryRow: View {
                 }
 
                 if let projectName {
-                    Label("Project: \(projectName)", systemImage: "folder")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    LinkedProjectLabel(projectName: projectName)
                         .accessibilityIdentifier("Linked project for \(memory.title)")
                 } else if memory.projectId != nil {
                     Label("Linked project", systemImage: "folder")
