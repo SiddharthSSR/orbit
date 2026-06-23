@@ -5,6 +5,7 @@ struct AskScreen: View {
     @StateObject private var viewModel: AskViewModel
     @State private var isContextPreviewExpanded = false
     @State private var isConfirmingClear = false
+    @State private var isProjectScopePickerPresented = false
 
     init(
         apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
@@ -325,35 +326,19 @@ struct AskScreen: View {
     @ViewBuilder
     private var projectScopeRow: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Menu {
-                Button {
-                    viewModel.clearProjectScope()
-                } label: {
-                    if viewModel.selectedProjectID == nil {
-                        Label("All Orbit context", systemImage: "checkmark")
-                    } else {
-                        Text("All Orbit context")
-                    }
-                }
-                ForEach(viewModel.availableProjects) { project in
-                    Button {
-                        viewModel.selectProjectScope(project.id)
-                    } label: {
-                        if viewModel.selectedProjectID == project.id {
-                            Label(project.name, systemImage: "checkmark")
-                        } else {
-                            Text(project.name)
-                        }
-                    }
-                }
+            // A plain button opening a sheet picker — reliably testable in
+            // XCUITest, unlike a SwiftUI Menu. Behavior is unchanged.
+            Button {
+                isProjectScopePickerPresented = true
             } label: {
                 Label(
                     viewModel.selectedProjectName.map { "Project: \($0)" } ?? "Project context: All",
                     systemImage: "folder"
                 )
             }
+            .buttonStyle(.plain)
             .disabled(!viewModel.includeContext)
-            .accessibilityLabel("Ask project context")
+            .accessibilityIdentifier("ask.projectScope")
 
             if let name = viewModel.selectedProjectName {
                 HStack {
@@ -367,8 +352,23 @@ struct AskScreen: View {
                     }
                     .font(.caption)
                     .buttonStyle(.borderless)
+                    .accessibilityIdentifier("ask.projectScope.clear")
                 }
             }
+        }
+        .sheet(isPresented: $isProjectScopePickerPresented) {
+            AskProjectScopePicker(
+                projects: viewModel.availableProjects,
+                selectedProjectID: viewModel.selectedProjectID,
+                onSelect: { projectID in
+                    viewModel.selectProjectScope(projectID)
+                    isProjectScopePickerPresented = false
+                },
+                onClear: {
+                    viewModel.clearProjectScope()
+                    isProjectScopePickerPresented = false
+                }
+            )
         }
     }
 
@@ -400,6 +400,60 @@ struct AskScreen: View {
         }
         let count = preview.contextSections.count
         return "\(count) context \(count == 1 ? "section" : "sections") available"
+    }
+}
+
+/// Sheet picker for the optional Ask project scope. A simple list (vs. a Menu)
+/// so the select/clear interaction is reliably testable in XCUITest.
+private struct AskProjectScopePicker: View {
+    @Environment(\.dismiss) private var dismiss
+    let projects: [ProjectDTO]
+    let selectedProjectID: UUID?
+    let onSelect: (UUID) -> Void
+    let onClear: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Button {
+                    onClear()
+                } label: {
+                    scopeRow(name: "All Orbit context", isSelected: selectedProjectID == nil)
+                }
+                .accessibilityIdentifier("ask.projectScope.all")
+
+                ForEach(projects) { project in
+                    Button {
+                        onSelect(project.id)
+                    } label: {
+                        scopeRow(name: project.name, isSelected: selectedProjectID == project.id)
+                    }
+                }
+            }
+            .navigationTitle("Project context")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    @ViewBuilder
+    private func scopeRow(name: String, isSelected: Bool) -> some View {
+        HStack {
+            Text(name)
+                .foregroundStyle(.primary)
+            Spacer()
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+            }
+        }
+        .contentShape(Rectangle())
     }
 }
 

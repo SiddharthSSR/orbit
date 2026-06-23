@@ -56,7 +56,7 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
     }
 
     @MainActor
-    func testAskShowsProjectScopeControlDefaultingToUnscoped() {
+    func testAskProjectScopeSelectAndClear() {
         let app = XCUIApplication()
         app.launchArguments = ["--orbit-ui-tests"]
         app.launch()
@@ -65,16 +65,35 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(askTab.waitForExistence(timeout: 5))
         askTab.tap()
 
-        // The opt-in project scope control is present and defaults to unscoped
-        // ("All"). Select/clear behavior is covered by AskViewModel unit tests;
-        // driving the SwiftUI Menu in XCUITest is too brittle to assert here.
+        // Opt-in scope control defaults to unscoped ("All").
+        let scopeControl = app.buttons["ask.projectScope"]
+        XCTAssertTrue(scopeControl.waitForExistence(timeout: 5), "Ask project scope control did not appear")
+        XCTAssertTrue(app.buttons["Project context: All"].exists, "Scope did not default to unscoped")
+
+        // Open the sheet picker and select a project.
+        scopeControl.tap()
+        let orbitOption = app.buttons["Orbit"]
+        XCTAssertTrue(orbitOption.waitForExistence(timeout: 5), "Project option did not appear in picker")
+        orbitOption.tap()
+
         XCTAssertTrue(
-            app.buttons["Ask project context"].waitForExistence(timeout: 5),
-            "Ask project context control did not appear"
+            app.staticTexts["Using project context: Orbit"].waitForExistence(timeout: 5),
+            "Selected project scope label did not appear"
         )
         XCTAssertTrue(
-            app.staticTexts["Project context: All"].waitForExistence(timeout: 5),
-            "Ask project context did not default to unscoped"
+            app.buttons["Project: Orbit"].waitForExistence(timeout: 5),
+            "Scope control did not reflect the selected project"
+        )
+
+        // Clear back to unscoped.
+        app.buttons["ask.projectScope.clear"].tap()
+        XCTAssertTrue(
+            app.staticTexts["Using project context: Orbit"].waitForNonExistence(timeout: 5),
+            "Project scope label did not clear"
+        )
+        XCTAssertTrue(
+            app.buttons["Project context: All"].waitForExistence(timeout: 5),
+            "Scope control did not return to unscoped"
         )
     }
 
