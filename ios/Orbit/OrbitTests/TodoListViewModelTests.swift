@@ -118,6 +118,22 @@ final class TodoListViewModelTests: XCTestCase {
         await fulfillment(of: [event], timeout: 0.3)
     }
 
+    func testMockTodoClientFiltersByProjectId() async throws {
+        let projectId = UUID()
+        let otherProjectId = UUID()
+        let client = MockTodoAPIClient(todos: [
+            makeTodo(title: "Linked task", projectId: projectId),
+            makeTodo(title: "Other task", projectId: otherProjectId),
+            makeTodo(title: "Unlinked task")
+        ])
+
+        let linkedTodos = try await client.listTodos(projectId: projectId)
+        let allTodos = try await client.listTodos()
+
+        XCTAssertEqual(linkedTodos.map(\.title), ["Linked task"])
+        XCTAssertEqual(allTodos.map(\.title), ["Linked task", "Other task", "Unlinked task"])
+    }
+
     private func makeTodo(
         title: String,
         notes: String? = nil,
@@ -140,7 +156,7 @@ final class TodoListViewModelTests: XCTestCase {
 }
 
 private struct FailingTodoAPIClient: TodoAPIClientProtocol {
-    func listTodos() async throws -> [TodoDTO] {
+    func listTodos(projectId: UUID?) async throws -> [TodoDTO] {
         throw FailingTodoAPIError.expectedFailure
     }
 

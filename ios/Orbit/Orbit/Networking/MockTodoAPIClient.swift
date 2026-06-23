@@ -12,8 +12,11 @@ actor MockTodoAPIClient: TodoAPIClientProtocol {
         createRequests
     }
 
-    func listTodos() async throws -> [TodoDTO] {
-        todos
+    func listTodos(projectId: UUID? = nil) async throws -> [TodoDTO] {
+        if let projectId {
+            return todos.filter { $0.projectId == projectId }
+        }
+        return todos
     }
 
     func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO {
@@ -65,6 +68,16 @@ actor MockTodoAPIClient: TodoAPIClientProtocol {
     }
 
     private static let previewTodos: [TodoDTO] = [
+        TodoDTO(
+            id: UUID(),
+            title: "Draft project brief",
+            notes: "Outline the next Orbit planning slice",
+            dueDate: Date().addingTimeInterval(86_400),
+            projectId: MockOrbitFixtureIDs.orbitProjectID,
+            isComplete: true,
+            createdAt: Date(),
+            updatedAt: Date()
+        ),
         TodoDTO(
             id: UUID(),
             title: "Review today plan",

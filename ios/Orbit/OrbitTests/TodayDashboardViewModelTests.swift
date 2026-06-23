@@ -406,7 +406,7 @@ private struct FailingDashboardBillAPIClient: BillAPIClientProtocol {
 }
 
 private struct FailingDashboardTodoAPIClient: TodoAPIClientProtocol {
-    func listTodos() async throws -> [TodoDTO] {
+    func listTodos(projectId: UUID?) async throws -> [TodoDTO] {
         throw FailingDashboardAPIError.expectedFailure
     }
 
@@ -433,7 +433,7 @@ private actor SuspendedDashboardTodoAPIClient: TodoAPIClientProtocol {
         self.todo = todo
     }
 
-    func listTodos() async throws -> [TodoDTO] {
+    func listTodos(projectId: UUID?) async throws -> [TodoDTO] {
         [todo]
     }
 
@@ -473,7 +473,7 @@ private actor SuspendedDashboardTodoAPIClient: TodoAPIClientProtocol {
 private struct FailingUpdateDashboardTodoAPIClient: TodoAPIClientProtocol {
     let todo: TodoDTO
 
-    func listTodos() async throws -> [TodoDTO] {
+    func listTodos(projectId: UUID?) async throws -> [TodoDTO] {
         [todo]
     }
 

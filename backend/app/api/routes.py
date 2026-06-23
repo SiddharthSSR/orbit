@@ -472,8 +472,11 @@ def delete_memory_item(memory_id: UUID, session: Session = Depends(get_session))
 
 
 @router.get("/todos", response_model=list[TodoRead], tags=["todos"])
-def list_todos(session: Session = Depends(get_session)) -> list[TodoRead]:
-    return TodoRepository(session).list()
+def list_todos(
+    project_id: UUID | None = None,
+    session: Session = Depends(get_session),
+) -> list[TodoRead]:
+    return TodoRepository(session).list(project_id=project_id)
 
 
 @router.post("/todos", response_model=TodoRead, status_code=201, tags=["todos"])

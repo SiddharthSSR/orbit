@@ -459,6 +459,29 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(queryItems.first { $0.name == "include_archived" }?.value, "false")
     }
 
+    func testListTodosCanRequestProjectFilter() async throws {
+        StubURLProtocol.lastRequest = nil
+        StubURLProtocol.response = HTTPURLResponse(
+            url: URL(string: "https://orbit.test/todos")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        StubURLProtocol.responseData = Data("[]".utf8)
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = OrbitAPIClient(baseURL: URL(string: "https://orbit.test")!, session: session)
+
+        _ = try await client.listTodos(projectId: UUID(uuidString: "55555555-5555-5555-5555-555555555555"))
+
+        let request = try XCTUnwrap(StubURLProtocol.lastRequest)
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        let queryItems = components.queryItems ?? []
+        XCTAssertEqual(queryItems.first { $0.name == "project_id" }?.value, "55555555-5555-5555-5555-555555555555")
+    }
+
     func testEncodesMoodCreateRequestWithSnakeCaseAndDateOnly() throws {
         let payload = MoodCreateRequest(
             mood: "calm",

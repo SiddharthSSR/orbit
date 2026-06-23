@@ -86,10 +86,16 @@ enum OrbitAPICoding {
 }
 
 protocol TodoAPIClientProtocol: Sendable {
-    func listTodos() async throws -> [TodoDTO]
+    func listTodos(projectId: UUID?) async throws -> [TodoDTO]
     func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO
     func updateTodo(id: UUID, payload: TodoUpdateRequest) async throws -> TodoDTO
     func deleteTodo(id: UUID) async throws
+}
+
+extension TodoAPIClientProtocol {
+    func listTodos() async throws -> [TodoDTO] {
+        try await listTodos(projectId: nil)
+    }
 }
 
 protocol BillAPIClientProtocol: Sendable {
@@ -164,8 +170,12 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
         self.session = session
     }
 
-    func listTodos() async throws -> [TodoDTO] {
-        try await request(path: "/todos")
+    func listTodos(projectId: UUID? = nil) async throws -> [TodoDTO] {
+        var queryItems: [URLQueryItem] = []
+        if let projectId {
+            queryItems.append(URLQueryItem(name: "project_id", value: projectId.uuidString))
+        }
+        return try await request(path: "/todos", queryItems: queryItems)
     }
 
     func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO {

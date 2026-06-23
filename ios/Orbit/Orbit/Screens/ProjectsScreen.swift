@@ -15,13 +15,16 @@ struct ProjectsScreen: View {
     private let statusOptions = ["active", "paused", "completed"]
     private let filterOptions = ["all", "active", "paused", "completed"]
     private let memoryAPIClient: any MemoryAPIClientProtocol
+    private let todoAPIClient: any TodoAPIClientProtocol
 
     init(
         apiClient: any ProjectAPIClientProtocol = OrbitAPIClient(),
-        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient()
+        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
+        todoAPIClient: any TodoAPIClientProtocol = OrbitAPIClient()
     ) {
         _projectViewModel = StateObject(wrappedValue: ProjectListViewModel(apiClient: apiClient))
         self.memoryAPIClient = memoryAPIClient
+        self.todoAPIClient = todoAPIClient
     }
 
     var body: some View {
@@ -169,7 +172,8 @@ struct ProjectsScreen: View {
         .navigationDestination(item: $selectedProject) { project in
             ProjectDetailScreen(
                 project: project,
-                memoryAPIClient: memoryAPIClient
+                memoryAPIClient: memoryAPIClient,
+                todoAPIClient: todoAPIClient
             )
         }
     }
@@ -296,7 +300,11 @@ private struct ProjectRow: View {
 private struct ProjectDetailScreen: View {
     let project: ProjectDTO
     let memoryAPIClient: any MemoryAPIClientProtocol
+    let todoAPIClient: any TodoAPIClientProtocol
 
+    @State private var linkedTodos: [TodoDTO] = []
+    @State private var isLoadingTodos = false
+    @State private var todoErrorMessage: String?
     @State private var linkedMemories: [MemoryDTO] = []
     @State private var isLoadingMemories = false
     @State private var memoryErrorMessage: String?
@@ -328,6 +336,48 @@ private struct ProjectDetailScreen: View {
                 }
                 .orbitFloatingCard()
                 .orbitListCardRow()
+            }
+
+            Section {
+                if isLoadingTodos {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                } else if let todoErrorMessage {
+                    VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+                        Label(todoErrorMessage, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                        Button {
+                            Task { await loadLinkedTodos() }
+                        } label: {
+                            Label("Retry todos", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .orbitFloatingCard()
+                    .orbitListCardRow()
+                } else if linkedTodos.isEmpty {
+                    EmptyStateView(
+                        title: "No linked todos yet",
+                        message: "Linked project tasks will appear here.",
+                        systemImage: "checklist"
+                    )
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(linkedTodos) { todo in
+                        ProjectLinkedTodoRow(todo: todo)
+                    }
+                }
+            } header: {
+                OrbitSectionHeader("Linked todos", systemImage: "checklist") {
+                    if !linkedTodos.isEmpty {
+                        OrbitBadge(text: "\(linkedTodos.count)")
+                    }
+                }
+                .textCase(nil)
             }
 
             Section {
@@ -377,10 +427,31 @@ private struct ProjectDetailScreen: View {
         .scrollContentBackground(.hidden)
         .orbitBackground()
         .task(id: project.id) {
-            await loadLinkedMemories()
+            await loadProjectLinks()
+        }
+        .onReceive(OrbitRefreshCenter.publisher(for: OrbitRefreshCenter.todoDidChange)) { _ in
+            Task { await loadLinkedTodos() }
         }
         .onReceive(OrbitRefreshCenter.publisher(for: OrbitRefreshCenter.memoryDidChange)) { _ in
             Task { await loadLinkedMemories() }
+        }
+    }
+
+    private func loadProjectLinks() async {
+        await loadLinkedTodos()
+        await loadLinkedMemories()
+    }
+
+    private func loadLinkedTodos() async {
+        isLoadingTodos = true
+        todoErrorMessage = nil
+        defer { isLoadingTodos = false }
+
+        do {
+            linkedTodos = try await todoAPIClient.listTodos(projectId: project.id)
+        } catch {
+            todoErrorMessage = readableMessage(for: error)
+            linkedTodos = []
         }
     }
 
@@ -421,6 +492,51 @@ private struct ProjectDetailScreen: View {
             return description
         }
         return error.localizedDescription
+    }
+}
+
+private struct ProjectLinkedTodoRow: View {
+    let todo: TodoDTO
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(todo.title)
+                    .font(OrbitTypography.cardTitle)
+                Spacer(minLength: OrbitSpacing.xs)
+                OrbitBadge(
+                    text: todo.isComplete ? "Completed" : "Open",
+                    tint: todo.isComplete ? .secondary : .green
+                )
+            }
+
+            if let notes = todo.notes, !notes.isEmpty {
+                Text(notes)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+
+            if let urgency = TodoUrgency.resolve(dueDate: todo.dueDate) {
+                Label(urgency.label, systemImage: "calendar")
+                    .font(.caption)
+                    .foregroundStyle(urgencyTint(urgency))
+                    .padding(.top, OrbitSpacing.xxs)
+            }
+        }
+        .orbitFloatingCard()
+        .orbitListCardRow()
+    }
+
+    private func urgencyTint(_ urgency: TodoUrgency) -> Color {
+        switch urgency {
+        case .overdue:
+            .red
+        case .today:
+            .orange
+        case .tomorrow, .upcoming:
+            .secondary
+        }
     }
 }
 
@@ -489,7 +605,8 @@ struct ProjectsScreen_Previews: PreviewProvider {
         NavigationStack {
             ProjectsScreen(
                 apiClient: MockProjectAPIClient(),
-                memoryAPIClient: MockMemoryAPIClient()
+                memoryAPIClient: MockMemoryAPIClient(),
+                todoAPIClient: MockTodoAPIClient()
             )
                 .navigationTitle("Projects")
         }

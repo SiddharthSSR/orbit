@@ -42,6 +42,41 @@ def test_list_todos(client) -> None:
     assert [todo["title"] for todo in response.json()] == ["Second", "First"]
 
 
+def test_list_todos_filtered_by_project_id(client) -> None:
+    orbit = client.post("/projects", json={"name": "Orbit"}).json()
+    worldlens = client.post("/projects", json={"name": "WorldLens"}).json()
+    client.post("/todos", json={"title": "Orbit task", "project_id": orbit["id"]})
+    client.post("/todos", json={"title": "WorldLens task", "project_id": worldlens["id"]})
+
+    response = client.get("/todos", params={"project_id": orbit["id"]})
+
+    assert response.status_code == 200
+    assert [todo["title"] for todo in response.json()] == ["Orbit task"]
+    assert response.json()[0]["project_id"] == orbit["id"]
+
+
+def test_list_todos_project_filter_excludes_unlinked_todos(client) -> None:
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+    client.post("/todos", json={"title": "Linked task", "project_id": project["id"]})
+    client.post("/todos", json={"title": "Unlinked task"})
+
+    response = client.get("/todos", params={"project_id": project["id"]})
+
+    assert response.status_code == 200
+    assert [todo["title"] for todo in response.json()] == ["Linked task"]
+
+
+def test_list_todos_project_filter_does_not_change_unfiltered_list(client) -> None:
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+    client.post("/todos", json={"title": "Linked task", "project_id": project["id"]})
+    client.post("/todos", json={"title": "Unlinked task"})
+
+    response = client.get("/todos")
+
+    assert response.status_code == 200
+    assert [todo["title"] for todo in response.json()] == ["Unlinked task", "Linked task"]
+
+
 def test_get_todo_by_id(client) -> None:
     created = client.post("/todos", json={"title": "Read article"}).json()
 

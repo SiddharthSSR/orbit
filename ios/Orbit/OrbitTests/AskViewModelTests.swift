@@ -1651,7 +1651,7 @@ private enum FailingMemoryAPIError: LocalizedError {
 }
 
 private struct FailingTodoAPIClient: TodoAPIClientProtocol {
-    func listTodos() async throws -> [TodoDTO] {
+    func listTodos(projectId: UUID?) async throws -> [TodoDTO] {
         throw FailingTodoAPIError.expectedFailure
     }
 

@@ -24,8 +24,10 @@ class TodoRepository:
         self.session.refresh(todo)
         return todo
 
-    def list(self) -> list[TodoRecord]:
+    def list(self, project_id: UUID | str | None = None) -> list[TodoRecord]:
         statement = select(TodoRecord).order_by(TodoRecord.created_at.desc())
+        if project_id is not None:
+            statement = statement.where(TodoRecord.project_id == str(project_id))
         return list(self.session.scalars(statement).all())
 
     def get(self, todo_id: UUID) -> TodoRecord | None:
