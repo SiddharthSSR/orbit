@@ -100,6 +100,87 @@ final class ProjectListViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.projects.map(\.name), ["Orbit"])
     }
 
+    func testProjectActivitySummaryCountsAndDerivedFields() {
+        let early = Date(timeIntervalSince1970: 1_700_000_000)
+        let later = Date(timeIntervalSince1970: 1_700_100_000)
+        let soonDue = Date(timeIntervalSince1970: 1_700_050_000)
+        let lateDue = Date(timeIntervalSince1970: 1_700_200_000)
+
+        let todos = [
+            makeSummaryTodo(title: "Open soon", isComplete: false, dueDate: soonDue),
+            makeSummaryTodo(title: "Open later", isComplete: false, dueDate: lateDue),
+            makeSummaryTodo(title: "Done task", isComplete: true, dueDate: nil)
+        ]
+        let memories = [
+            makeSummaryMemory(createdAt: early),
+            makeSummaryMemory(createdAt: later)
+        ]
+
+        let summary = ProjectActivitySummary(todos: todos, memories: memories)
+
+        XCTAssertEqual(summary.linkedTodoCount, 3)
+        XCTAssertEqual(summary.linkedMemoryCount, 2)
+        XCTAssertEqual(summary.openTodoCount, 2)
+        XCTAssertEqual(summary.completedTodoCount, 1)
+        XCTAssertEqual(summary.nextDueTodo?.title, "Open soon")
+        XCTAssertEqual(summary.lastMemoryCapturedAt, later)
+    }
+
+    func testProjectActivitySummaryHandlesEmptyInputs() {
+        let summary = ProjectActivitySummary(todos: [], memories: [])
+
+        XCTAssertEqual(summary.linkedTodoCount, 0)
+        XCTAssertEqual(summary.linkedMemoryCount, 0)
+        XCTAssertEqual(summary.openTodoCount, 0)
+        XCTAssertEqual(summary.completedTodoCount, 0)
+        XCTAssertNil(summary.nextDueTodo)
+        XCTAssertNil(summary.lastMemoryCapturedAt)
+    }
+
+    func testProjectActivitySummaryIgnoresCompletedAndUndatedForNextDue() {
+        let due = Date(timeIntervalSince1970: 1_700_050_000)
+        let todos = [
+            makeSummaryTodo(title: "Completed dated", isComplete: true, dueDate: due),
+            makeSummaryTodo(title: "Open undated", isComplete: false, dueDate: nil)
+        ]
+
+        let summary = ProjectActivitySummary(todos: todos, memories: [])
+
+        XCTAssertNil(summary.nextDueTodo)
+    }
+
+    private func makeSummaryTodo(
+        title: String,
+        isComplete: Bool,
+        dueDate: Date?
+    ) -> TodoDTO {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        return TodoDTO(
+            id: UUID(),
+            title: title,
+            notes: nil,
+            dueDate: dueDate,
+            projectId: nil,
+            isComplete: isComplete,
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+
+    private func makeSummaryMemory(createdAt: Date) -> MemoryDTO {
+        MemoryDTO(
+            id: UUID(),
+            title: "Memory",
+            body: "Body",
+            kind: "note",
+            sourceUrl: nil,
+            tags: [],
+            isArchived: false,
+            createdAt: createdAt,
+            updatedAt: createdAt
+        )
+    }
+
     private func makeProject(
         name: String,
         status: String = "active",

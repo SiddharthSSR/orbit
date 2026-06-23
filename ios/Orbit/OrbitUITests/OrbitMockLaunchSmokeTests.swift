@@ -43,6 +43,10 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(detailsButton.waitForExistence(timeout: 5), "Orbit project details button did not appear")
         detailsButton.tap()
 
+        // Read-only activity summary near the top.
+        XCTAssertTrue(app.staticTexts["Activity"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Done"].waitForExistence(timeout: 5))
+
         XCTAssertTrue(app.staticTexts["Linked todos"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Draft project brief"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["Linked memories"].waitForExistence(timeout: 5))

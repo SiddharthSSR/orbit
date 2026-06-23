@@ -339,6 +339,28 @@ private struct ProjectDetailScreen: View {
             }
 
             Section {
+                if (isLoadingTodos || isLoadingMemories)
+                    && linkedTodos.isEmpty && linkedMemories.isEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                } else {
+                    ProjectActivitySummaryCard(
+                        summary: ProjectActivitySummary(
+                            todos: linkedTodos,
+                            memories: linkedMemories
+                        )
+                    )
+                }
+            } header: {
+                OrbitSectionHeader("Activity", systemImage: "square.grid.2x2")
+                    .textCase(nil)
+            }
+
+            Section {
                 if isLoadingTodos {
                     HStack {
                         Spacer()
@@ -492,6 +514,82 @@ private struct ProjectDetailScreen: View {
             return description
         }
         return error.localizedDescription
+    }
+}
+
+/// Read-only summary of a project's linked activity, derived purely from the
+/// linked todos and memories already loaded by Project detail. No networking,
+/// no new endpoints — just a compact roll-up.
+struct ProjectActivitySummary: Equatable {
+    let linkedMemoryCount: Int
+    let linkedTodoCount: Int
+    let openTodoCount: Int
+    let completedTodoCount: Int
+    let nextDueTodo: TodoDTO?
+    let lastMemoryCapturedAt: Date?
+
+    init(todos: [TodoDTO], memories: [MemoryDTO]) {
+        linkedTodoCount = todos.count
+        linkedMemoryCount = memories.count
+        openTodoCount = todos.filter { !$0.isComplete }.count
+        completedTodoCount = todos.filter { $0.isComplete }.count
+        nextDueTodo = todos
+            .filter { !$0.isComplete && $0.dueDate != nil }
+            .min { ($0.dueDate ?? .distantFuture) < ($1.dueDate ?? .distantFuture) }
+        lastMemoryCapturedAt = memories.map(\.createdAt).max()
+    }
+}
+
+private struct ProjectActivitySummaryCard: View {
+    let summary: ProjectActivitySummary
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: OrbitSpacing.sm) {
+            HStack(spacing: OrbitSpacing.sm) {
+                stat("Memories", summary.linkedMemoryCount)
+                stat("Todos", summary.linkedTodoCount)
+                stat("Open", summary.openTodoCount)
+                stat("Done", summary.completedTodoCount)
+            }
+
+            if let nextDue = summary.nextDueTodo {
+                Label {
+                    Text("Next due: \(nextDue.title)\(dueSuffix(nextDue.dueDate))")
+                } icon: {
+                    Image(systemName: "calendar")
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            }
+
+            if let captured = summary.lastMemoryCapturedAt {
+                Label(
+                    "Last captured \(captured.formatted(date: .abbreviated, time: .omitted))",
+                    systemImage: "clock"
+                )
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            }
+        }
+        .orbitFloatingCard()
+        .orbitListCardRow()
+    }
+
+    private func stat(_ label: String, _ value: Int) -> some View {
+        VStack(spacing: 2) {
+            Text("\(value)")
+                .font(OrbitTypography.cardTitle)
+            Text(label)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    private func dueSuffix(_ date: Date?) -> String {
+        guard let date else { return "" }
+        return " · " + date.formatted(date: .abbreviated, time: .omitted)
     }
 }
 
