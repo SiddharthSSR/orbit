@@ -88,7 +88,13 @@ jobs:
   ios-ui-smoke:
     name: iOS UI Smoke
     runs-on: macos-latest
-    timeout-minutes: 15
+    # The smoke suite itself runs in ~7 minutes; the variable cost is a full
+    # from-scratch Swift build plus simulator boot on macos-latest. The project
+    # has no SwiftPM dependencies to cache, and Xcode DerivedData caching across
+    # runners is unreliable enough to risk introducing build flakiness, so we use
+    # a modest headroom timeout instead. 25 minutes comfortably covers a slow
+    # build/boot while still bounding a genuinely hung run.
+    timeout-minutes: 25
 
     steps:
       - name: Check out repository

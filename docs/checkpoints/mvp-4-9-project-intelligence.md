@@ -89,15 +89,19 @@ backend, development database, OpenAI call, or API key.
 
 ## CI timing note
 
-- The iOS UI Smoke job has `timeout-minutes: 15` (`.github/workflows/ci.yml`).
-- On slow `macos-latest` runners the job can approach that timeout because build and
-  simulator boot time vary. On MVP-4.8 the first attempt was cancelled at the 15-minute mark
-  even though all 9 UI tests had passed (~7 minutes of test execution after an unusually slow
-  build); the rerun passed well within budget.
+- The iOS UI Smoke job has `timeout-minutes: 25` (`.github/workflows/ci.yml`). This was
+  raised from 15 in MVP-5.0 after a runner-variance cancellation; see the reasoning below.
+- The smoke suite itself runs in ~7 minutes; the variable cost is a full from-scratch Swift
+  build plus simulator boot on `macos-latest`. On MVP-4.8 the first attempt was cancelled at
+  the old 15-minute mark even though all 9 UI tests had passed; the rerun passed.
+- The project has no SwiftPM dependencies to cache, and Xcode DerivedData caching across
+  runners is unreliable enough to risk introducing build flakiness, so MVP-5.0 used a modest
+  headroom timeout (25 min) instead of a cache. 25 minutes comfortably covers a slow
+  build/boot while still bounding a genuinely hung run.
 - First action on a UI Smoke cancellation: inspect the job log/artifacts. If the tests
   passed and the job was cancelled by the timeout, rerun the job rather than changing code.
-- Do not change the CI timeout casually. A timeout increase or build/derived-data caching is
-  a deliberate, infra-only change that belongs in its own MVP with explicit justification.
+- Do not change the CI timeout casually. Any further timeout change or caching is a
+  deliberate, infra-only change that belongs in its own MVP with explicit justification.
 
 ## Recommended next steps
 
