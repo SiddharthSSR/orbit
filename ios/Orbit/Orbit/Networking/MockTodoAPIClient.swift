@@ -63,6 +63,18 @@ actor MockTodoAPIClient: TodoAPIClientProtocol {
         return todo
     }
 
+    func updateTodoProject(id: UUID, payload: TodoProjectLinkRequest) async throws -> TodoDTO {
+        guard let index = todos.firstIndex(where: { $0.id == id }) else {
+            throw OrbitAPIError.requestFailed(statusCode: 404, message: "Todo not found")
+        }
+
+        var todo = todos[index]
+        todo.projectId = payload.projectId
+        todo.updatedAt = Date()
+        todos[index] = todo
+        return todo
+    }
+
     func deleteTodo(id: UUID) async throws {
         todos.removeAll { $0.id == id }
     }

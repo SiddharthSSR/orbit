@@ -14,14 +14,16 @@ struct TodayScreen: View {
         todoAPIClient: any TodoAPIClientProtocol = OrbitAPIClient(),
         billAPIClient: any BillAPIClientProtocol = OrbitAPIClient(),
         memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
-        moodAPIClient: any MoodAPIClientProtocol = OrbitAPIClient()
+        moodAPIClient: any MoodAPIClientProtocol = OrbitAPIClient(),
+        projectAPIClient: any ProjectAPIClientProtocol = OrbitAPIClient()
     ) {
         _dashboardViewModel = StateObject(
             wrappedValue: TodayDashboardViewModel(
                 todoAPIClient: todoAPIClient,
                 billAPIClient: billAPIClient,
                 memoryAPIClient: memoryAPIClient,
-                moodAPIClient: moodAPIClient
+                moodAPIClient: moodAPIClient,
+                projectAPIClient: projectAPIClient
             )
         )
     }
@@ -50,6 +52,7 @@ struct TodayScreen: View {
         .orbitBackground()
         .task {
             await dashboardViewModel.loadDashboard()
+            await dashboardViewModel.loadProjects()
             consumePendingHighlightIfLoaded()
         }
         .task(id: highlightedTodoID) {
@@ -184,10 +187,23 @@ struct TodayScreen: View {
                         TodayTodoRow(
                             todo: todo,
                             isHighlighted: todo.id == highlightedTodoID,
-                            isCompleting: dashboardViewModel.isCompletingTodo(id: todo.id)
-                        ) {
-                            Task { await dashboardViewModel.toggleTodoComplete(todo: todo) }
-                        }
+                            isCompleting: dashboardViewModel.isCompletingTodo(id: todo.id),
+                            projects: dashboardViewModel.projects,
+                            projectName: dashboardViewModel.projectName(for: todo.projectId),
+                            isUpdatingProject: dashboardViewModel.isUpdatingProject(id: todo.id),
+                            projectLinkErrorMessage: dashboardViewModel.todoProjectLinkErrors[todo.id],
+                            onToggle: {
+                                Task { await dashboardViewModel.toggleTodoComplete(todo: todo) }
+                            },
+                            onProjectSelected: { projectID in
+                                Task {
+                                    await dashboardViewModel.updateTodoProjectLink(
+                                        todo: todo,
+                                        projectID: projectID
+                                    )
+                                }
+                            }
+                        )
                     }
                 }
 
@@ -331,53 +347,84 @@ private struct TodayTodoRow: View {
     let todo: TodoDTO
     let isHighlighted: Bool
     let isCompleting: Bool
+    let projects: [ProjectDTO]
+    let projectName: String?
+    let isUpdatingProject: Bool
+    let projectLinkErrorMessage: String?
     let onToggle: () -> Void
+    let onProjectSelected: (UUID?) -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onToggle) {
-                Group {
-                    if isCompleting {
-                        ProgressView()
-                            .controlSize(.small)
-                    } else {
-                        Image(systemName: "circle")
-                            .font(.title3)
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                Button(action: onToggle) {
+                    Group {
+                        if isCompleting {
+                            ProgressView()
+                                .controlSize(.small)
+                        } else {
+                            Image(systemName: "circle")
+                                .font(.title3)
+                        }
                     }
+                    .frame(width: 32, height: 32)
+                    .foregroundStyle(isHighlighted ? Color.accentColor : .secondary)
                 }
-                .frame(width: 32, height: 32)
-                .foregroundStyle(isHighlighted ? Color.accentColor : .secondary)
-            }
-            .buttonStyle(.plain)
-            .disabled(isCompleting)
-            .accessibilityLabel("Complete \(todo.title)")
-            .accessibilityValue(isCompleting ? "Completing" : "Not completed")
+                .buttonStyle(.plain)
+                .disabled(isCompleting)
+                .accessibilityLabel("Complete \(todo.title)")
+                .accessibilityValue(isCompleting ? "Completing" : "Not completed")
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 8) {
-                    Text(todo.title)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(spacing: 8) {
+                        Text(todo.title)
 
-                    if isHighlighted {
-                        Text("New")
+                        if isHighlighted {
+                            Text("New")
+                                .font(.caption2.weight(.semibold))
+                                .foregroundStyle(Color.accentColor)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.accentColor.opacity(0.12), in: Capsule())
+                        }
+                    }
+
+                    if let urgency = TodoUrgency.resolve(dueDate: todo.dueDate) {
+                        Text(urgency.label)
                             .font(.caption2.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
+                            .foregroundStyle(urgency.tint)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
-                            .background(Color.accentColor.opacity(0.12), in: Capsule())
+                            .background(urgency.tint.opacity(0.1), in: Capsule())
+                    }
+
+                    if let projectName {
+                        Label("Project: \(projectName)", systemImage: "folder")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
-                if let urgency = TodoUrgency.resolve(dueDate: todo.dueDate) {
-                    Text(urgency.label)
-                        .font(.caption2.weight(.semibold))
-                        .foregroundStyle(urgency.tint)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(urgency.tint.opacity(0.1), in: Capsule())
+                Spacer()
+
+                Menu {
+                    projectButton(name: "Unlinked", projectID: nil)
+                    ForEach(projects) { project in
+                        projectButton(name: project.name, projectID: project.id)
+                    }
+                } label: {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
                 }
+                .disabled(isUpdatingProject)
+                .accessibilityLabel("Project for \(todo.title)")
             }
 
-            Spacer()
+            if let projectLinkErrorMessage {
+                Label(projectLinkErrorMessage, systemImage: "exclamationmark.triangle")
+                    .font(.caption)
+                    .foregroundStyle(.red)
+            }
         }
         .padding(.vertical, 8)
         .background {
@@ -392,6 +439,19 @@ private struct TodayTodoRow: View {
                 )
         }
         .animation(.easeInOut(duration: 0.2), value: isHighlighted)
+    }
+
+    @ViewBuilder
+    private func projectButton(name: String, projectID: UUID?) -> some View {
+        Button {
+            onProjectSelected(projectID)
+        } label: {
+            if todo.projectId == projectID {
+                Label(name, systemImage: "checkmark")
+            } else {
+                Text(name)
+            }
+        }
     }
 }
 
@@ -491,7 +551,8 @@ struct TodayScreen_Previews: PreviewProvider {
                 todoAPIClient: MockTodoAPIClient(),
                 billAPIClient: MockBillAPIClient(),
                 memoryAPIClient: MockMemoryAPIClient(),
-                moodAPIClient: MockMoodAPIClient()
+                moodAPIClient: MockMoodAPIClient(),
+                projectAPIClient: MockProjectAPIClient()
             )
             .navigationTitle("Today")
             .environmentObject(AppNavigationModel())

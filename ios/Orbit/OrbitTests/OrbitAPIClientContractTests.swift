@@ -430,6 +430,23 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertTrue(json["project_id"] is NSNull)
     }
 
+    func testEncodesTodoProjectLinkWithSnakeCase() throws {
+        let payload = TodoProjectLinkRequest(
+            projectId: UUID(uuidString: "55555555-5555-5555-5555-555555555555")
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["project_id"] as? String, "55555555-5555-5555-5555-555555555555")
+    }
+
+    func testEncodesTodoProjectUnlinkAsExplicitNull() throws {
+        let json = try encodeJSONObject(TodoProjectLinkRequest(projectId: nil))
+
+        XCTAssertTrue(json.keys.contains("project_id"))
+        XCTAssertTrue(json["project_id"] is NSNull)
+    }
+
     func testListMemoryCanRequestProjectFilter() async throws {
         StubURLProtocol.lastRequest = nil
         StubURLProtocol.response = HTTPURLResponse(

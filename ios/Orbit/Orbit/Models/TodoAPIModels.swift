@@ -43,3 +43,19 @@ struct TodoUpdateRequest: Encodable, Sendable {
         try container.encodeIfPresent(isComplete, forKey: .isComplete)
     }
 }
+
+/// Focused request for linking/unlinking a todo's project. Unlike
+/// `TodoUpdateRequest`, this always encodes `project_id` — including an explicit
+/// `null` — so passing `nil` unlinks the project rather than omitting the field.
+struct TodoProjectLinkRequest: Encodable, Sendable {
+    var projectId: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case projectId
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(projectId, forKey: .projectId)
+    }
+}

@@ -134,6 +134,28 @@ final class TodoListViewModelTests: XCTestCase {
         XCTAssertEqual(allTodos.map(\.title), ["Linked task", "Other task", "Unlinked task"])
     }
 
+    func testMockTodoClientUpdateTodoProjectLinksAndUnlinks() async throws {
+        let projectId = UUID()
+        let todo = makeTodo(title: "Plan task")
+        let client = MockTodoAPIClient(todos: [todo])
+
+        let linked = try await client.updateTodoProject(
+            id: todo.id,
+            payload: TodoProjectLinkRequest(projectId: projectId)
+        )
+        XCTAssertEqual(linked.projectId, projectId)
+        let afterLink = try await client.listTodos(projectId: projectId)
+        XCTAssertEqual(afterLink.map(\.title), ["Plan task"])
+
+        let unlinked = try await client.updateTodoProject(
+            id: todo.id,
+            payload: TodoProjectLinkRequest(projectId: nil)
+        )
+        XCTAssertNil(unlinked.projectId)
+        let afterUnlink = try await client.listTodos(projectId: projectId)
+        XCTAssertTrue(afterUnlink.isEmpty)
+    }
+
     private func makeTodo(
         title: String,
         notes: String? = nil,

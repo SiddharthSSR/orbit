@@ -111,7 +111,8 @@ struct RootTabView: View {
                 todoAPIClient: dependencies.todoAPIClient,
                 billAPIClient: dependencies.billAPIClient,
                 memoryAPIClient: dependencies.memoryAPIClient,
-                moodAPIClient: dependencies.moodAPIClient
+                moodAPIClient: dependencies.moodAPIClient,
+                projectAPIClient: dependencies.projectAPIClient
             )
         case .inbox:
             InboxScreen(

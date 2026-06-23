@@ -305,6 +305,61 @@ final class TodayDashboardViewModelTests: XCTestCase {
         await fulfillment(of: [event], timeout: 0.3)
     }
 
+    func testUpdateTodoProjectLinkUpdatesLocalTodoState() async {
+        let todo = makeTodo(title: "Plan launch")
+        let project = makeProject(name: "Orbit")
+        let viewModel = TodayDashboardViewModel(
+            todoAPIClient: MockTodoAPIClient(todos: [todo]),
+            billAPIClient: MockBillAPIClient(bills: []),
+            memoryAPIClient: MockMemoryAPIClient(memoryItems: []),
+            moodAPIClient: MockMoodAPIClient(moods: []),
+            projectAPIClient: MockProjectAPIClient(projects: [project])
+        )
+        await viewModel.loadDashboard()
+        await viewModel.loadProjects()
+
+        await viewModel.updateTodoProjectLink(todo: todo, projectID: project.id)
+        XCTAssertEqual(viewModel.todos.first?.projectId, project.id)
+        XCTAssertEqual(viewModel.projectName(for: project.id), "Orbit")
+        XCTAssertNil(viewModel.todoProjectLinkErrors[todo.id])
+
+        let linkedTodo = viewModel.todos.first!
+        await viewModel.updateTodoProjectLink(todo: linkedTodo, projectID: nil)
+        XCTAssertNil(viewModel.todos.first?.projectId)
+    }
+
+    func testProjectLoadFailureDoesNotBreakTodoList() async {
+        let todo = makeTodo(title: "Plan launch")
+        let viewModel = TodayDashboardViewModel(
+            todoAPIClient: MockTodoAPIClient(todos: [todo]),
+            billAPIClient: MockBillAPIClient(bills: []),
+            memoryAPIClient: MockMemoryAPIClient(memoryItems: []),
+            moodAPIClient: MockMoodAPIClient(moods: []),
+            projectAPIClient: FailingDashboardProjectAPIClient()
+        )
+        await viewModel.loadDashboard()
+        await viewModel.loadProjects()
+
+        XCTAssertEqual(viewModel.todos.map(\.title), ["Plan launch"])
+        XCTAssertTrue(viewModel.projects.isEmpty)
+        XCTAssertNotNil(viewModel.projectLoadErrorMessage)
+        XCTAssertNil(viewModel.errorMessage)
+    }
+
+    private func makeProject(name: String) -> ProjectDTO {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        return ProjectDTO(
+            id: UUID(),
+            name: name,
+            description: nil,
+            status: "active",
+            area: nil,
+            tags: [],
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+
     private func makeViewModel(
         todos: [TodoDTO] = [],
         bills: [BillDTO] = [],
@@ -493,6 +548,24 @@ private enum FailingTodoCompletionError: LocalizedError {
 
     var errorDescription: String? {
         "Expected todo completion failure."
+    }
+}
+
+private struct FailingDashboardProjectAPIClient: ProjectAPIClientProtocol {
+    func listProjects(includeArchived: Bool, status: String?, area: String?, tag: String?) async throws -> [ProjectDTO] {
+        throw FailingDashboardAPIError.expectedFailure
+    }
+
+    func createProject(_ payload: ProjectCreateRequest) async throws -> ProjectDTO {
+        throw FailingDashboardAPIError.expectedFailure
+    }
+
+    func updateProject(id: UUID, payload: ProjectUpdateRequest) async throws -> ProjectDTO {
+        throw FailingDashboardAPIError.expectedFailure
+    }
+
+    func deleteProject(id: UUID) async throws {
+        throw FailingDashboardAPIError.expectedFailure
     }
 }
 

@@ -89,12 +89,20 @@ protocol TodoAPIClientProtocol: Sendable {
     func listTodos(projectId: UUID?) async throws -> [TodoDTO]
     func createTodo(_ payload: TodoCreateRequest) async throws -> TodoDTO
     func updateTodo(id: UUID, payload: TodoUpdateRequest) async throws -> TodoDTO
+    func updateTodoProject(id: UUID, payload: TodoProjectLinkRequest) async throws -> TodoDTO
     func deleteTodo(id: UUID) async throws
 }
 
 extension TodoAPIClientProtocol {
     func listTodos() async throws -> [TodoDTO] {
         try await listTodos(projectId: nil)
+    }
+
+    /// Default keeps existing conformers (e.g. test stubs) source-compatible.
+    /// The live and mock clients override this to send an explicit `project_id`
+    /// (including `null`) so unlinking works.
+    func updateTodoProject(id: UUID, payload: TodoProjectLinkRequest) async throws -> TodoDTO {
+        try await updateTodo(id: id, payload: TodoUpdateRequest(projectId: payload.projectId))
     }
 }
 
@@ -183,6 +191,10 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
     }
 
     func updateTodo(id: UUID, payload: TodoUpdateRequest) async throws -> TodoDTO {
+        try await request(path: "/todos/\(id.uuidString)", method: "PATCH", body: payload)
+    }
+
+    func updateTodoProject(id: UUID, payload: TodoProjectLinkRequest) async throws -> TodoDTO {
         try await request(path: "/todos/\(id.uuidString)", method: "PATCH", body: payload)
     }
 

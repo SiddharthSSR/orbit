@@ -54,6 +54,38 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
     }
 
     @MainActor
+    func testTodayTodoCanLinkAndUnlinkProject() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        // Today is the default tab; the seeded open todo "Review today plan"
+        // exposes a per-row project menu.
+        let menu = app.buttons["Project for Review today plan"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "Project menu for the seeded todo did not appear")
+        menu.tap()
+
+        let orbitOption = app.buttons["Orbit"]
+        XCTAssertTrue(orbitOption.waitForExistence(timeout: 5), "Orbit project option did not appear")
+        orbitOption.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Project: Orbit"].waitForExistence(timeout: 5),
+            "Linked project label did not appear after assigning"
+        )
+
+        menu.tap()
+        let unlinkOption = app.buttons["Unlinked"]
+        XCTAssertTrue(unlinkOption.waitForExistence(timeout: 5), "Unlinked option did not appear")
+        unlinkOption.tap()
+
+        XCTAssertTrue(
+            app.staticTexts["Project: Orbit"].waitForNonExistence(timeout: 5),
+            "Linked project label did not disappear after unlinking"
+        )
+    }
+
+    @MainActor
     func testInboxMemoryCanLinkAndUnlinkProject() {
         let app = XCUIApplication()
         app.launchArguments = ["--orbit-ui-tests"]

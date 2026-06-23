@@ -52,12 +52,17 @@ final class TodayDashboardViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var completingTodoIDs: Set<UUID> = []
     @Published private(set) var todoCompletionErrorMessage: String?
+    @Published private(set) var projects: [ProjectDTO] = []
+    @Published private(set) var projectLoadErrorMessage: String?
+    @Published private(set) var updatingProjectTodoIDs: Set<UUID> = []
+    @Published private(set) var todoProjectLinkErrors: [UUID: String] = [:]
     @Published var errorMessage: String?
 
     private let todoAPIClient: any TodoAPIClientProtocol
     private let billAPIClient: any BillAPIClientProtocol
     private let memoryAPIClient: any MemoryAPIClientProtocol
     private let moodAPIClient: any MoodAPIClientProtocol
+    private let projectAPIClient: any ProjectAPIClientProtocol
     private let notificationCenter: NotificationCenter
 
     var openTodos: [TodoDTO] {
@@ -125,13 +130,60 @@ final class TodayDashboardViewModel: ObservableObject {
         billAPIClient: any BillAPIClientProtocol = OrbitAPIClient(),
         memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
         moodAPIClient: any MoodAPIClientProtocol = OrbitAPIClient(),
+        projectAPIClient: any ProjectAPIClientProtocol = OrbitAPIClient(),
         notificationCenter: NotificationCenter = .default
     ) {
         self.todoAPIClient = todoAPIClient
         self.billAPIClient = billAPIClient
         self.memoryAPIClient = memoryAPIClient
         self.moodAPIClient = moodAPIClient
+        self.projectAPIClient = projectAPIClient
         self.notificationCenter = notificationCenter
+    }
+
+    /// Loads non-archived projects used by the per-todo project-link menu. A
+    /// failure here is surfaced separately and never blocks the todo list.
+    func loadProjects() async {
+        projectLoadErrorMessage = nil
+        do {
+            projects = try await projectAPIClient.listProjects(
+                includeArchived: false,
+                status: nil,
+                area: nil,
+                tag: nil
+            )
+        } catch {
+            projectLoadErrorMessage = readableMessage(for: error)
+        }
+    }
+
+    func projectName(for projectID: UUID?) -> String? {
+        guard let projectID else { return nil }
+        return projects.first(where: { $0.id == projectID })?.name
+    }
+
+    func isUpdatingProject(id: UUID) -> Bool {
+        updatingProjectTodoIDs.contains(id)
+    }
+
+    /// Assigns, changes, or (with `projectID == nil`) unlinks a todo's project,
+    /// then refreshes other surfaces (e.g. Project detail) via the todo change
+    /// notification. Todo title/status/due-date are untouched.
+    func updateTodoProjectLink(todo: TodoDTO, projectID: UUID?) async {
+        guard updatingProjectTodoIDs.insert(todo.id).inserted else { return }
+        todoProjectLinkErrors[todo.id] = nil
+        defer { updatingProjectTodoIDs.remove(todo.id) }
+
+        do {
+            let updatedTodo = try await todoAPIClient.updateTodoProject(
+                id: todo.id,
+                payload: TodoProjectLinkRequest(projectId: projectID)
+            )
+            replace(updatedTodo)
+            OrbitRefreshCenter.postTodoDidChange(on: notificationCenter)
+        } catch {
+            todoProjectLinkErrors[todo.id] = readableMessage(for: error)
+        }
     }
 
     func loadDashboard(showsLoading: Bool = true) async {
