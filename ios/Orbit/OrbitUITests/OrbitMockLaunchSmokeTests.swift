@@ -56,6 +56,29 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
     }
 
     @MainActor
+    func testAskShowsProjectScopeControlDefaultingToUnscoped() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let askTab = app.buttons["Ask"]
+        XCTAssertTrue(askTab.waitForExistence(timeout: 5))
+        askTab.tap()
+
+        // The opt-in project scope control is present and defaults to unscoped
+        // ("All"). Select/clear behavior is covered by AskViewModel unit tests;
+        // driving the SwiftUI Menu in XCUITest is too brittle to assert here.
+        XCTAssertTrue(
+            app.buttons["Ask project context"].waitForExistence(timeout: 5),
+            "Ask project context control did not appear"
+        )
+        XCTAssertTrue(
+            app.staticTexts["Project context: All"].waitForExistence(timeout: 5),
+            "Ask project context did not default to unscoped"
+        )
+    }
+
+    @MainActor
     func testTodayTodoCanLinkAndUnlinkProject() {
         let app = XCUIApplication()
         app.launchArguments = ["--orbit-ui-tests"]

@@ -120,6 +120,7 @@ def build_orbit_context_for_question(
     retrieval_mode: str,
     memory_top_k: int,
     min_vector_score: float,
+    project_id: UUID | None = None,
 ) -> tuple[str, RetrievalDiagnostics | None]:
     if not include_context:
         return "", None
@@ -156,6 +157,7 @@ def build_orbit_context_for_question(
         question=question,
         vector_memory_results=vector_memory_results,
         memory_limit=memory_top_k,
+        project_id=project_id,
     ).build_context()
     diagnostics = RetrievalDiagnostics(
         retrieval_mode=retrieval_mode,
@@ -187,6 +189,7 @@ def preview_ask_context(
         retrieval_mode=payload.retrieval_mode,
         memory_top_k=payload.memory_top_k,
         min_vector_score=payload.min_vector_score,
+        project_id=payload.project_id,
     )
     return AskContextPreviewResponse(
         question=payload.question,
@@ -235,6 +238,7 @@ def ask(
         retrieval_mode=payload.retrieval_mode,
         memory_top_k=payload.memory_top_k,
         min_vector_score=payload.min_vector_score,
+        project_id=payload.project_id,
     )
     answer = ai_provider.generate_answer(payload.question, context, history)
     assistant_message = chat_repository.create_message(

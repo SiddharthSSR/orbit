@@ -9,13 +9,15 @@ struct AskScreen: View {
     init(
         apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
         memoryClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
-        todoClient: any TodoAPIClientProtocol = OrbitAPIClient()
+        todoClient: any TodoAPIClientProtocol = OrbitAPIClient(),
+        projectAPIClient: any ProjectAPIClientProtocol = OrbitAPIClient()
     ) {
         _viewModel = StateObject(
             wrappedValue: AskViewModel(
                 apiClient: apiClient,
                 memoryClient: memoryClient,
-                todoClient: todoClient
+                todoClient: todoClient,
+                projectAPIClient: projectAPIClient
             )
         )
     }
@@ -43,6 +45,8 @@ struct AskScreen: View {
                         .foregroundStyle(.secondary)
                 }
                 .disabled(!viewModel.includeContext)
+
+                projectScopeRow
 
                 if let diagnostics = viewModel.latestRetrievalDiagnostics {
                     RetrievalDiagnosticsLine(diagnostics: diagnostics)
@@ -283,6 +287,7 @@ struct AskScreen: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await viewModel.loadSessions()
+            await viewModel.loadProjects()
         }
         .onChange(of: viewModel.pendingTabNavigation) { _, pendingTab in
             guard let pendingTab else { return }
@@ -314,6 +319,56 @@ struct AskScreen: View {
                     }
                 )
             )
+        }
+    }
+
+    @ViewBuilder
+    private var projectScopeRow: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Menu {
+                Button {
+                    viewModel.clearProjectScope()
+                } label: {
+                    if viewModel.selectedProjectID == nil {
+                        Label("All Orbit context", systemImage: "checkmark")
+                    } else {
+                        Text("All Orbit context")
+                    }
+                }
+                ForEach(viewModel.availableProjects) { project in
+                    Button {
+                        viewModel.selectProjectScope(project.id)
+                    } label: {
+                        if viewModel.selectedProjectID == project.id {
+                            Label(project.name, systemImage: "checkmark")
+                        } else {
+                            Text(project.name)
+                        }
+                    }
+                }
+            } label: {
+                Label(
+                    viewModel.selectedProjectName.map { "Project: \($0)" } ?? "Project context: All",
+                    systemImage: "folder"
+                )
+            }
+            .disabled(!viewModel.includeContext)
+            .accessibilityLabel("Ask project context")
+
+            if let name = viewModel.selectedProjectName {
+                HStack {
+                    Text("Using project context")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .accessibilityLabel("Using project context: \(name)")
+                    Spacer()
+                    Button("Clear") {
+                        viewModel.clearProjectScope()
+                    }
+                    .font(.caption)
+                    .buttonStyle(.borderless)
+                }
+            }
         }
     }
 
@@ -673,7 +728,8 @@ struct AskScreen_Previews: PreviewProvider {
             AskScreen(
                 apiClient: MockChatAPIClient(),
                 memoryClient: MockMemoryAPIClient(),
-                todoClient: MockTodoAPIClient()
+                todoClient: MockTodoAPIClient(),
+                projectAPIClient: MockProjectAPIClient()
             )
                 .navigationTitle("Ask")
         }

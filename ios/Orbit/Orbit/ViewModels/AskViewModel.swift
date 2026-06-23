@@ -85,6 +85,9 @@ final class AskViewModel: ObservableObject {
     @Published private(set) var isPreviewLoading = false
     @Published var previewErrorMessage: String?
     @Published private(set) var latestRetrievalDiagnostics: RetrievalDiagnostics?
+    @Published private(set) var availableProjects: [ProjectDTO] = []
+    @Published private(set) var selectedProjectID: UUID?
+    @Published private(set) var projectLoadErrorMessage: String?
     @Published private(set) var answerContextSummaries: [UUID: String] = [:]
     @Published private(set) var answerSuggestedActions: [UUID: [SuggestedActionDTO]] = [:]
     @Published private(set) var suggestedActionExecutionStatuses: [
@@ -114,6 +117,7 @@ final class AskViewModel: ObservableObject {
     private let apiClient: any ChatAPIClientProtocol
     private let memoryClient: any MemoryAPIClientProtocol
     private let todoClient: any TodoAPIClientProtocol
+    private let projectAPIClient: any ProjectAPIClientProtocol
     private let notificationCenter: NotificationCenter
     private let preferences: AskRetrievalPreferences
     private var selectedSuggestedActionMessageID: UUID?
@@ -122,12 +126,14 @@ final class AskViewModel: ObservableObject {
         apiClient: any ChatAPIClientProtocol = OrbitAPIClient(),
         memoryClient: any MemoryAPIClientProtocol = OrbitAPIClient(),
         todoClient: any TodoAPIClientProtocol = OrbitAPIClient(),
+        projectAPIClient: any ProjectAPIClientProtocol = OrbitAPIClient(),
         notificationCenter: NotificationCenter = .default,
         preferences: AskRetrievalPreferences = AskRetrievalPreferences()
     ) {
         self.apiClient = apiClient
         self.memoryClient = memoryClient
         self.todoClient = todoClient
+        self.projectAPIClient = projectAPIClient
         self.notificationCenter = notificationCenter
         self.preferences = preferences
         // `didSet` does not fire for assignments made during init, so loading
@@ -147,6 +153,36 @@ final class AskViewModel: ObservableObject {
         } catch {
             errorMessage = readableMessage(for: error)
         }
+    }
+
+    /// Loads non-archived projects for the optional Ask scope selector. A
+    /// failure here is surfaced separately and never blocks normal Ask.
+    func loadProjects() async {
+        projectLoadErrorMessage = nil
+        do {
+            availableProjects = try await projectAPIClient.listProjects(
+                includeArchived: false,
+                status: nil,
+                area: nil,
+                tag: nil
+            )
+        } catch {
+            projectLoadErrorMessage = readableMessage(for: error)
+        }
+    }
+
+    /// Opt-in: scope subsequent Ask requests to one project's linked memories.
+    func selectProjectScope(_ projectID: UUID?) {
+        selectedProjectID = projectID
+    }
+
+    func clearProjectScope() {
+        selectedProjectID = nil
+    }
+
+    var selectedProjectName: String? {
+        guard let selectedProjectID else { return nil }
+        return availableProjects.first(where: { $0.id == selectedProjectID })?.name
     }
 
     func selectSession(_ session: ChatSessionDTO) async {
@@ -184,7 +220,8 @@ final class AskViewModel: ObservableObject {
                     includeContext: includeContext,
                     retrievalMode: retrievalMode,
                     memoryTopK: memoryTopK,
-                    minVectorScore: minVectorScore
+                    minVectorScore: minVectorScore,
+                    projectId: selectedProjectID
                 )
             )
             selectedSession = response.session
@@ -219,7 +256,8 @@ final class AskViewModel: ObservableObject {
                     includeContext: includeContext,
                     retrievalMode: retrievalMode,
                     memoryTopK: memoryTopK,
-                    minVectorScore: minVectorScore
+                    minVectorScore: minVectorScore,
+                    projectId: selectedProjectID
                 )
             )
             latestRetrievalDiagnostics = contextPreview?.retrievalDiagnostics

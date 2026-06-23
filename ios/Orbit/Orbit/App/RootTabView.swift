@@ -123,7 +123,8 @@ struct RootTabView: View {
             AskScreen(
                 apiClient: dependencies.chatAPIClient,
                 memoryClient: dependencies.memoryAPIClient,
-                todoClient: dependencies.todoAPIClient
+                todoClient: dependencies.todoAPIClient,
+                projectAPIClient: dependencies.projectAPIClient
             )
         case .projects:
             ProjectsScreen(

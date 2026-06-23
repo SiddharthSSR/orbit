@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -55,6 +56,7 @@ class OrbitContextBuilder:
         preview_length: int = 180,
         vector_memory_results: list[MemorySearchResult] | None = None,
         memory_limit: int | None = None,
+        project_id: UUID | str | None = None,
     ) -> None:
         self.session = session
         self.query_tokens = tokenize_query(question or "")
@@ -64,6 +66,9 @@ class OrbitContextBuilder:
         self.preview_length = preview_length
         self.vector_memory_results = vector_memory_results
         self.memory_limit = memory_limit or section_limit
+        # Opt-in: scope the recent-memory section to one project's linked
+        # memories. `None` keeps the existing unscoped behavior.
+        self.project_id = project_id
 
     def build_context(self) -> str:
         sections = [
@@ -115,7 +120,10 @@ class OrbitContextBuilder:
         return "Unpaid bills:\n" + "\n".join(lines)
 
     def _recent_memory_section(self) -> str:
-        all_memory_items = MemoryItemRepository(self.session).list(include_archived=False)
+        all_memory_items = MemoryItemRepository(self.session).list(
+            include_archived=False,
+            project_id=self.project_id,
+        )
         keyword_scores = {
             str(item.id): self._memory_keyword_score(item)
             for item in all_memory_items
@@ -130,6 +138,9 @@ class OrbitContextBuilder:
         else:
             candidates = {str(item.id): item for item in keyword_memory_items}
             for result in self.vector_memory_results:
+                if self.project_id is not None and \
+                        str(result.memory_item.project_id) != str(self.project_id):
+                    continue
                 memory_id = str(result.memory_item.id)
                 candidates[memory_id] = result.memory_item
                 vector_scores[memory_id] = max(

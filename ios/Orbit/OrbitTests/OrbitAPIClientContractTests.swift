@@ -548,6 +548,20 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertEqual(json["retrieval_mode"] as? String, "keyword")
         XCTAssertEqual(json["memory_top_k"] as? Int, 5)
         XCTAssertEqual(json["min_vector_score"] as? Double, 0.0)
+        // Unscoped Ask must not send a project_id (preserves default behavior).
+        XCTAssertFalse(json.keys.contains("project_id"))
+    }
+
+    func testEncodesProjectScopedAskRequest() throws {
+        let payload = AskRequest(
+            question: "What is the latest on Orbit?",
+            sessionId: nil,
+            projectId: UUID(uuidString: "55555555-5555-5555-5555-555555555555")
+        )
+
+        let json = try encodeJSONObject(payload)
+
+        XCTAssertEqual(json["project_id"] as? String, "55555555-5555-5555-5555-555555555555")
     }
 
     func testEncodesHybridAskRequestControls() throws {

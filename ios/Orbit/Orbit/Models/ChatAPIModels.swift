@@ -377,6 +377,8 @@ struct AskRequest: Encodable, Sendable {
     var retrievalMode: RetrievalMode = .keyword
     var memoryTopK: Int = 5
     var minVectorScore: Double = 0.0
+    /// Opt-in project scope. Omitted (nil) preserves default unscoped Ask.
+    var projectId: UUID? = nil
 }
 
 struct AskResponse: Decodable, Sendable {
@@ -396,6 +398,8 @@ struct AskContextPreviewRequest: Encodable, Sendable {
     var retrievalMode: RetrievalMode = .keyword
     var memoryTopK: Int = 5
     var minVectorScore: Double = 0.0
+    /// Opt-in project scope, mirroring `AskRequest`.
+    var projectId: UUID? = nil
 }
 
 struct AskContextPreviewResponse: Decodable, Equatable, Sendable {

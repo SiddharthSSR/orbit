@@ -12,6 +12,66 @@ final class AskViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.latestRetrievalDiagnostics)
     }
 
+    func testUnscopedAskDoesNotSendProjectID() async {
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = makeViewModel(client)
+        viewModel.draftQuestion = "What should I focus on?"
+
+        await viewModel.sendQuestion()
+
+        let request = await client.lastAskRequest()
+        XCTAssertNotNil(request)
+        XCTAssertNil(request?.projectId)
+    }
+
+    func testScopedAskSendsSelectedProjectID() async {
+        let project = makeScopeProject(name: "Orbit")
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = makeViewModel(client, projectAPIClient: MockProjectAPIClient(projects: [project]))
+        await viewModel.loadProjects()
+        viewModel.selectProjectScope(project.id)
+        viewModel.draftQuestion = "What is the latest?"
+
+        await viewModel.sendQuestion()
+
+        let request = await client.lastAskRequest()
+        XCTAssertEqual(request?.projectId, project.id)
+        XCTAssertEqual(viewModel.selectedProjectName, "Orbit")
+    }
+
+    func testClearingProjectScopeRemovesProjectID() async {
+        let project = makeScopeProject(name: "Orbit")
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = makeViewModel(client, projectAPIClient: MockProjectAPIClient(projects: [project]))
+        await viewModel.loadProjects()
+        viewModel.selectProjectScope(project.id)
+        viewModel.clearProjectScope()
+        viewModel.draftQuestion = "What is the latest?"
+
+        await viewModel.sendQuestion()
+
+        let request = await client.lastAskRequest()
+        XCTAssertNil(request?.projectId)
+        XCTAssertNil(viewModel.selectedProjectName)
+    }
+
+    func testProjectLoadFailureDoesNotBlockUnscopedAsk() async {
+        let client = MockChatAPIClient(sessions: [], messagesBySession: [:])
+        let viewModel = makeViewModel(client, projectAPIClient: FailingAskProjectAPIClient())
+
+        await viewModel.loadProjects()
+        XCTAssertNotNil(viewModel.projectLoadErrorMessage)
+        XCTAssertTrue(viewModel.availableProjects.isEmpty)
+
+        viewModel.draftQuestion = "What should I focus on?"
+        await viewModel.sendQuestion()
+
+        XCTAssertNil(viewModel.errorMessage)
+        let request = await client.lastAskRequest()
+        XCTAssertNotNil(request)
+        XCTAssertNil(request?.projectId)
+    }
+
     func testLoadSessionsLoadsMockSessions() async {
         let sessions = [makeSession(title: "Focus today"), makeSession(title: "Bills")]
         let viewModel = makeViewModel(MockChatAPIClient(sessions: sessions, messagesBySession: [:]))
@@ -1452,6 +1512,7 @@ final class AskViewModelTests: XCTestCase {
         _ apiClient: any ChatAPIClientProtocol,
         memoryClient: (any MemoryAPIClientProtocol)? = nil,
         todoClient: (any TodoAPIClientProtocol)? = nil,
+        projectAPIClient: (any ProjectAPIClientProtocol)? = nil,
         notificationCenter: NotificationCenter? = nil,
         defaults: UserDefaults? = nil
     ) -> AskViewModel {
@@ -1459,8 +1520,23 @@ final class AskViewModelTests: XCTestCase {
             apiClient: apiClient,
             memoryClient: memoryClient ?? MockMemoryAPIClient(memoryItems: []),
             todoClient: todoClient ?? MockTodoAPIClient(todos: []),
+            projectAPIClient: projectAPIClient ?? MockProjectAPIClient(projects: []),
             notificationCenter: notificationCenter ?? NotificationCenter(),
             preferences: AskRetrievalPreferences(defaults: defaults ?? makeIsolatedDefaults())
+        )
+    }
+
+    private func makeScopeProject(name: String) -> ProjectDTO {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        return ProjectDTO(
+            id: UUID(),
+            name: name,
+            description: nil,
+            status: "active",
+            area: nil,
+            tags: [],
+            createdAt: now,
+            updatedAt: now
         )
     }
 
@@ -1673,5 +1749,31 @@ private enum FailingTodoAPIError: LocalizedError {
 
     var errorDescription: String? {
         "Expected todo API failure."
+    }
+}
+
+private struct FailingAskProjectAPIClient: ProjectAPIClientProtocol {
+    func listProjects(includeArchived: Bool, status: String?, area: String?, tag: String?) async throws -> [ProjectDTO] {
+        throw FailingAskProjectAPIError.expectedFailure
+    }
+
+    func createProject(_ payload: ProjectCreateRequest) async throws -> ProjectDTO {
+        throw FailingAskProjectAPIError.expectedFailure
+    }
+
+    func updateProject(id: UUID, payload: ProjectUpdateRequest) async throws -> ProjectDTO {
+        throw FailingAskProjectAPIError.expectedFailure
+    }
+
+    func deleteProject(id: UUID) async throws {
+        throw FailingAskProjectAPIError.expectedFailure
+    }
+}
+
+private enum FailingAskProjectAPIError: LocalizedError {
+    case expectedFailure
+
+    var errorDescription: String? {
+        "Expected project API failure."
     }
 }

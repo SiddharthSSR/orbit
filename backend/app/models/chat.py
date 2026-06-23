@@ -104,6 +104,9 @@ class AskRequest(BaseModel):
     retrieval_mode: Literal["keyword", "hybrid"] = "keyword"
     memory_top_k: int = Field(default=5, ge=1, le=20)
     min_vector_score: float = 0.0
+    # Opt-in: when set, the memory context is scoped to this project's linked
+    # memories. Omitting it preserves the default (unscoped) retrieval behavior.
+    project_id: UUID | None = None
 
     @field_validator("question")
     @classmethod
@@ -131,6 +134,8 @@ class AskContextPreviewRequest(BaseModel):
     retrieval_mode: Literal["keyword", "hybrid"] = "keyword"
     memory_top_k: int = Field(default=5, ge=1, le=20)
     min_vector_score: float = 0.0
+    # Opt-in project scoping, mirroring `AskRequest`.
+    project_id: UUID | None = None
 
     @field_validator("question")
     @classmethod

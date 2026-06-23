@@ -78,6 +78,66 @@ def test_ask_returns_only_non_empty_context_sections(client) -> None:
     assert response.json()["context_summary"] == "Context used: Today, Recent memory"
 
 
+def test_ask_context_preview_without_project_id_includes_all_memories(client) -> None:
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+    client.post(
+        "/memory",
+        json={"title": "Orbit note", "body": "scoped body", "project_id": project["id"]},
+    )
+    client.post("/memory", json={"title": "General note", "body": "other body"})
+
+    response = client.post("/ask/context-preview", json={"question": "notes"})
+
+    assert response.status_code == 200
+    context = response.json()["context"]
+    assert "Orbit note" in context
+    assert "General note" in context
+
+
+def test_ask_context_preview_scoped_to_project_only_includes_linked_memories(client) -> None:
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+    client.post(
+        "/memory",
+        json={"title": "Orbit note", "body": "scoped body", "project_id": project["id"]},
+    )
+    client.post("/memory", json={"title": "General note", "body": "other body"})
+
+    response = client.post(
+        "/ask/context-preview",
+        json={"question": "notes", "project_id": project["id"]},
+    )
+
+    assert response.status_code == 200
+    context = response.json()["context"]
+    assert "Orbit note" in context
+    assert "General note" not in context
+
+
+def test_ask_scoped_to_project_with_no_memories_handles_empty_context(client) -> None:
+    project = client.post("/projects", json={"name": "Empty"}).json()
+    client.post("/memory", json={"title": "General note", "body": "other body"})
+
+    response = client.post(
+        "/ask",
+        json={"question": "notes", "project_id": project["id"]},
+    )
+
+    assert response.status_code == 200
+    assert "Recent memory" not in response.json()["context_sections"]
+
+
+def test_ask_without_project_id_preserves_default_context(client) -> None:
+    client.post(
+        "/memory",
+        json={"title": "AI retrieval notes", "body": "Lightweight relevance", "tags": ["ai"]},
+    )
+
+    response = client.post("/ask", json={"question": "What did I save about AI?"})
+
+    assert response.status_code == 200
+    assert response.json()["context_sections"] == ["Today", "Recent memory"]
+
+
 def test_ask_without_context_returns_empty_context_summary(client) -> None:
     response = client.post(
         "/ask",
