@@ -34,6 +34,46 @@ def test_list_memory_items(client) -> None:
     assert [item["title"] for item in response.json()] == ["Second", "First"]
 
 
+def test_list_memory_items_filtered_by_project_id(client) -> None:
+    orbit = client.post("/projects", json={"name": "Orbit"}).json()
+    worldlens = client.post("/projects", json={"name": "WorldLens"}).json()
+    client.post(
+        "/memory",
+        json={"title": "Orbit note", "body": "Project note", "project_id": orbit["id"]},
+    )
+    client.post(
+        "/memory",
+        json={"title": "WorldLens note", "body": "Other project note", "project_id": worldlens["id"]},
+    )
+    client.post("/memory", json={"title": "Unlinked note", "body": "No project"})
+
+    response = client.get("/memory", params={"project_id": orbit["id"]})
+
+    assert response.status_code == 200
+    assert [item["title"] for item in response.json()] == ["Orbit note"]
+
+
+def test_list_memory_project_filter_excludes_unlinked_memory(client) -> None:
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+    client.post("/memory", json={"title": "Unlinked note", "body": "No project"})
+
+    response = client.get("/memory", params={"project_id": project["id"]})
+
+    assert response.status_code == 200
+    assert response.json() == []
+
+
+def test_list_memory_project_filter_does_not_change_unfiltered_list(client) -> None:
+    project = client.post("/projects", json={"name": "Orbit"}).json()
+    client.post("/memory", json={"title": "Linked note", "body": "Project note", "project_id": project["id"]})
+    client.post("/memory", json={"title": "Unlinked note", "body": "No project"})
+
+    response = client.get("/memory")
+
+    assert response.status_code == 200
+    assert [item["title"] for item in response.json()] == ["Unlinked note", "Linked note"]
+
+
 def test_get_memory_by_id(client) -> None:
     created = client.post("/memory", json={"title": "Inbox item", "body": "Remember this"}).json()
 

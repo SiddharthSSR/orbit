@@ -60,7 +60,8 @@ final class AppLaunchConfigurationTests: XCTestCase {
         let memory = try await dependencies.memoryAPIClient.listMemory(
             includeArchived: false,
             kind: nil,
-            tag: nil
+            tag: nil,
+            projectId: nil
         )
         let response = try await dependencies.chatAPIClient.ask(
             AskRequest(question: "remember that I like quiet cafes")
@@ -429,6 +430,35 @@ final class OrbitAPIClientContractTests: XCTestCase {
         XCTAssertTrue(json["project_id"] is NSNull)
     }
 
+    func testListMemoryCanRequestProjectFilter() async throws {
+        StubURLProtocol.lastRequest = nil
+        StubURLProtocol.response = HTTPURLResponse(
+            url: URL(string: "https://orbit.test/memory")!,
+            statusCode: 200,
+            httpVersion: nil,
+            headerFields: nil
+        )
+        StubURLProtocol.responseData = Data("[]".utf8)
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StubURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        let client = OrbitAPIClient(baseURL: URL(string: "https://orbit.test")!, session: session)
+
+        _ = try await client.listMemory(
+            includeArchived: false,
+            kind: nil,
+            tag: nil,
+            projectId: UUID(uuidString: "55555555-5555-5555-5555-555555555555")
+        )
+
+        let request = try XCTUnwrap(StubURLProtocol.lastRequest)
+        let components = try XCTUnwrap(URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false))
+        let queryItems = components.queryItems ?? []
+        XCTAssertEqual(queryItems.first { $0.name == "project_id" }?.value, "55555555-5555-5555-5555-555555555555")
+        XCTAssertEqual(queryItems.first { $0.name == "include_archived" }?.value, "false")
+    }
+
     func testEncodesMoodCreateRequestWithSnakeCaseAndDateOnly() throws {
         let payload = MoodCreateRequest(
             mood: "calm",
@@ -563,13 +593,15 @@ final class OrbitAPIClientContractTests: XCTestCase {
 private final class StubURLProtocol: URLProtocol {
     nonisolated(unsafe) static var response: HTTPURLResponse?
     nonisolated(unsafe) static var responseData = Data()
+    nonisolated(unsafe) static var lastRequest: URLRequest?
 
     override class func canInit(with request: URLRequest) -> Bool {
         true
     }
 
     override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
+        lastRequest = request
+        return request
     }
 
     override func startLoading() {

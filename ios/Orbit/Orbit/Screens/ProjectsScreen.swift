@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProjectsScreen: View {
     @StateObject private var projectViewModel: ProjectListViewModel
+    @State private var selectedProject: ProjectDTO?
     @State private var newProjectName = ""
     @State private var newProjectDescription = ""
     @State private var newProjectStatus = "active"
@@ -13,9 +14,14 @@ struct ProjectsScreen: View {
 
     private let statusOptions = ["active", "paused", "completed"]
     private let filterOptions = ["all", "active", "paused", "completed"]
+    private let memoryAPIClient: any MemoryAPIClientProtocol
 
-    init(apiClient: any ProjectAPIClientProtocol = OrbitAPIClient()) {
+    init(
+        apiClient: any ProjectAPIClientProtocol = OrbitAPIClient(),
+        memoryAPIClient: any MemoryAPIClientProtocol = OrbitAPIClient()
+    ) {
         _projectViewModel = StateObject(wrappedValue: ProjectListViewModel(apiClient: apiClient))
+        self.memoryAPIClient = memoryAPIClient
     }
 
     var body: some View {
@@ -125,6 +131,9 @@ struct ProjectsScreen: View {
                     ForEach(projectViewModel.projects) { project in
                         ProjectRow(
                             project: project,
+                            onOpen: {
+                                selectedProject = project
+                            },
                             onMarkActive: {
                                 Task { await projectViewModel.updateProjectStatus(project: project, status: "active") }
                             },
@@ -157,6 +166,12 @@ struct ProjectsScreen: View {
         .task {
             await projectViewModel.loadProjects()
         }
+        .navigationDestination(item: $selectedProject) { project in
+            ProjectDetailScreen(
+                project: project,
+                memoryAPIClient: memoryAPIClient
+            )
+        }
     }
 
     private func createProject() async {
@@ -188,6 +203,7 @@ struct ProjectsScreen: View {
 
 private struct ProjectRow: View {
     let project: ProjectDTO
+    let onOpen: () -> Void
     let onMarkActive: () -> Void
     let onMarkPaused: () -> Void
     let onMarkCompleted: () -> Void
@@ -224,6 +240,11 @@ private struct ProjectRow: View {
             }
 
             HStack(spacing: 14) {
+                Button(action: onOpen) {
+                    Label("Details", systemImage: "chevron.right.circle")
+                }
+                .accessibilityLabel("Open \(project.name) project")
+
                 Button(action: onMarkActive) {
                     Label("Active", systemImage: "play.circle")
                 }
@@ -272,10 +293,204 @@ private struct ProjectRow: View {
     }
 }
 
+private struct ProjectDetailScreen: View {
+    let project: ProjectDTO
+    let memoryAPIClient: any MemoryAPIClientProtocol
+
+    @State private var linkedMemories: [MemoryDTO] = []
+    @State private var isLoadingMemories = false
+    @State private var memoryErrorMessage: String?
+
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: OrbitSpacing.md) {
+                    OrbitScreenMasthead(
+                        project.name,
+                        subtitle: project.description
+                    )
+
+                    VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+                        HStack {
+                            OrbitBadge(text: project.status.capitalized, tint: statusColor(project.status))
+                            if let area = project.area, !area.isEmpty {
+                                OrbitBadge(text: area, tint: .accentColor)
+                            }
+                        }
+
+                        if !project.tags.isEmpty {
+                            Label(project.tags.joined(separator: " · "), systemImage: "tag")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(2)
+                        }
+                    }
+                }
+                .orbitFloatingCard()
+                .orbitListCardRow()
+            }
+
+            Section {
+                if isLoadingMemories {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .listRowBackground(Color.clear)
+                } else if let memoryErrorMessage {
+                    VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+                        Label(memoryErrorMessage, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                        Button {
+                            Task { await loadLinkedMemories() }
+                        } label: {
+                            Label("Retry memories", systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .orbitFloatingCard()
+                    .orbitListCardRow()
+                } else if linkedMemories.isEmpty {
+                    EmptyStateView(
+                        title: "No linked memories yet",
+                        message: "Link memories from Inbox and they will appear here.",
+                        systemImage: "tray"
+                    )
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(linkedMemories) { memory in
+                        ProjectLinkedMemoryRow(memory: memory)
+                    }
+                }
+            } header: {
+                OrbitSectionHeader("Linked memories", systemImage: "tray") {
+                    if !linkedMemories.isEmpty {
+                        OrbitBadge(text: "\(linkedMemories.count)")
+                    }
+                }
+                .textCase(nil)
+            }
+        }
+        .navigationTitle(project.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .orbitBackground()
+        .task(id: project.id) {
+            await loadLinkedMemories()
+        }
+        .onReceive(OrbitRefreshCenter.publisher(for: OrbitRefreshCenter.memoryDidChange)) { _ in
+            Task { await loadLinkedMemories() }
+        }
+    }
+
+    private func loadLinkedMemories() async {
+        isLoadingMemories = true
+        memoryErrorMessage = nil
+        defer { isLoadingMemories = false }
+
+        do {
+            linkedMemories = try await memoryAPIClient.listMemory(
+                includeArchived: false,
+                kind: nil,
+                tag: nil,
+                projectId: project.id
+            )
+        } catch {
+            memoryErrorMessage = readableMessage(for: error)
+            linkedMemories = []
+        }
+    }
+
+    private func statusColor(_ status: String) -> Color {
+        switch status {
+        case "active":
+            .green
+        case "paused":
+            .orange
+        case "completed":
+            .blue
+        default:
+            .secondary
+        }
+    }
+
+    private func readableMessage(for error: Error) -> String {
+        if let localizedError = error as? LocalizedError,
+           let description = localizedError.errorDescription {
+            return description
+        }
+        return error.localizedDescription
+    }
+}
+
+private struct ProjectLinkedMemoryRow: View {
+    let memory: MemoryDTO
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(memory.title)
+                    .font(OrbitTypography.cardTitle)
+                Spacer(minLength: OrbitSpacing.xs)
+                OrbitBadge(text: kindLabel(memory.kind))
+            }
+
+            Text(memory.body)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
+
+            VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
+                if let sourceHost {
+                    Label(sourceHost, systemImage: "link")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+
+                if !memory.tags.isEmpty {
+                    Label(memory.tags.joined(separator: " · "), systemImage: "tag")
+                        .font(.caption)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(2)
+                }
+
+                Label(
+                    "Captured \(memory.createdAt.formatted(date: .abbreviated, time: .omitted))",
+                    systemImage: "clock"
+                )
+                .font(.caption)
+                .foregroundStyle(.tertiary)
+            }
+            .padding(.top, OrbitSpacing.xxs)
+        }
+        .orbitFloatingCard()
+        .orbitListCardRow()
+    }
+
+    private var sourceHost: String? {
+        guard let sourceUrl = memory.sourceUrl, !sourceUrl.isEmpty else { return nil }
+        return URL(string: sourceUrl)?.host ?? sourceUrl
+    }
+
+    private func kindLabel(_ kind: String) -> String {
+        switch kind {
+        case "project_update":
+            "Project"
+        default:
+            kind.capitalized
+        }
+    }
+}
+
 struct ProjectsScreen_Previews: PreviewProvider {
     static var previews: some View {
         NavigationStack {
-            ProjectsScreen(apiClient: MockProjectAPIClient())
+            ProjectsScreen(
+                apiClient: MockProjectAPIClient(),
+                memoryAPIClient: MockMemoryAPIClient()
+            )
                 .navigationTitle("Projects")
         }
     }

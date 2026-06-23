@@ -125,7 +125,10 @@ struct RootTabView: View {
                 todoClient: dependencies.todoAPIClient
             )
         case .projects:
-            ProjectsScreen(apiClient: dependencies.projectAPIClient)
+            ProjectsScreen(
+                apiClient: dependencies.projectAPIClient,
+                memoryAPIClient: dependencies.memoryAPIClient
+            )
         case .bills:
             BillsScreen(apiClient: dependencies.billAPIClient)
         }

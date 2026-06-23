@@ -175,6 +175,24 @@ final class MemoryListViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.memoryItems.map(\.title), ["AI article"])
     }
 
+    func testMockMemoryClientFiltersByProjectId() async throws {
+        let project = UUID()
+        let client = MockMemoryAPIClient(memoryItems: [
+            makeMemory(title: "Project note", projectId: project),
+            makeMemory(title: "Other project note", projectId: UUID()),
+            makeMemory(title: "Unlinked note")
+        ])
+
+        let linkedMemory = try await client.listMemory(
+            includeArchived: false,
+            kind: nil,
+            tag: nil,
+            projectId: project
+        )
+
+        XCTAssertEqual(linkedMemory.map(\.title), ["Project note"])
+    }
+
     func testCreateMemoryEmitsMemoryRefreshEvent() async {
         let center = NotificationCenter()
         let viewModel = MemoryListViewModel(
@@ -273,7 +291,7 @@ final class MemoryListViewModelTests: XCTestCase {
 }
 
 private struct FailingMemoryAPIClient: MemoryAPIClientProtocol {
-    func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO] {
+    func listMemory(includeArchived: Bool, kind: String?, tag: String?, projectId: UUID?) async throws -> [MemoryDTO] {
         throw FailingMemoryAPIError.expectedFailure
     }
 
@@ -297,7 +315,7 @@ private struct FailingMemoryAPIClient: MemoryAPIClientProtocol {
 private struct FailingProjectLinkMemoryAPIClient: MemoryAPIClientProtocol {
     let memory: MemoryDTO
 
-    func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO] {
+    func listMemory(includeArchived: Bool, kind: String?, tag: String?, projectId: UUID?) async throws -> [MemoryDTO] {
         [memory]
     }
 

@@ -1,5 +1,9 @@
 import Foundation
 
+enum MockOrbitFixtureIDs {
+    static let orbitProjectID = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+}
+
 actor MockProjectAPIClient: ProjectAPIClientProtocol {
     private var projects: [ProjectDTO]
 
@@ -79,7 +83,7 @@ actor MockProjectAPIClient: ProjectAPIClientProtocol {
 
     private static let previewProjects: [ProjectDTO] = [
         ProjectDTO(
-            id: UUID(),
+            id: MockOrbitFixtureIDs.orbitProjectID,
             name: "Orbit",
             description: "Personal iPhone second brain MVP.",
             status: "active",

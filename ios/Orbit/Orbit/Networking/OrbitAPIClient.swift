@@ -100,11 +100,17 @@ protocol BillAPIClientProtocol: Sendable {
 }
 
 protocol MemoryAPIClientProtocol: Sendable {
-    func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO]
+    func listMemory(includeArchived: Bool, kind: String?, tag: String?, projectId: UUID?) async throws -> [MemoryDTO]
     func createMemory(_ payload: MemoryCreateRequest) async throws -> MemoryDTO
     func updateMemory(id: UUID, payload: MemoryUpdateRequest) async throws -> MemoryDTO
     func updateMemoryProject(id: UUID, payload: MemoryProjectLinkRequest) async throws -> MemoryDTO
     func deleteMemory(id: UUID) async throws
+}
+
+extension MemoryAPIClientProtocol {
+    func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO] {
+        try await listMemory(includeArchived: includeArchived, kind: kind, tag: tag, projectId: nil)
+    }
 }
 
 protocol MoodAPIClientProtocol: Sendable {
@@ -190,13 +196,21 @@ struct OrbitAPIClient: TodoAPIClientProtocol, BillAPIClientProtocol, MemoryAPICl
         let _: EmptyResponse = try await request(path: "/bills/\(id.uuidString)", method: "DELETE")
     }
 
-    func listMemory(includeArchived: Bool = false, kind: String? = nil, tag: String? = nil) async throws -> [MemoryDTO] {
+    func listMemory(
+        includeArchived: Bool = false,
+        kind: String? = nil,
+        tag: String? = nil,
+        projectId: UUID? = nil
+    ) async throws -> [MemoryDTO] {
         var queryItems = [URLQueryItem(name: "include_archived", value: includeArchived ? "true" : "false")]
         if let kind, !kind.isEmpty {
             queryItems.append(URLQueryItem(name: "kind", value: kind))
         }
         if let tag, !tag.isEmpty {
             queryItems.append(URLQueryItem(name: "tag", value: tag))
+        }
+        if let projectId {
+            queryItems.append(URLQueryItem(name: "project_id", value: projectId.uuidString))
         }
         let memoryItems: [MemoryDTO] = try await request(path: "/memory", queryItems: queryItems)
         return memoryItems

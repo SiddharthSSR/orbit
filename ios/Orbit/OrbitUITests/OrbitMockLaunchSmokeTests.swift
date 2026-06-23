@@ -29,6 +29,25 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
     }
 
     @MainActor
+    func testProjectDetailShowsLinkedMemories() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let projectsTab = app.buttons["Projects"]
+        XCTAssertTrue(projectsTab.waitForExistence(timeout: 5))
+        projectsTab.tap()
+
+        XCTAssertTrue(app.staticTexts["Orbit"].waitForExistence(timeout: 5))
+        let detailsButton = app.buttons["Open Orbit project"]
+        XCTAssertTrue(detailsButton.waitForExistence(timeout: 5), "Orbit project details button did not appear")
+        detailsButton.tap()
+
+        XCTAssertTrue(app.staticTexts["Linked memories"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["AI article link"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testInboxMemoryCanLinkAndUnlinkProject() {
         let app = XCUIApplication()
         app.launchArguments = ["--orbit-ui-tests"]

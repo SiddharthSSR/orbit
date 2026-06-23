@@ -1621,7 +1621,7 @@ private enum FailingChatAPIError: LocalizedError {
 }
 
 private struct FailingMemoryAPIClient: MemoryAPIClientProtocol {
-    func listMemory(includeArchived: Bool, kind: String?, tag: String?) async throws -> [MemoryDTO] {
+    func listMemory(includeArchived: Bool, kind: String?, tag: String?, projectId: UUID?) async throws -> [MemoryDTO] {
         throw FailingMemoryAPIError.expectedFailure
     }
 

@@ -296,9 +296,15 @@ def list_memory_items(
     include_archived: bool = False,
     kind: str | None = None,
     tag: str | None = None,
+    project_id: UUID | None = None,
     session: Session = Depends(get_session),
 ) -> list[MemoryRead]:
-    return MemoryItemRepository(session).list(include_archived=include_archived, kind=kind, tag=tag)
+    return MemoryItemRepository(session).list(
+        include_archived=include_archived,
+        kind=kind,
+        tag=tag,
+        project_id=project_id,
+    )
 
 
 @router.post("/memory", response_model=MemoryRead, status_code=201, tags=["memory"])

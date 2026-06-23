@@ -51,7 +51,8 @@ final class MemoryListViewModel: ObservableObject {
             memoryItems = try await apiClient.listMemory(
                 includeArchived: false,
                 kind: activeKindFilter,
-                tag: activeTagFilter
+                tag: activeTagFilter,
+                projectId: nil
             )
         } catch {
             errorMessage = readableMessage(for: error)

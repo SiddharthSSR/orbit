@@ -12,7 +12,12 @@ actor MockMemoryAPIClient: MemoryAPIClientProtocol {
         createRequests
     }
 
-    func listMemory(includeArchived: Bool = false, kind: String? = nil, tag: String? = nil) async throws -> [MemoryDTO] {
+    func listMemory(
+        includeArchived: Bool = false,
+        kind: String? = nil,
+        tag: String? = nil,
+        projectId: UUID? = nil
+    ) async throws -> [MemoryDTO] {
         memoryItems.filter { item in
             if !includeArchived, item.isArchived {
                 return false
@@ -21,6 +26,9 @@ actor MockMemoryAPIClient: MemoryAPIClientProtocol {
                 return false
             }
             if let tag, !tag.isEmpty, !item.tags.contains(tag) {
+                return false
+            }
+            if let projectId, item.projectId != projectId {
                 return false
             }
             return true
@@ -99,6 +107,7 @@ actor MockMemoryAPIClient: MemoryAPIClientProtocol {
             body: "Read later: practical approaches to personal AI memory.",
             kind: "link",
             sourceUrl: "https://example.com/ai-memory",
+            projectId: MockOrbitFixtureIDs.orbitProjectID,
             tags: ["ai", "read-later"],
             isArchived: false,
             createdAt: Date(),

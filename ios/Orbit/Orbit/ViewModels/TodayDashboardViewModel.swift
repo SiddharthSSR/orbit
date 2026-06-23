@@ -147,7 +147,8 @@ final class TodayDashboardViewModel: ObservableObject {
             let loadedMemory = try await memoryAPIClient.listMemory(
                 includeArchived: false,
                 kind: nil,
-                tag: nil
+                tag: nil,
+                projectId: nil
             )
             let loadedMoods = try await moodAPIClient.listMoods(limit: 1, fromDate: nil, toDate: nil)
 

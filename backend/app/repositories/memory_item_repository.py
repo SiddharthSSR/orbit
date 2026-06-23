@@ -32,12 +32,15 @@ class MemoryItemRepository:
         include_archived: bool = False,
         kind: str | None = None,
         tag: str | None = None,
+        project_id: UUID | str | None = None,
     ) -> list[MemoryRecord]:
         statement = select(MemoryRecord)
         if not include_archived:
             statement = statement.where(MemoryRecord.is_archived.is_(False))
         if kind is not None:
             statement = statement.where(MemoryRecord.kind == kind)
+        if project_id is not None:
+            statement = statement.where(MemoryRecord.project_id == str(project_id))
         statement = statement.order_by(MemoryRecord.created_at.desc())
 
         memory_items = list(self.session.scalars(statement).all())
