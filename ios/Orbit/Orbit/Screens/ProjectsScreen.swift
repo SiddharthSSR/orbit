@@ -297,7 +297,7 @@ private struct ProjectRow: View {
     }
 }
 
-private struct ProjectDetailScreen: View {
+struct ProjectDetailScreen: View {
     let project: ProjectDTO
     let memoryAPIClient: any MemoryAPIClientProtocol
     let todoAPIClient: any TodoAPIClientProtocol

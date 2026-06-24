@@ -8,8 +8,11 @@ struct TodayScreen: View {
     @State private var selectedEnergy = 3
     @State private var moodNotes = ""
     @State private var projectPickerTodoID: UUID?
+    @State private var selectedProject: ProjectDTO?
 
     private let moodOptions = ["focused", "calm", "happy", "stressed", "tired", "anxious", "excited", "neutral"]
+    private let memoryAPIClient: any MemoryAPIClientProtocol
+    private let todoAPIClient: any TodoAPIClientProtocol
 
     init(
         todoAPIClient: any TodoAPIClientProtocol = OrbitAPIClient(),
@@ -27,6 +30,8 @@ struct TodayScreen: View {
                 projectAPIClient: projectAPIClient
             )
         )
+        self.memoryAPIClient = memoryAPIClient
+        self.todoAPIClient = todoAPIClient
     }
 
     var body: some View {
@@ -52,6 +57,13 @@ struct TodayScreen: View {
         }
         .navigationBarTitleDisplayMode(.inline)
         .orbitBackground()
+        .navigationDestination(item: $selectedProject) { project in
+            ProjectDetailScreen(
+                project: project,
+                memoryAPIClient: memoryAPIClient,
+                todoAPIClient: todoAPIClient
+            )
+        }
         .task {
             await dashboardViewModel.loadDashboard()
             await dashboardViewModel.loadProjects()
@@ -289,7 +301,9 @@ struct TodayScreen: View {
             } else {
                 VStack(spacing: OrbitSpacing.xs) {
                     ForEach(dashboardViewModel.projectDigestItems) { item in
-                        TodayProjectDigestRow(item: item)
+                        TodayProjectDigestRow(item: item) {
+                            selectedProject = item.project
+                        }
                     }
                 }
             }
@@ -494,57 +508,61 @@ private struct TodayTodoRow: View {
 
 private struct TodayProjectDigestRow: View {
     let item: TodayProjectDigestItem
+    let onOpen: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
-            HStack(alignment: .firstTextBaseline, spacing: OrbitSpacing.xs) {
-                Text(item.project.name)
-                    .font(OrbitTypography.cardTitle)
-                    .lineLimit(1)
+        Button(action: onOpen) {
+            VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+                HStack(alignment: .firstTextBaseline, spacing: OrbitSpacing.xs) {
+                    Text(item.project.name)
+                        .font(OrbitTypography.cardTitle)
+                        .lineLimit(1)
 
-                Spacer(minLength: OrbitSpacing.xs)
+                    Spacer(minLength: OrbitSpacing.xs)
 
-                OrbitBadge(text: item.project.status.capitalized, tint: statusTint)
-            }
+                    OrbitBadge(text: item.project.status.capitalized, tint: statusTint)
+                }
 
-            HStack(spacing: OrbitSpacing.xs) {
-                signalLabel(
-                    "\(item.openTodoCount) open",
-                    systemImage: "circle",
-                    accessibilityLabel: openTodoAccessibilityLabel
-                )
-
-                if item.completedTodoCount > 0 {
+                HStack(spacing: OrbitSpacing.xs) {
                     signalLabel(
-                        "\(item.completedTodoCount) done",
-                        systemImage: "checkmark.circle",
-                        accessibilityLabel: completedTodoAccessibilityLabel
+                        "\(item.openTodoCount) open",
+                        systemImage: "circle",
+                        accessibilityLabel: openTodoAccessibilityLabel
                     )
-                }
 
-                if item.memoryCount > 0 {
-                    signalLabel(
-                        "\(item.memoryCount) memories",
-                        systemImage: "tray",
-                        accessibilityLabel: memoryAccessibilityLabel
-                    )
+                    if item.completedTodoCount > 0 {
+                        signalLabel(
+                            "\(item.completedTodoCount) done",
+                            systemImage: "checkmark.circle",
+                            accessibilityLabel: completedTodoAccessibilityLabel
+                        )
+                    }
+
+                    if item.memoryCount > 0 {
+                        signalLabel(
+                            "\(item.memoryCount) memories",
+                            systemImage: "tray",
+                            accessibilityLabel: memoryAccessibilityLabel
+                        )
+                    }
+                }
+                .font(OrbitTypography.caption)
+                .foregroundStyle(.secondary)
+
+                if let nextDueTodo = item.nextDueTodo {
+                    Text("Next due: \(nextDueTodo.title)")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.primary)
+
+                    if let urgency = TodoUrgency.resolve(dueDate: nextDueTodo.dueDate) {
+                        OrbitBadge(text: urgency.label, tint: urgency.tint)
+                    }
                 }
             }
-            .font(OrbitTypography.caption)
-            .foregroundStyle(.secondary)
-
-            if let nextDueTodo = item.nextDueTodo {
-                Text("Next due: \(nextDueTodo.title)")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-
-                if let urgency = TodoUrgency.resolve(dueDate: nextDueTodo.dueDate) {
-                    OrbitBadge(text: urgency.label, tint: urgency.tint)
-                }
-            }
+            .orbitFloatingCard(padding: OrbitSpacing.sm)
         }
-        .orbitFloatingCard(padding: OrbitSpacing.sm)
-        .accessibilityElement(children: .combine)
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("today.projectDigest.\(item.project.name)")
     }
 
     private var statusTint: Color {

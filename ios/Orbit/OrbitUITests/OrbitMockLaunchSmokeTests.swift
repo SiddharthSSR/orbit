@@ -58,6 +58,25 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
     }
 
     @MainActor
+    func testTodayProjectDigestOpensProjectDetail() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        XCTAssertTrue(app.staticTexts["Project Digest"].waitForExistence(timeout: 5))
+
+        let digestRow = app.buttons["today.projectDigest.Orbit"]
+        XCTAssertTrue(digestRow.waitForExistence(timeout: 5), "Orbit digest row did not appear")
+        digestRow.tap()
+
+        XCTAssertTrue(app.staticTexts["Activity"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Linked todos"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Draft project brief"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Linked memories"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["AI article link"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
     func testAskProjectScopeSelectAndClear() {
         let app = XCUIApplication()
         app.launchArguments = ["--orbit-ui-tests"]
