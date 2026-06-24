@@ -43,6 +43,91 @@ enum TodoUrgency: Equatable {
     }
 }
 
+struct TodayProjectDigestItem: Identifiable, Equatable {
+    let project: ProjectDTO
+    let openTodoCount: Int
+    let completedTodoCount: Int
+    let memoryCount: Int
+    let nextDueTodo: TodoDTO?
+
+    var id: UUID { project.id }
+
+    static func derive(
+        projects: [ProjectDTO],
+        todos: [TodoDTO],
+        memoryItems: [MemoryDTO],
+        limit: Int = 4
+    ) -> [TodayProjectDigestItem] {
+        projects
+            .compactMap { project in
+                let linkedTodos = todos.filter { $0.projectId == project.id }
+                let linkedMemoryItems = memoryItems.filter { $0.projectId == project.id && !$0.isArchived }
+                guard !linkedTodos.isEmpty || !linkedMemoryItems.isEmpty else { return nil }
+
+                let openTodos = linkedTodos.filter { !$0.isComplete }
+                let completedTodoCount = linkedTodos.filter(\.isComplete).count
+                let nextDueTodo = openTodos
+                    .filter { $0.dueDate != nil }
+                    .sorted(by: todoDueDateSort)
+                    .first
+
+                return TodayProjectDigestItem(
+                    project: project,
+                    openTodoCount: openTodos.count,
+                    completedTodoCount: completedTodoCount,
+                    memoryCount: linkedMemoryItems.count,
+                    nextDueTodo: nextDueTodo
+                )
+            }
+            .sorted(by: digestSort)
+            .prefix(limit)
+            .map { $0 }
+    }
+
+    private static func digestSort(
+        lhs: TodayProjectDigestItem,
+        rhs: TodayProjectDigestItem
+    ) -> Bool {
+        switch (lhs.nextDueTodo?.dueDate, rhs.nextDueTodo?.dueDate) {
+        case let (lhsDue?, rhsDue?) where lhsDue != rhsDue:
+            return lhsDue < rhsDue
+        case (_?, nil):
+            return true
+        case (nil, _?):
+            return false
+        default:
+            break
+        }
+
+        if lhs.openTodoCount != rhs.openTodoCount {
+            return lhs.openTodoCount > rhs.openTodoCount
+        }
+
+        let lhsActivity = latestActivityDate(for: lhs)
+        let rhsActivity = latestActivityDate(for: rhs)
+        if lhsActivity != rhsActivity {
+            return lhsActivity > rhsActivity
+        }
+
+        return lhs.project.name.localizedCaseInsensitiveCompare(rhs.project.name) == .orderedAscending
+    }
+
+    private static func latestActivityDate(for item: TodayProjectDigestItem) -> Date {
+        [item.project.updatedAt, item.nextDueTodo?.updatedAt]
+            .compactMap { $0 }
+            .max() ?? item.project.updatedAt
+    }
+
+    private static func todoDueDateSort(lhs: TodoDTO, rhs: TodoDTO) -> Bool {
+        switch (lhs.dueDate, rhs.dueDate) {
+        case let (lhsDue?, rhsDue?) where lhsDue != rhsDue:
+            return lhsDue < rhsDue
+        default:
+            return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
+}
+
 @MainActor
 final class TodayDashboardViewModel: ObservableObject {
     @Published private(set) var todos: [TodoDTO] = []
@@ -109,6 +194,14 @@ final class TodayDashboardViewModel: ObservableObject {
         Array(memoryItems.filter { !$0.isArchived }.prefix(5))
     }
 
+    var projectDigestItems: [TodayProjectDigestItem] {
+        TodayProjectDigestItem.derive(
+            projects: projects,
+            todos: todos,
+            memoryItems: memoryItems
+        )
+    }
+
     var openTodoCount: Int {
         todos.filter { !$0.isComplete }.count
     }
@@ -170,9 +263,16 @@ final class TodayDashboardViewModel: ObservableObject {
     /// then refreshes other surfaces (e.g. Project detail) via the todo change
     /// notification. Todo title/status/due-date are untouched.
     func updateTodoProjectLink(todo: TodoDTO, projectID: UUID?) async {
-        guard updatingProjectTodoIDs.insert(todo.id).inserted else { return }
+        guard !updatingProjectTodoIDs.contains(todo.id) else { return }
+        var updatingIDs = updatingProjectTodoIDs
+        updatingIDs.insert(todo.id)
+        updatingProjectTodoIDs = updatingIDs
         todoProjectLinkErrors[todo.id] = nil
-        defer { updatingProjectTodoIDs.remove(todo.id) }
+        defer {
+            var updatedIDs = updatingProjectTodoIDs
+            updatedIDs.remove(todo.id)
+            updatingProjectTodoIDs = updatedIDs
+        }
 
         do {
             let updatedTodo = try await todoAPIClient.updateTodoProject(

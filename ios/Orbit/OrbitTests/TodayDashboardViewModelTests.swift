@@ -346,17 +346,102 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertNil(viewModel.errorMessage)
     }
 
-    private func makeProject(name: String) -> ProjectDTO {
+    func testProjectDigestCountsLinkedTodosAndMemory() {
+        let projectID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let project = makeProject(id: projectID, name: "Orbit")
+
+        let digest = TodayProjectDigestItem.derive(
+            projects: [project],
+            todos: [
+                makeTodo(title: "Open", projectId: projectID),
+                makeTodo(title: "Done", projectId: projectID, isComplete: true),
+                makeTodo(title: "Unlinked")
+            ],
+            memoryItems: [
+                makeMemory(title: "Linked note", projectId: projectID),
+                makeMemory(title: "Unlinked note")
+            ]
+        )
+
+        XCTAssertEqual(digest.count, 1)
+        XCTAssertEqual(digest.first?.project.name, "Orbit")
+        XCTAssertEqual(digest.first?.openTodoCount, 1)
+        XCTAssertEqual(digest.first?.completedTodoCount, 1)
+        XCTAssertEqual(digest.first?.memoryCount, 1)
+    }
+
+    func testProjectDigestChoosesEarliestDueOpenTodo() {
+        let projectID = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
+        let project = makeProject(id: projectID, name: "Orbit")
+        let later = Date(timeIntervalSince1970: 1_700_086_400)
+        let earlier = Date(timeIntervalSince1970: 1_700_000_000)
+
+        let digest = TodayProjectDigestItem.derive(
+            projects: [project],
+            todos: [
+                makeTodo(title: "Later", dueDate: later, projectId: projectID),
+                makeTodo(title: "Earlier", dueDate: earlier, projectId: projectID),
+                makeTodo(title: "Completed first", dueDate: earlier.addingTimeInterval(-86_400), projectId: projectID, isComplete: true)
+            ],
+            memoryItems: []
+        )
+
+        XCTAssertEqual(digest.first?.nextDueTodo?.title, "Earlier")
+    }
+
+    func testProjectDigestIgnoresUnlinkedActivityAndHandlesEmptyInput() {
+        let project = makeProject(name: "Orbit")
+
+        let digest = TodayProjectDigestItem.derive(
+            projects: [project],
+            todos: [makeTodo(title: "Unlinked")],
+            memoryItems: [makeMemory(title: "Unlinked note")]
+        )
+
+        XCTAssertTrue(digest.isEmpty)
+        XCTAssertTrue(TodayProjectDigestItem.derive(projects: [], todos: [], memoryItems: []).isEmpty)
+    }
+
+    func testProjectDigestSortsByNextDueThenOpenCount() {
+        let urgentID = UUID(uuidString: "33333333-3333-3333-3333-333333333333")!
+        let busyID = UUID(uuidString: "44444444-4444-4444-4444-444444444444")!
+        let quietID = UUID(uuidString: "55555555-5555-5555-5555-555555555555")!
+        let dueTomorrow = Date(timeIntervalSince1970: 1_700_086_400)
+
+        let digest = TodayProjectDigestItem.derive(
+            projects: [
+                makeProject(id: quietID, name: "Quiet"),
+                makeProject(id: busyID, name: "Busy"),
+                makeProject(id: urgentID, name: "Urgent")
+            ],
+            todos: [
+                makeTodo(title: "Busy one", projectId: busyID),
+                makeTodo(title: "Busy two", projectId: busyID),
+                makeTodo(title: "Quiet one", projectId: quietID),
+                makeTodo(title: "Due soon", dueDate: dueTomorrow, projectId: urgentID)
+            ],
+            memoryItems: []
+        )
+
+        XCTAssertEqual(digest.map(\.project.name), ["Urgent", "Busy", "Quiet"])
+    }
+
+    private func makeProject(
+        id: UUID = UUID(),
+        name: String,
+        status: String = "active",
+        updatedAt: Date = Date(timeIntervalSince1970: 1_700_000_000)
+    ) -> ProjectDTO {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         return ProjectDTO(
-            id: UUID(),
+            id: id,
             name: name,
             description: nil,
-            status: "active",
+            status: status,
             area: nil,
             tags: [],
             createdAt: now,
-            updatedAt: now
+            updatedAt: updatedAt
         )
     }
 
@@ -380,6 +465,7 @@ final class TodayDashboardViewModelTests: XCTestCase {
         id: UUID = UUID(),
         title: String,
         dueDate: Date? = nil,
+        projectId: UUID? = nil,
         isComplete: Bool = false,
         createdAt: Date = Date(timeIntervalSince1970: 1_700_000_000)
     ) -> TodoDTO {
@@ -389,7 +475,7 @@ final class TodayDashboardViewModelTests: XCTestCase {
             title: title,
             notes: nil,
             dueDate: dueDate,
-            projectId: nil,
+            projectId: projectId,
             isComplete: isComplete,
             createdAt: createdAt,
             updatedAt: now
@@ -413,7 +499,11 @@ final class TodayDashboardViewModelTests: XCTestCase {
         )
     }
 
-    private func makeMemory(title: String, isArchived: Bool = false) -> MemoryDTO {
+    private func makeMemory(
+        title: String,
+        projectId: UUID? = nil,
+        isArchived: Bool = false
+    ) -> MemoryDTO {
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         return MemoryDTO(
             id: UUID(),
@@ -421,6 +511,7 @@ final class TodayDashboardViewModelTests: XCTestCase {
             body: "Body",
             kind: "note",
             sourceUrl: nil,
+            projectId: projectId,
             tags: ["today"],
             isArchived: isArchived,
             createdAt: now,

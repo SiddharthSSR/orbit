@@ -7,6 +7,7 @@ struct TodayScreen: View {
     @State private var selectedMood = "focused"
     @State private var selectedEnergy = 3
     @State private var moodNotes = ""
+    @State private var projectPickerTodoID: UUID?
 
     private let moodOptions = ["focused", "calm", "happy", "stressed", "tired", "anxious", "excited", "neutral"]
 
@@ -41,6 +42,7 @@ struct TodayScreen: View {
                     errorCard(errorMessage)
                 } else {
                     moodCheckInSection
+                    projectDigestSection
                     openTodosSection
                     unpaidBillsSection
                     recentMemorySection
@@ -190,12 +192,17 @@ struct TodayScreen: View {
                             isCompleting: dashboardViewModel.isCompletingTodo(id: todo.id),
                             projects: dashboardViewModel.projects,
                             projectName: dashboardViewModel.projectName(for: todo.projectId),
+                            isShowingProjectPicker: projectPickerTodoID == todo.id,
                             isUpdatingProject: dashboardViewModel.isUpdatingProject(id: todo.id),
                             projectLinkErrorMessage: dashboardViewModel.todoProjectLinkErrors[todo.id],
                             onToggle: {
                                 Task { await dashboardViewModel.toggleTodoComplete(todo: todo) }
                             },
+                            onProjectPickerRequested: {
+                                projectPickerTodoID = projectPickerTodoID == todo.id ? nil : todo.id
+                            },
                             onProjectSelected: { projectID in
+                                projectPickerTodoID = nil
                                 Task {
                                     await dashboardViewModel.updateTodoProjectLink(
                                         todo: todo,
@@ -264,6 +271,27 @@ struct TodayScreen: View {
                     Label("Save check-in", systemImage: "heart.fill")
                 }
                 .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private var projectDigestSection: some View {
+        DashboardSection(title: "Project Digest", systemImage: "folder") {
+            if dashboardViewModel.projectDigestItems.isEmpty {
+                OrbitCard {
+                    EmptyStateView(
+                        title: "No linked project activity",
+                        message: "Link todos or captures to projects to see a daily digest here.",
+                        systemImage: "folder"
+                    )
+                    .frame(minHeight: 110)
+                }
+            } else {
+                VStack(spacing: OrbitSpacing.xs) {
+                    ForEach(dashboardViewModel.projectDigestItems) { item in
+                        TodayProjectDigestRow(item: item)
+                    }
+                }
             }
         }
     }
@@ -349,9 +377,11 @@ private struct TodayTodoRow: View {
     let isCompleting: Bool
     let projects: [ProjectDTO]
     let projectName: String?
+    let isShowingProjectPicker: Bool
     let isUpdatingProject: Bool
     let projectLinkErrorMessage: String?
     let onToggle: () -> Void
+    let onProjectPickerRequested: () -> Void
     let onProjectSelected: (UUID?) -> Void
 
     var body: some View {
@@ -405,17 +435,24 @@ private struct TodayTodoRow: View {
 
                 Spacer()
 
-                Menu {
+                Button(action: onProjectPickerRequested) {
+                    Image(systemName: "folder")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+                .disabled(isUpdatingProject)
+                .accessibilityLabel("Project for \(todo.title)")
+            }
+
+            if isShowingProjectPicker || projectName != nil {
+                HStack(spacing: OrbitSpacing.xs) {
                     projectButton(name: "Unlinked", projectID: nil)
                     ForEach(projects) { project in
                         projectButton(name: project.name, projectID: project.id)
                     }
-                } label: {
-                    Image(systemName: "folder")
-                        .foregroundStyle(.secondary)
                 }
-                .disabled(isUpdatingProject)
-                .accessibilityLabel("Project for \(todo.title)")
+                .padding(.leading, 44)
+                .padding(.top, 4)
             }
 
             if let projectLinkErrorMessage {
@@ -450,6 +487,100 @@ private struct TodayTodoRow: View {
                 Text(name)
             }
         }
+        .buttonStyle(.bordered)
+        .controlSize(.small)
+    }
+}
+
+private struct TodayProjectDigestRow: View {
+    let item: TodayProjectDigestItem
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+            HStack(alignment: .firstTextBaseline, spacing: OrbitSpacing.xs) {
+                Text(item.project.name)
+                    .font(OrbitTypography.cardTitle)
+                    .lineLimit(1)
+
+                Spacer(minLength: OrbitSpacing.xs)
+
+                OrbitBadge(text: item.project.status.capitalized, tint: statusTint)
+            }
+
+            HStack(spacing: OrbitSpacing.xs) {
+                signalLabel(
+                    "\(item.openTodoCount) open",
+                    systemImage: "circle",
+                    accessibilityLabel: openTodoAccessibilityLabel
+                )
+
+                if item.completedTodoCount > 0 {
+                    signalLabel(
+                        "\(item.completedTodoCount) done",
+                        systemImage: "checkmark.circle",
+                        accessibilityLabel: completedTodoAccessibilityLabel
+                    )
+                }
+
+                if item.memoryCount > 0 {
+                    signalLabel(
+                        "\(item.memoryCount) memories",
+                        systemImage: "tray",
+                        accessibilityLabel: memoryAccessibilityLabel
+                    )
+                }
+            }
+            .font(OrbitTypography.caption)
+            .foregroundStyle(.secondary)
+
+            if let nextDueTodo = item.nextDueTodo {
+                Text("Next due: \(nextDueTodo.title)")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+
+                if let urgency = TodoUrgency.resolve(dueDate: nextDueTodo.dueDate) {
+                    OrbitBadge(text: urgency.label, tint: urgency.tint)
+                }
+            }
+        }
+        .orbitFloatingCard(padding: OrbitSpacing.sm)
+        .accessibilityElement(children: .combine)
+    }
+
+    private var statusTint: Color {
+        switch item.project.status {
+        case "active":
+            .green
+        case "paused":
+            .orange
+        case "archived":
+            .secondary
+        default:
+            .accentColor
+        }
+    }
+
+    private var openTodoAccessibilityLabel: String {
+        item.openTodoCount == 1 ? "1 open linked todo" : "\(item.openTodoCount) open linked todos"
+    }
+
+    private var completedTodoAccessibilityLabel: String {
+        item.completedTodoCount == 1
+            ? "1 completed linked todo"
+            : "\(item.completedTodoCount) completed linked todos"
+    }
+
+    private var memoryAccessibilityLabel: String {
+        item.memoryCount == 1 ? "1 linked memory" : "\(item.memoryCount) linked memories"
+    }
+
+    private func signalLabel(
+        _ text: String,
+        systemImage: String,
+        accessibilityLabel: String
+    ) -> some View {
+        Label(text, systemImage: systemImage)
+            .accessibilityLabel(accessibilityLabel)
     }
 }
 

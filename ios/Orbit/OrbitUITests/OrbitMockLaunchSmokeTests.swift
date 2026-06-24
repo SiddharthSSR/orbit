@@ -11,6 +11,8 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(
             app.staticTexts["You have 1 open todos, 1 unpaid bills, and 3 recent captures."].exists
         )
+        XCTAssertTrue(app.staticTexts["Project Digest"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Orbit"].waitForExistence(timeout: 5))
 
         let askTab = app.buttons["Ask"]
         XCTAssertTrue(askTab.exists)
@@ -147,8 +149,7 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         // Today is the default tab; the seeded open todo "Review today plan"
         // exposes a per-row project menu.
         let menu = app.buttons["Project for Review today plan"]
-        XCTAssertTrue(menu.waitForExistence(timeout: 5), "Project menu for the seeded todo did not appear")
-        menu.tap()
+        revealAndTap(menu, in: app, label: "Review today plan project menu")
 
         let orbitOption = app.buttons["Orbit"]
         XCTAssertTrue(orbitOption.waitForExistence(timeout: 5), "Orbit project option did not appear")
@@ -159,7 +160,12 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
             "Linked project label did not appear after assigning"
         )
 
-        menu.tap()
+        let updatedMenu = app.buttons["Project for Review today plan"]
+        XCTAssertTrue(
+            updatedMenu.waitUntilEnabled(timeout: 5),
+            "Project menu did not re-enable after assigning"
+        )
+        revealAndTap(updatedMenu, in: app, label: "Review today plan project menu after linking")
         let unlinkOption = app.buttons["Unlinked"]
         XCTAssertTrue(unlinkOption.waitForExistence(timeout: 5), "Unlinked option did not appear")
         unlinkOption.tap()
@@ -413,5 +419,13 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         } else {
             app.swipeUp()
         }
+    }
+}
+
+private extension XCUIElement {
+    func waitUntilEnabled(timeout: TimeInterval) -> Bool {
+        let predicate = NSPredicate(format: "exists == true AND enabled == true")
+        let expectation = XCTNSPredicateExpectation(predicate: predicate, object: self)
+        return XCTWaiter.wait(for: [expectation], timeout: timeout) == .completed
     }
 }
