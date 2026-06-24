@@ -549,14 +549,11 @@ private struct TodayProjectDigestRow: View {
                 .font(OrbitTypography.caption)
                 .foregroundStyle(.secondary)
 
-                if let nextDueTodo = item.nextDueTodo {
-                    Text("Next due: \(nextDueTodo.title)")
+                if let cue = item.nextDueCue() {
+                    Text(cue)
                         .font(.caption.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    if let urgency = TodoUrgency.resolve(dueDate: nextDueTodo.dueDate) {
-                        OrbitBadge(text: urgency.label, tint: urgency.tint)
-                    }
+                        .foregroundStyle(nextDueTint)
+                        .lineLimit(1)
                 }
             }
             .orbitFloatingCard(padding: OrbitSpacing.sm)
@@ -576,6 +573,10 @@ private struct TodayProjectDigestRow: View {
         default:
             .accentColor
         }
+    }
+
+    private var nextDueTint: Color {
+        TodoUrgency.resolve(dueDate: item.nextDueTodo?.dueDate)?.tint ?? .primary
     }
 
     private var openTodoAccessibilityLabel: String {

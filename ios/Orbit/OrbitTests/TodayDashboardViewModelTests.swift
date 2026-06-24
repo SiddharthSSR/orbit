@@ -426,6 +426,57 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertEqual(digest.map(\.project.name), ["Urgent", "Busy", "Quiet"])
     }
 
+    func testProjectDigestNextDueCueForOverdueTodo() {
+        XCTAssertEqual(digestCue(dueOffsetDays: -1), "Overdue: Linked task")
+    }
+
+    func testProjectDigestNextDueCueForDueTodayTodo() {
+        XCTAssertEqual(digestCue(dueOffsetDays: 0), "Due today: Linked task")
+    }
+
+    func testProjectDigestNextDueCueForUpcomingTodoIncludesDate() {
+        let cue = digestCue(dueOffsetDays: 3)
+        XCTAssertTrue(
+            cue?.hasPrefix("Next: Linked task · ") == true,
+            "Unexpected upcoming cue: \(cue ?? "nil")"
+        )
+    }
+
+    func testProjectDigestNextDueCueIgnoresCompletedAndUndatedTodos() {
+        let item = makeDigestItem(todos: [
+            makeTodo(title: "Done", dueDate: digestCueNow, projectId: digestCueProjectID, isComplete: true),
+            makeTodo(title: "Undated open", projectId: digestCueProjectID)
+        ])
+        XCTAssertNotNil(item, "Project with linked todos should still appear in the digest")
+        XCTAssertNil(item?.nextDueCue(relativeTo: digestCueNow, calendar: digestCueCalendar))
+    }
+
+    private let digestCueProjectID = UUID(uuidString: "66666666-6666-6666-6666-666666666666")!
+
+    private var digestCueNow: Date { Date(timeIntervalSince1970: 1_700_006_400) }
+
+    private var digestCueCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar
+    }
+
+    private func makeDigestItem(todos: [TodoDTO]) -> TodayProjectDigestItem? {
+        TodayProjectDigestItem.derive(
+            projects: [makeProject(id: digestCueProjectID, name: "Orbit")],
+            todos: todos,
+            memoryItems: []
+        ).first
+    }
+
+    private func digestCue(dueOffsetDays: Int) -> String? {
+        let due = digestCueCalendar.date(byAdding: .day, value: dueOffsetDays, to: digestCueNow)!
+        let item = makeDigestItem(todos: [
+            makeTodo(title: "Linked task", dueDate: due, projectId: digestCueProjectID)
+        ])
+        return item?.nextDueCue(relativeTo: digestCueNow, calendar: digestCueCalendar)
+    }
+
     private func makeProject(
         id: UUID = UUID(),
         name: String,

@@ -126,6 +126,31 @@ struct TodayProjectDigestItem: Identifiable, Equatable {
             return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
         }
     }
+
+    /// Compact, deterministic next-due cue for the digest row, or `nil` when the
+    /// project has no open dated todo. Urgency is conveyed in the wording so the
+    /// row stays compact:
+    /// - Overdue: `Overdue: <title>`
+    /// - Due today: `Due today: <title>`
+    /// - Later (incl. tomorrow): `Next: <title> · <date>`
+    func nextDueCue(
+        relativeTo now: Date = .now,
+        calendar: Calendar = .current
+    ) -> String? {
+        guard let todo = nextDueTodo,
+              let dueDate = todo.dueDate,
+              let urgency = TodoUrgency.resolve(dueDate: dueDate, relativeTo: now, calendar: calendar)
+        else { return nil }
+
+        switch urgency {
+        case .overdue:
+            return "Overdue: \(todo.title)"
+        case .today:
+            return "Due today: \(todo.title)"
+        case .tomorrow, .upcoming:
+            return "Next: \(todo.title) · \(dueDate.formatted(date: .abbreviated, time: .omitted))"
+        }
+    }
 }
 
 @MainActor
