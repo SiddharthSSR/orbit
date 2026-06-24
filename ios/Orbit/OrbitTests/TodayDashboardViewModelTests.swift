@@ -451,6 +451,37 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertNil(item?.nextDueCue(relativeTo: digestCueNow, calendar: digestCueCalendar))
     }
 
+    func testProjectDigestCaughtUpWhenCompletedTodosOnly() {
+        let item = makeDigestItem(todos: [
+            makeTodo(title: "Done", dueDate: digestCueNow, projectId: digestCueProjectID, isComplete: true)
+        ])
+        XCTAssertNotNil(item)
+        XCTAssertEqual(item?.openTodoCount, 0)
+        XCTAssertEqual(item?.completedTodoCount, 1)
+        XCTAssertEqual(item?.isCaughtUp, true)
+        XCTAssertNil(item?.nextDueCue(relativeTo: digestCueNow, calendar: digestCueCalendar))
+    }
+
+    func testProjectDigestCaughtUpWhenMemoriesOnly() {
+        let item = TodayProjectDigestItem.derive(
+            projects: [makeProject(id: digestCueProjectID, name: "Orbit")],
+            todos: [],
+            memoryItems: [makeMemory(title: "Note", projectId: digestCueProjectID)]
+        ).first
+        XCTAssertNotNil(item)
+        XCTAssertEqual(item?.openTodoCount, 0)
+        XCTAssertEqual(item?.memoryCount, 1)
+        XCTAssertEqual(item?.isCaughtUp, true)
+    }
+
+    func testProjectDigestNotCaughtUpWithOpenTodos() {
+        let item = makeDigestItem(todos: [
+            makeTodo(title: "Open", projectId: digestCueProjectID)
+        ])
+        XCTAssertEqual(item?.openTodoCount, 1)
+        XCTAssertEqual(item?.isCaughtUp, false)
+    }
+
     private let digestCueProjectID = UUID(uuidString: "66666666-6666-6666-6666-666666666666")!
 
     private var digestCueNow: Date { Date(timeIntervalSince1970: 1_700_006_400) }

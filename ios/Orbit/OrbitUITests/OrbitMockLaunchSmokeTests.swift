@@ -67,6 +67,12 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
 
         let digestRow = app.buttons["today.projectDigest.Orbit"]
         XCTAssertTrue(digestRow.waitForExistence(timeout: 5), "Orbit digest row did not appear")
+        // The seeded Orbit project has only a completed linked todo (plus a linked
+        // memory), so its digest row shows the calm caught-up signal.
+        XCTAssertTrue(
+            app.staticTexts["All caught up"].waitForExistence(timeout: 5),
+            "Caught-up signal did not appear for a project with no open todos"
+        )
         digestRow.tap()
 
         XCTAssertTrue(app.staticTexts["Activity"].waitForExistence(timeout: 5))

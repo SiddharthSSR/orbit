@@ -52,6 +52,12 @@ struct TodayProjectDigestItem: Identifiable, Equatable {
 
     var id: UUID { project.id }
 
+    /// True when the project has linked activity but no open linked todos, so the
+    /// digest row can show a calm, positive "all caught up" signal instead of a
+    /// silent zero. (Items only appear in the digest when they have some linked
+    /// activity, so this also covers completed-only and memory-only projects.)
+    var isCaughtUp: Bool { openTodoCount == 0 }
+
     static func derive(
         projects: [ProjectDTO],
         todos: [TodoDTO],

@@ -292,7 +292,7 @@ struct TodayScreen: View {
             if dashboardViewModel.projectDigestItems.isEmpty {
                 OrbitCard {
                     EmptyStateView(
-                        title: "No linked project activity",
+                        title: "No project activity yet",
                         message: "Link todos or captures to projects to see a daily digest here.",
                         systemImage: "folder"
                     )
@@ -553,6 +553,11 @@ private struct TodayProjectDigestRow: View {
                     Text(cue)
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(nextDueTint)
+                        .lineLimit(1)
+                } else if item.isCaughtUp {
+                    Label("All caught up", systemImage: "checkmark.circle")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
                         .lineLimit(1)
                 }
             }
