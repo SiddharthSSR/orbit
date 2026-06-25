@@ -13,6 +13,30 @@ struct MemoryDTO: Decodable, Identifiable, Hashable, Sendable {
     var updatedAt: Date
 }
 
+/// Lightweight, read-only capture-quality signals derived purely from a memory's
+/// existing fields. No score is invented and no backend data is required; this
+/// only restates what the DTO already carries so Inbox can surface a calm cue for
+/// captures that arrived without any organizing metadata.
+struct MemoryCaptureQuality: Equatable {
+    let isLinkedToProject: Bool
+    let hasTags: Bool
+    let hasSource: Bool
+
+    init(memory: MemoryDTO) {
+        isLinkedToProject = memory.projectId != nil
+        hasTags = !memory.tags.isEmpty
+        hasSource = !(memory.sourceUrl?.isEmpty ?? true)
+    }
+
+    /// Flags a capture for review only when it has no organizing metadata at all —
+    /// not linked to a project, untagged, and without a source. These bare rows
+    /// are the ones most likely to need filing later, and the signal is fully
+    /// deterministic, so the cue stays reliable rather than speculative.
+    var needsReview: Bool {
+        !isLinkedToProject && !hasTags && !hasSource
+    }
+}
+
 struct MemoryCreateRequest: Encodable, Sendable {
     var title: String
     var body: String

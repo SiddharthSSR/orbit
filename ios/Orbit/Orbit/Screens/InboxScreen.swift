@@ -233,6 +233,10 @@ private struct MemoryRow: View {
                 Text(memory.title)
                     .font(OrbitTypography.cardTitle)
                 Spacer(minLength: OrbitSpacing.xs)
+                if quality.needsReview {
+                    OrbitBadge(text: "Needs review", tint: .orange)
+                        .accessibilityLabel("Needs review: no project, tags, or source")
+                }
                 OrbitBadge(text: kindLabel(memory.kind))
             }
 
@@ -323,6 +327,12 @@ private struct MemoryRow: View {
                 Text(name)
             }
         }
+    }
+
+    /// Read-only capture-quality signals derived from the memory's existing
+    /// fields, used to show the calm "needs review" cue.
+    private var quality: MemoryCaptureQuality {
+        MemoryCaptureQuality(memory: memory)
     }
 
     /// The source URL's host for a calm archive-style label, falling back to the

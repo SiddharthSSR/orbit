@@ -252,11 +252,52 @@ final class MemoryListViewModelTests: XCTestCase {
         await fulfillment(of: [event], timeout: 0.3)
     }
 
+    func testCaptureQualityNeedsReviewForBareCapture() {
+        let memory = makeMemory(title: "Quick thought")
+        let quality = MemoryCaptureQuality(memory: memory)
+
+        XCTAssertFalse(quality.isLinkedToProject)
+        XCTAssertFalse(quality.hasTags)
+        XCTAssertFalse(quality.hasSource)
+        XCTAssertTrue(quality.needsReview)
+    }
+
+    func testCaptureQualityDoesNotNeedReviewWhenTagged() {
+        let quality = MemoryCaptureQuality(memory: makeMemory(title: "Idea", tags: ["orbit"]))
+
+        XCTAssertTrue(quality.hasTags)
+        XCTAssertFalse(quality.needsReview)
+    }
+
+    func testCaptureQualityDoesNotNeedReviewWhenLinkedToProject() {
+        let quality = MemoryCaptureQuality(memory: makeMemory(title: "Note", projectId: UUID()))
+
+        XCTAssertTrue(quality.isLinkedToProject)
+        XCTAssertFalse(quality.needsReview)
+    }
+
+    func testCaptureQualityDoesNotNeedReviewWhenSourcePresent() {
+        let quality = MemoryCaptureQuality(
+            memory: makeMemory(title: "Saved link", sourceUrl: "https://example.com")
+        )
+
+        XCTAssertTrue(quality.hasSource)
+        XCTAssertFalse(quality.needsReview)
+    }
+
+    func testCaptureQualityTreatsEmptySourceStringAsNoSource() {
+        let quality = MemoryCaptureQuality(memory: makeMemory(title: "Empty source", sourceUrl: ""))
+
+        XCTAssertFalse(quality.hasSource)
+        XCTAssertTrue(quality.needsReview)
+    }
+
     private func makeMemory(
         title: String,
         body: String = "Body",
         kind: String = "note",
         tags: [String] = [],
+        sourceUrl: String? = nil,
         projectId: UUID? = nil,
         isArchived: Bool = false
     ) -> MemoryDTO {
@@ -266,7 +307,7 @@ final class MemoryListViewModelTests: XCTestCase {
             title: title,
             body: body,
             kind: kind,
-            sourceUrl: nil,
+            sourceUrl: sourceUrl,
             projectId: projectId,
             tags: tags,
             isArchived: isArchived,
