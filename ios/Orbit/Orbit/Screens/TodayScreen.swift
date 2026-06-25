@@ -288,7 +288,11 @@ struct TodayScreen: View {
     }
 
     private var projectDigestSection: some View {
-        DashboardSection(title: "Project Digest", systemImage: "folder") {
+        DashboardSection(
+            title: "Project Digest",
+            systemImage: "folder",
+            summary: dashboardViewModel.projectDigestSummary?.label
+        ) {
             if dashboardViewModel.projectDigestItems.isEmpty {
                 OrbitCard {
                     EmptyStateView(
@@ -369,12 +373,16 @@ private struct DashboardSection<Content: View>: View {
     let title: String
     let systemImage: String
     var count: Int? = nil
+    var summary: String? = nil
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: OrbitSpacing.sm) {
             OrbitSectionHeader(title, systemImage: systemImage) {
-                if let count {
+                if let summary {
+                    OrbitBadge(text: summary)
+                        .accessibilityLabel(summary)
+                } else if let count {
                     OrbitBadge(text: "\(count) open")
                         .accessibilityLabel(count == 1 ? "1 open todo" : "\(count) open todos")
                 }

@@ -65,6 +65,13 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Project Digest"].waitForExistence(timeout: 5))
 
+        // The seeded digest has one project (Orbit) with no open todos, so the
+        // header summary is deterministic.
+        XCTAssertTrue(
+            app.staticTexts["1 project · All caught up"].waitForExistence(timeout: 5),
+            "Project Digest header summary did not appear"
+        )
+
         let digestRow = app.buttons["today.projectDigest.Orbit"]
         XCTAssertTrue(digestRow.waitForExistence(timeout: 5), "Orbit digest row did not appear")
         // The seeded Orbit project has only a completed linked todo (plus a linked

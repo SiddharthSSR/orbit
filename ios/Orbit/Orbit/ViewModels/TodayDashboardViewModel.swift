@@ -159,6 +159,39 @@ struct TodayProjectDigestItem: Identifiable, Equatable {
     }
 }
 
+/// Compact, deterministic glance summary of the project digest, shown in the
+/// section header so the digest reads at a glance. Combines the digest project
+/// count with either the total open linked todos or a calm "All caught up"
+/// signal when no digest project has open todos.
+struct TodayProjectDigestSummary: Equatable {
+    let projectCount: Int
+    let openTodoCount: Int
+
+    /// True when no digest project has an open linked todo, so the header can
+    /// echo the same calm signal used by individual caught-up rows.
+    var isAllCaughtUp: Bool { openTodoCount == 0 }
+
+    /// Header copy, e.g. `4 projects · 2 open` or `1 project · All caught up`.
+    /// Kept terse and free of dynamic dates so it stays stable and testable.
+    var label: String {
+        let projectPart = projectCount == 1 ? "1 project" : "\(projectCount) projects"
+        let activityPart = isAllCaughtUp
+            ? "All caught up"
+            : (openTodoCount == 1 ? "1 open" : "\(openTodoCount) open")
+        return "\(projectPart) · \(activityPart)"
+    }
+
+    /// Derives the summary from digest items, or `nil` for an empty digest so the
+    /// header stays clean and the existing empty state is preserved.
+    static func derive(from items: [TodayProjectDigestItem]) -> TodayProjectDigestSummary? {
+        guard !items.isEmpty else { return nil }
+        return TodayProjectDigestSummary(
+            projectCount: items.count,
+            openTodoCount: items.reduce(0) { $0 + $1.openTodoCount }
+        )
+    }
+}
+
 @MainActor
 final class TodayDashboardViewModel: ObservableObject {
     @Published private(set) var todos: [TodoDTO] = []
@@ -231,6 +264,12 @@ final class TodayDashboardViewModel: ObservableObject {
             todos: todos,
             memoryItems: memoryItems
         )
+    }
+
+    /// Glance summary for the Project Digest section header, or `nil` when the
+    /// digest is empty.
+    var projectDigestSummary: TodayProjectDigestSummary? {
+        TodayProjectDigestSummary.derive(from: projectDigestItems)
     }
 
     var openTodoCount: Int {

@@ -482,6 +482,60 @@ final class TodayDashboardViewModelTests: XCTestCase {
         XCTAssertEqual(item?.isCaughtUp, false)
     }
 
+    func testProjectDigestSummaryCountsProjectsAndTotalOpenTodos() {
+        let firstID = UUID(uuidString: "77777777-7777-7777-7777-777777777777")!
+        let secondID = UUID(uuidString: "88888888-8888-8888-8888-888888888888")!
+
+        let items = TodayProjectDigestItem.derive(
+            projects: [
+                makeProject(id: firstID, name: "Orbit"),
+                makeProject(id: secondID, name: "WorldLens")
+            ],
+            todos: [
+                makeTodo(title: "Open one", projectId: firstID),
+                makeTodo(title: "Open two", projectId: firstID),
+                makeTodo(title: "Open three", projectId: secondID)
+            ],
+            memoryItems: []
+        )
+
+        let summary = TodayProjectDigestSummary.derive(from: items)
+        XCTAssertEqual(summary?.projectCount, 2)
+        XCTAssertEqual(summary?.openTodoCount, 3)
+        XCTAssertEqual(summary?.isAllCaughtUp, false)
+        XCTAssertEqual(summary?.label, "2 projects · 3 open")
+    }
+
+    func testProjectDigestSummaryUsesSingularOpenCopyForOneOpenTodo() {
+        let projectID = UUID(uuidString: "99999999-9999-9999-9999-999999999999")!
+        let items = TodayProjectDigestItem.derive(
+            projects: [makeProject(id: projectID, name: "Orbit")],
+            todos: [makeTodo(title: "Open", projectId: projectID)],
+            memoryItems: []
+        )
+
+        XCTAssertEqual(TodayProjectDigestSummary.derive(from: items)?.label, "1 project · 1 open")
+    }
+
+    func testProjectDigestSummaryShowsAllCaughtUpWhenNoOpenTodos() {
+        let projectID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let items = TodayProjectDigestItem.derive(
+            projects: [makeProject(id: projectID, name: "Orbit")],
+            todos: [makeTodo(title: "Done", projectId: projectID, isComplete: true)],
+            memoryItems: [makeMemory(title: "Note", projectId: projectID)]
+        )
+
+        let summary = TodayProjectDigestSummary.derive(from: items)
+        XCTAssertEqual(summary?.projectCount, 1)
+        XCTAssertEqual(summary?.openTodoCount, 0)
+        XCTAssertEqual(summary?.isAllCaughtUp, true)
+        XCTAssertEqual(summary?.label, "1 project · All caught up")
+    }
+
+    func testProjectDigestSummaryIsNilForEmptyDigest() {
+        XCTAssertNil(TodayProjectDigestSummary.derive(from: []))
+    }
+
     private let digestCueProjectID = UUID(uuidString: "66666666-6666-6666-6666-666666666666")!
 
     private var digestCueNow: Date { Date(timeIntervalSince1970: 1_700_006_400) }
