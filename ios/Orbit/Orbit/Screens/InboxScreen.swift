@@ -104,29 +104,48 @@ struct InboxScreen: View {
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
                 } else {
-                    ForEach(memoryViewModel.memoryItems) { memory in
-                        MemoryRow(
-                            memory: memory,
-                            projects: memoryViewModel.projects,
-                            projectName: memoryViewModel.projectName(for: memory.projectId),
-                            projectLinkErrorMessage: memoryViewModel.projectLinkErrorMessages[memory.id],
-                            isUpdatingProject: memoryViewModel.updatingProjectMemoryIDs.contains(memory.id),
-                            isHighlighted: memory.id == highlightedMemoryID,
-                            onProjectSelected: { projectID in
-                                Task {
-                                    await memoryViewModel.updateProjectLink(
-                                        memory: memory,
-                                        projectID: projectID
-                                    )
-                                }
-                            },
-                            onArchive: {
-                                Task { await memoryViewModel.archiveMemory(memory: memory) }
-                            },
-                            onDelete: {
-                                Task { await memoryViewModel.deleteMemory(memory: memory) }
-                            }
+                    Picker("Filter captures", selection: $memoryViewModel.activeInboxFilter) {
+                        ForEach(InboxMemoryFilter.allCases) { filter in
+                            Text(filter.title).tag(filter)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .accessibilityIdentifier("Inbox filter")
+
+                    if memoryViewModel.filteredMemoryItems.isEmpty {
+                        EmptyStateView(
+                            title: "No matching captures",
+                            message: "No memories match this filter. Switch back to All to see everything.",
+                            systemImage: "line.3.horizontal.decrease.circle"
                         )
+                        .frame(maxWidth: .infinity)
+                        .listRowBackground(Color.clear)
+                    } else {
+                        ForEach(memoryViewModel.filteredMemoryItems) { memory in
+                            MemoryRow(
+                                memory: memory,
+                                projects: memoryViewModel.projects,
+                                projectName: memoryViewModel.projectName(for: memory.projectId),
+                                projectLinkErrorMessage: memoryViewModel.projectLinkErrorMessages[memory.id],
+                                isUpdatingProject: memoryViewModel.updatingProjectMemoryIDs.contains(memory.id),
+                                isHighlighted: memory.id == highlightedMemoryID,
+                                onProjectSelected: { projectID in
+                                    Task {
+                                        await memoryViewModel.updateProjectLink(
+                                            memory: memory,
+                                            projectID: projectID
+                                        )
+                                    }
+                                },
+                                onArchive: {
+                                    Task { await memoryViewModel.archiveMemory(memory: memory) }
+                                },
+                                onDelete: {
+                                    Task { await memoryViewModel.deleteMemory(memory: memory) }
+                                }
+                            )
+                        }
                     }
                 }
             } header: {

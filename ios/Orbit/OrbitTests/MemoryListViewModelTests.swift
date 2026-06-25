@@ -292,6 +292,68 @@ final class MemoryListViewModelTests: XCTestCase {
         XCTAssertTrue(quality.needsReview)
     }
 
+    func testInboxFilterAllReturnsEveryMemory() async {
+        let viewModel = await loadedFilterViewModel()
+
+        viewModel.activeInboxFilter = .all
+
+        XCTAssertEqual(
+            viewModel.filteredMemoryItems.map(\.title),
+            ["Bare", "Linked", "Sourced", "Tagged"]
+        )
+    }
+
+    func testInboxFilterNeedsReviewReturnsBareCaptures() async {
+        let viewModel = await loadedFilterViewModel()
+
+        viewModel.activeInboxFilter = .needsReview
+
+        XCTAssertEqual(viewModel.filteredMemoryItems.map(\.title), ["Bare"])
+    }
+
+    func testInboxFilterLinkedReturnsProjectLinkedMemories() async {
+        let viewModel = await loadedFilterViewModel()
+
+        viewModel.activeInboxFilter = .linked
+
+        XCTAssertEqual(viewModel.filteredMemoryItems.map(\.title), ["Linked"])
+    }
+
+    func testInboxFilterHasSourceReturnsMemoriesWithSource() async {
+        let viewModel = await loadedFilterViewModel()
+
+        viewModel.activeInboxFilter = .hasSource
+
+        XCTAssertEqual(viewModel.filteredMemoryItems.map(\.title), ["Sourced"])
+    }
+
+    func testInboxFilterEmptyResultWhenNoMemoryMatches() async {
+        let viewModel = MemoryListViewModel(
+            apiClient: MockMemoryAPIClient(memoryItems: [makeMemory(title: "Tagged", tags: ["orbit"])])
+        )
+        await viewModel.loadMemory()
+
+        viewModel.activeInboxFilter = .needsReview
+
+        XCTAssertTrue(viewModel.filteredMemoryItems.isEmpty)
+        XCTAssertFalse(viewModel.memoryItems.isEmpty)
+    }
+
+    /// View model seeded with one memory per capture-quality state, in a fixed
+    /// order, so filter assertions stay deterministic.
+    private func loadedFilterViewModel() async -> MemoryListViewModel {
+        let viewModel = MemoryListViewModel(
+            apiClient: MockMemoryAPIClient(memoryItems: [
+                makeMemory(title: "Bare"),
+                makeMemory(title: "Linked", projectId: UUID()),
+                makeMemory(title: "Sourced", sourceUrl: "https://example.com"),
+                makeMemory(title: "Tagged", tags: ["orbit"])
+            ])
+        )
+        await viewModel.loadMemory()
+        return viewModel
+    }
+
     private func makeMemory(
         title: String,
         body: String = "Body",

@@ -11,6 +11,16 @@ final class MemoryListViewModel: ObservableObject {
     @Published private(set) var projectLinkErrorMessages: [UUID: String] = [:]
     @Published var activeKindFilter: String?
     @Published var activeTagFilter: String?
+    /// Inbox-local capture-quality filter, applied client-side to the already
+    /// loaded `memoryItems`. Defaults to `.all`; changing it does not reload.
+    @Published var activeInboxFilter: InboxMemoryFilter = .all
+
+    /// `memoryItems` narrowed by `activeInboxFilter`. The unfiltered list stays
+    /// the source of truth so archive/delete/project-link continue to operate on
+    /// the full loaded set.
+    var filteredMemoryItems: [MemoryDTO] {
+        memoryItems.filter { activeInboxFilter.matches($0) }
+    }
 
     private let apiClient: any MemoryAPIClientProtocol
     private let projectAPIClient: any ProjectAPIClientProtocol

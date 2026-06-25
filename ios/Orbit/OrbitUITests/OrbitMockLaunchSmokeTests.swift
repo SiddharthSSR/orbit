@@ -240,6 +240,35 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         wait(for: [removed], timeout: 5)
     }
 
+    @MainActor
+    func testInboxFilterNarrowsCapturesAndReturnsToAll() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let inboxTab = app.buttons["Inbox"]
+        XCTAssertTrue(inboxTab.waitForExistence(timeout: 5))
+        inboxTab.tap()
+
+        // All (default) shows the seeded captures: the linked+sourced "AI article
+        // link" and the unlinked, source-less "iPhone app idea".
+        XCTAssertTrue(app.staticTexts["AI article link"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["iPhone app idea"].waitForExistence(timeout: 5))
+
+        // Filtering to Linked keeps only the project-linked capture.
+        revealAndTap(app.buttons["Linked"], in: app, label: "Linked filter segment")
+        XCTAssertTrue(app.staticTexts["AI article link"].waitForExistence(timeout: 5))
+        let ideaHidden = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "exists == false"),
+            object: app.staticTexts["iPhone app idea"]
+        )
+        wait(for: [ideaHidden], timeout: 5)
+
+        // Returning to All restores the full list.
+        revealAndTap(app.buttons["All"], in: app, label: "All filter segment")
+        XCTAssertTrue(app.staticTexts["iPhone app idea"].waitForExistence(timeout: 5))
+    }
+
     /// End-to-end mock-mode coverage of the create_todo suggested-action loop:
     /// ask -> suggested action chip -> preview sheet -> execute -> navigate to
     /// Today with the new todo highlighted. Runs entirely on seeded mock

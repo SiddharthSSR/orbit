@@ -37,6 +37,41 @@ struct MemoryCaptureQuality: Equatable {
     }
 }
 
+/// Lightweight, Inbox-local filter over already-loaded memories, applied
+/// client-side via `MemoryCaptureQuality`. `all` is the default and returns the
+/// list unchanged; the others narrow by a single reliable capture signal. This
+/// adds no backend query — it only reshapes what is already loaded.
+enum InboxMemoryFilter: String, CaseIterable, Identifiable {
+    case all
+    case needsReview
+    case linked
+    case hasSource
+
+    var id: String { rawValue }
+
+    /// Short label for the compact filter control.
+    var title: String {
+        switch self {
+        case .all: "All"
+        case .needsReview: "Needs review"
+        case .linked: "Linked"
+        case .hasSource: "Has source"
+        }
+    }
+
+    /// True when the memory belongs in this filter, using the same reliable
+    /// capture signals shown on the row.
+    func matches(_ memory: MemoryDTO) -> Bool {
+        let quality = MemoryCaptureQuality(memory: memory)
+        switch self {
+        case .all: return true
+        case .needsReview: return quality.needsReview
+        case .linked: return quality.isLinkedToProject
+        case .hasSource: return quality.hasSource
+        }
+    }
+}
+
 struct MemoryCreateRequest: Encodable, Sendable {
     var title: String
     var body: String
