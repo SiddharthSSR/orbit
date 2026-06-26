@@ -4,6 +4,7 @@ struct InboxScreen: View {
     @EnvironmentObject private var navigation: AppNavigationModel
     @StateObject private var memoryViewModel: MemoryListViewModel
     @State private var highlightedMemoryID: UUID?
+    @State private var selectedMemory: MemoryDTO?
     @State private var newTitle = ""
     @State private var newBody = ""
     @State private var newKind = "note"
@@ -130,6 +131,7 @@ struct InboxScreen: View {
                                 projectLinkErrorMessage: memoryViewModel.projectLinkErrorMessages[memory.id],
                                 isUpdatingProject: memoryViewModel.updatingProjectMemoryIDs.contains(memory.id),
                                 isHighlighted: memory.id == highlightedMemoryID,
+                                onOpen: { selectedMemory = memory },
                                 onProjectSelected: { projectID in
                                     Task {
                                         await memoryViewModel.updateProjectLink(
@@ -159,6 +161,12 @@ struct InboxScreen: View {
         }
         .scrollContentBackground(.hidden)
         .orbitBackground()
+        .navigationDestination(item: $selectedMemory) { memory in
+            MemoryDetailView(
+                memory: memory,
+                projectName: memoryViewModel.projectName(for: memory.projectId)
+            )
+        }
         .task {
             await memoryViewModel.loadMemory()
             consumePendingHighlightIfLoaded()
@@ -242,60 +250,73 @@ private struct MemoryRow: View {
     let projectLinkErrorMessage: String?
     let isUpdatingProject: Bool
     let isHighlighted: Bool
+    let onOpen: () -> Void
     let onProjectSelected: (UUID?) -> Void
     let onArchive: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(memory.title)
-                    .font(OrbitTypography.cardTitle)
-                Spacer(minLength: OrbitSpacing.xs)
-                if quality.needsReview {
-                    OrbitBadge(text: "Needs review", tint: .orange)
-                        .accessibilityLabel("Needs review: no project, tags, or source")
-                }
-                OrbitBadge(text: kindLabel(memory.kind))
-            }
+            // Only the content area navigates to the read-only detail; the action
+            // row below stays outside this button so the project menu, archive,
+            // and delete controls keep their own taps.
+            Button(action: onOpen) {
+                VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(memory.title)
+                            .font(OrbitTypography.cardTitle)
+                        Spacer(minLength: OrbitSpacing.xs)
+                        if quality.needsReview {
+                            OrbitBadge(text: "Needs review", tint: .orange)
+                                .accessibilityLabel("Needs review: no project, tags, or source")
+                        }
+                        OrbitBadge(text: kindLabel(memory.kind))
+                    }
 
-            Text(memory.body)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .lineLimit(3)
-
-            VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
-                if let sourceHost {
-                    Label(sourceHost, systemImage: "link")
-                        .font(.footnote)
+                    Text(memory.body)
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                        .lineLimit(3)
 
-                if !memory.tags.isEmpty {
-                    Label(memory.tags.joined(separator: " · "), systemImage: "tag")
+                    VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
+                        if let sourceHost {
+                            Label(sourceHost, systemImage: "link")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+
+                        if !memory.tags.isEmpty {
+                            Label(memory.tags.joined(separator: " · "), systemImage: "tag")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .lineLimit(2)
+                        }
+
+                        if let projectName {
+                            LinkedProjectLabel(projectName: projectName)
+                                .accessibilityIdentifier("Linked project for \(memory.title)")
+                        } else if memory.projectId != nil {
+                            Label("Linked project", systemImage: "folder")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
+                        Label(
+                            "Captured \(memory.createdAt.formatted(date: .abbreviated, time: .omitted))",
+                            systemImage: "clock"
+                        )
                         .font(.caption)
                         .foregroundStyle(.tertiary)
-                        .lineLimit(2)
+                    }
+                    .padding(.top, OrbitSpacing.xxs)
                 }
-
-                if let projectName {
-                    LinkedProjectLabel(projectName: projectName)
-                        .accessibilityIdentifier("Linked project for \(memory.title)")
-                } else if memory.projectId != nil {
-                    Label("Linked project", systemImage: "folder")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Label(
-                    "Captured \(memory.createdAt.formatted(date: .abbreviated, time: .omitted))",
-                    systemImage: "clock"
-                )
-                .font(.caption)
-                .foregroundStyle(.tertiary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .padding(.top, OrbitSpacing.xxs)
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("Open memory \(memory.title)")
+            .accessibilityHint("Opens memory details")
 
             HStack {
                 Menu {
@@ -359,6 +380,140 @@ private struct MemoryRow: View {
     private var sourceHost: String? {
         guard let sourceUrl = memory.sourceUrl, !sourceUrl.isEmpty else { return nil }
         return URL(string: sourceUrl)?.host ?? sourceUrl
+    }
+
+    private func kindLabel(_ kind: String) -> String {
+        switch kind {
+        case "project_update":
+            "Project"
+        default:
+            kind.capitalized
+        }
+    }
+}
+
+/// Read-only detail for a single captured memory, opened from an Inbox row. It
+/// reuses the already-loaded memory (and resolved project name) — no fetch, no
+/// editing. Missing source/tags/project render calm "omitted" rows rather than
+/// disappearing, so the capture's completeness is legible at a glance.
+private struct MemoryDetailView: View {
+    let memory: MemoryDTO
+    let projectName: String?
+
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: OrbitSpacing.md) {
+                    OrbitScreenMasthead(memory.title)
+
+                    HStack(spacing: OrbitSpacing.xs) {
+                        OrbitBadge(text: kindLabel(memory.kind))
+                        if quality.needsReview {
+                            OrbitBadge(text: "Needs review", tint: .orange)
+                                .accessibilityLabel("Needs review: no project, tags, or source")
+                        }
+                    }
+
+                    if let sourceURL {
+                        VStack(alignment: .leading, spacing: OrbitSpacing.xxs) {
+                            Label(sourceHost ?? sourceURL, systemImage: "link")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            Text(sourceURL)
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .textSelection(.enabled)
+                                .lineLimit(3)
+                        }
+                    } else {
+                        omittedRow("No source", systemImage: "link")
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .orbitFloatingCard()
+                .orbitListCardRow()
+            }
+
+            Section {
+                Text(memory.body)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .textSelection(.enabled)
+                    .orbitFloatingCard()
+                    .orbitListCardRow()
+            } header: {
+                OrbitSectionHeader("Note", systemImage: "doc.text")
+                    .textCase(nil)
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: OrbitSpacing.sm) {
+                    if !memory.tags.isEmpty {
+                        Label(memory.tags.joined(separator: " · "), systemImage: "tag")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(3)
+                    } else {
+                        omittedRow("No tags", systemImage: "tag")
+                    }
+
+                    Divider()
+
+                    if let projectName {
+                        LinkedProjectLabel(projectName: projectName)
+                    } else if memory.projectId != nil {
+                        Label("Linked project", systemImage: "folder")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        omittedRow("Not linked to a project", systemImage: "folder")
+                    }
+
+                    Divider()
+
+                    Label(
+                        "Captured \(memory.createdAt.formatted(date: .abbreviated, time: .omitted))",
+                        systemImage: "clock"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .orbitFloatingCard()
+                .orbitListCardRow()
+            } header: {
+                OrbitSectionHeader("Details", systemImage: "info.circle")
+                    .textCase(nil)
+            }
+        }
+        .navigationTitle(memory.title)
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .orbitBackground()
+    }
+
+    private var quality: MemoryCaptureQuality {
+        MemoryCaptureQuality(memory: memory)
+    }
+
+    /// Trimmed, non-empty source URL or `nil`.
+    private var sourceURL: String? {
+        guard let trimmed = memory.sourceUrl?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
+    /// Host of the source URL for a calm label, falling back to the raw value.
+    private var sourceHost: String? {
+        guard let sourceURL else { return nil }
+        return URL(string: sourceURL)?.host ?? sourceURL
+    }
+
+    @ViewBuilder
+    private func omittedRow(_ text: String, systemImage: String) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(.subheadline)
+            .foregroundStyle(.tertiary)
     }
 
     private func kindLabel(_ kind: String) -> String {

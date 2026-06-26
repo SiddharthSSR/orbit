@@ -270,6 +270,33 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["AI article link"].waitForExistence(timeout: 5))
     }
 
+    @MainActor
+    func testInboxMemoryOpensReadOnlyDetail() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let inboxTab = app.buttons["Inbox"]
+        XCTAssertTrue(inboxTab.waitForExistence(timeout: 5))
+        inboxTab.tap()
+
+        // Open the first seeded capture's read-only detail.
+        let openButton = app.buttons["Open memory AI article link"]
+        revealAndTap(openButton, in: app, label: "Open AI article link memory")
+
+        // The detail shows the full source URL, which the Inbox row only
+        // summarizes by host — so this is unique to the detail screen and sits in
+        // the top card (no below-fold dependency).
+        XCTAssertTrue(
+            app.staticTexts["https://example.com/ai-memory"].waitForExistence(timeout: 5),
+            "Memory detail did not show the full source URL"
+        )
+
+        // Back returns to Inbox; the row open-button exists only on the Inbox list.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(openButton.waitForExistence(timeout: 5), "Did not return to Inbox")
+    }
+
     /// End-to-end mock-mode coverage of the create_todo suggested-action loop:
     /// ask -> suggested action chip -> preview sheet -> execute -> navigate to
     /// Today with the new todo highlighted. Runs entirely on seeded mock
