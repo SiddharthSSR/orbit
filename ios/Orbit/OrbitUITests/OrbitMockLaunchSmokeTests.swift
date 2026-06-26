@@ -454,6 +454,39 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testBillOpensReadOnlyDetail() {
+        let app = XCUIApplication()
+        app.launchArguments = ["--orbit-ui-tests"]
+        app.launch()
+
+        let billsTab = app.buttons["Bills"]
+        XCTAssertTrue(billsTab.waitForExistence(timeout: 5))
+        billsTab.tap()
+        XCTAssertTrue(app.staticTexts["Credit card bill"].waitForExistence(timeout: 5))
+
+        // Open the first seeded bill's read-only detail.
+        let openButton = app.buttons["Open bill Credit card bill"]
+        revealAndTap(openButton, in: app, label: "Open Credit card bill")
+
+        // The seeded bill's recurrence ("Monthly") is shown only on the detail
+        // screen — the Bills row never surfaces it — and is deterministic, so it
+        // is a stable detail-only signal that does not depend on dynamic dates.
+        let recurrence = app.staticTexts["Monthly"]
+        var shown = recurrence.waitForExistence(timeout: 5)
+        var attempts = 0
+        while !shown && attempts < 6 {
+            app.swipeUp()
+            shown = recurrence.exists
+            attempts += 1
+        }
+        XCTAssertTrue(shown, "Bill detail did not show the recurrence")
+
+        // Back returns to Bills; the row open-button exists only on the list.
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        XCTAssertTrue(openButton.waitForExistence(timeout: 5), "Did not return to Bills")
+    }
+
     /// The Ask composer uses a vertical `TextField` (backed by a text view), so
     /// resolve whichever element kind exposes the `ask.input` identifier.
     @MainActor

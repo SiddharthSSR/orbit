@@ -2,6 +2,7 @@ import SwiftUI
 
 struct BillsScreen: View {
     @StateObject private var billViewModel: BillListViewModel
+    @State private var selectedBill: BillDTO?
     @State private var newBillName = ""
     @State private var newBillAmount = ""
     @State private var newBillDueDate = Date()
@@ -67,6 +68,7 @@ struct BillsScreen: View {
                     ForEach(billViewModel.bills) { bill in
                         BillRow(
                             bill: bill,
+                            onOpen: { selectedBill = bill },
                             onTogglePaid: {
                                 Task { await billViewModel.toggleBillPaid(bill: bill) }
                             },
@@ -82,6 +84,9 @@ struct BillsScreen: View {
         }
         .scrollContentBackground(.hidden)
         .orbitBackground()
+        .navigationDestination(item: $selectedBill) { bill in
+            BillDetailView(bill: bill)
+        }
         .task {
             await billViewModel.loadBills()
         }
@@ -125,6 +130,7 @@ struct BillsScreen: View {
 
 private struct BillRow: View {
     let bill: BillDTO
+    let onOpen: () -> Void
     let onTogglePaid: () -> Void
     let onDelete: () -> Void
 
@@ -138,29 +144,38 @@ private struct BillRow: View {
             .buttonStyle(.plain)
             .accessibilityLabel(bill.isPaid ? "Mark unpaid" : "Mark paid")
 
-            VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(bill.name)
-                        .font(OrbitTypography.cardTitle)
-                    Spacer(minLength: OrbitSpacing.xs)
-                    OrbitBadge(text: status.label, tint: status.tint)
-                }
+            // Only the content area opens the read-only detail; the toggle-paid
+            // and delete controls stay outside this button so their taps survive.
+            Button(action: onOpen) {
+                VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(bill.name)
+                            .font(OrbitTypography.cardTitle)
+                        Spacer(minLength: OrbitSpacing.xs)
+                        OrbitBadge(text: status.label, tint: status.tint)
+                    }
 
-                if let amount = bill.amount {
-                    Text(amount, format: .currency(code: bill.currency))
-                        .font(.title3.weight(.semibold))
-                }
+                    if let amount = bill.amount {
+                        Text(amount, format: .currency(code: bill.currency))
+                            .font(.title3.weight(.semibold))
+                    }
 
-                Text("Due \(bill.dueDate.formatted(date: .abbreviated, time: .omitted))")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-
-                if let notes = bill.notes, !notes.isEmpty {
-                    Text(notes)
-                        .font(.footnote)
+                    Text("Due \(bill.dueDate.formatted(date: .abbreviated, time: .omitted))")
+                        .font(.subheadline)
                         .foregroundStyle(.secondary)
+
+                    if let notes = bill.notes, !notes.isEmpty {
+                        Text(notes)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("Open bill \(bill.name)")
+            .accessibilityHint("Opens bill details")
 
             Button(role: .destructive, action: onDelete) {
                 Image(systemName: "trash")
@@ -174,6 +189,119 @@ private struct BillRow: View {
 
     private var status: BillStatus {
         BillStatus.resolve(isPaid: bill.isPaid, dueDate: bill.dueDate)
+    }
+}
+
+/// Read-only detail for a single bill (MVP-8.0). Surfaces the existing
+/// `BillDTO` fields calmly — prominent amount and due date, a status badge,
+/// and any optional metadata that is actually present. No editing here.
+private struct BillDetailView: View {
+    let bill: BillDTO
+
+    var body: some View {
+        List {
+            Section {
+                VStack(alignment: .leading, spacing: OrbitSpacing.md) {
+                    OrbitScreenMasthead(bill.name)
+
+                    OrbitBadge(text: status.label, tint: status.tint)
+
+                    VStack(alignment: .leading, spacing: OrbitSpacing.xs) {
+                        if let amount = bill.amount {
+                            Text(amount, format: .currency(code: bill.currency))
+                                .font(.largeTitle.weight(.bold))
+                        } else {
+                            omittedRow("No amount set", systemImage: "indianrupeesign.circle")
+                        }
+
+                        Label(
+                            "Due \(bill.dueDate.formatted(date: .complete, time: .omitted))",
+                            systemImage: "calendar"
+                        )
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .orbitFloatingCard()
+                .orbitListCardRow()
+            }
+
+            if let notes = bill.notes, !notes.isEmpty {
+                Section {
+                    Text(notes)
+                        .font(.body)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .textSelection(.enabled)
+                        .orbitFloatingCard()
+                        .orbitListCardRow()
+                } header: {
+                    OrbitSectionHeader("Notes", systemImage: "doc.text")
+                        .textCase(nil)
+                }
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: OrbitSpacing.sm) {
+                    if let recurrence, !recurrence.isEmpty {
+                        Label(recurrence.capitalized, systemImage: "arrow.triangle.2.circlepath")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        omittedRow("One-off bill", systemImage: "arrow.triangle.2.circlepath")
+                    }
+
+                    Divider()
+
+                    Label(reminderLabel, systemImage: "bell")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Divider()
+
+                    Label(
+                        "Added \(bill.createdAt.formatted(date: .abbreviated, time: .omitted))",
+                        systemImage: "clock"
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .orbitFloatingCard()
+                .orbitListCardRow()
+            } header: {
+                OrbitSectionHeader("Details", systemImage: "info.circle")
+                    .textCase(nil)
+            }
+        }
+        .navigationTitle(bill.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .scrollContentBackground(.hidden)
+        .orbitBackground()
+    }
+
+    private var status: BillStatus {
+        BillStatus.resolve(isPaid: bill.isPaid, dueDate: bill.dueDate)
+    }
+
+    /// Trimmed, non-empty recurrence string or `nil`.
+    private var recurrence: String? {
+        guard let trimmed = bill.recurrence?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
+    private var reminderLabel: String {
+        let days = bill.reminderDaysBefore
+        if days <= 0 { return "No reminder" }
+        return days == 1 ? "Remind 1 day before" : "Remind \(days) days before"
+    }
+
+    @ViewBuilder
+    private func omittedRow(_ text: String, systemImage: String) -> some View {
+        Label(text, systemImage: systemImage)
+            .font(.subheadline)
+            .foregroundStyle(.tertiary)
     }
 }
 
