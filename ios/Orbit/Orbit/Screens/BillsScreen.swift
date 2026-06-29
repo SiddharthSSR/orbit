@@ -188,7 +188,11 @@ private struct BillRow: View {
     }
 
     private var status: BillStatus {
-        BillStatus.resolve(isPaid: bill.isPaid, dueDate: bill.dueDate)
+        BillStatus.resolve(
+            isPaid: bill.isPaid,
+            dueDate: bill.dueDate,
+            reminderDaysBefore: bill.reminderDaysBefore
+        )
     }
 }
 
@@ -281,7 +285,11 @@ private struct BillDetailView: View {
     }
 
     private var status: BillStatus {
-        BillStatus.resolve(isPaid: bill.isPaid, dueDate: bill.dueDate)
+        BillStatus.resolve(
+            isPaid: bill.isPaid,
+            dueDate: bill.dueDate,
+            reminderDaysBefore: bill.reminderDaysBefore
+        )
     }
 
     /// Trimmed, non-empty recurrence string or `nil`.
@@ -305,16 +313,26 @@ private struct BillDetailView: View {
     }
 }
 
-/// Calm, status-oriented label for a bill, derived only from the existing
-/// `isPaid` flag and `dueDate` (no new data fields or behavior).
-private enum BillStatus {
+/// Calm, status-oriented cue for a bill, derived only from the existing
+/// `isPaid` flag, `dueDate`, and `reminderDaysBefore` (no new data fields or
+/// behavior). Shared verbatim by the Bills list and Bill Detail so the status
+/// language stays consistent.
+enum BillStatus: Equatable {
     case paid
+    case overdue
+    case dueToday
     case dueSoon
     case upcoming
+
+    /// Fallback "due soon" window (in days) when a bill has no usable
+    /// `reminderDaysBefore` lead time.
+    static let defaultDueSoonWindowDays = 3
 
     var label: String {
         switch self {
         case .paid: "Paid"
+        case .overdue: "Overdue"
+        case .dueToday: "Due today"
         case .dueSoon: "Due soon"
         case .upcoming: "Upcoming"
         }
@@ -323,15 +341,35 @@ private enum BillStatus {
     var tint: Color {
         switch self {
         case .paid: .green
+        case .overdue: .red
+        case .dueToday: .orange
         case .dueSoon: .orange
         case .upcoming: .secondary
         }
     }
 
-    static func resolve(isPaid: Bool, dueDate: Date) -> BillStatus {
+    /// Resolve a bill's status from existing fields only, comparing whole
+    /// calendar days so a bill due later today still reads as "Due today".
+    /// `now` and `calendar` are injectable to keep the logic deterministic
+    /// under test.
+    static func resolve(
+        isPaid: Bool,
+        dueDate: Date,
+        reminderDaysBefore: Int,
+        now: Date = Date(),
+        calendar: Calendar = .current
+    ) -> BillStatus {
         if isPaid { return .paid }
-        let dueSoonThreshold = Calendar.current.date(byAdding: .day, value: 3, to: Date()) ?? Date()
-        return dueDate <= dueSoonThreshold ? .dueSoon : .upcoming
+
+        let today = calendar.startOfDay(for: now)
+        let due = calendar.startOfDay(for: dueDate)
+
+        if due < today { return .overdue }
+        if due == today { return .dueToday }
+
+        let window = reminderDaysBefore > 0 ? reminderDaysBefore : defaultDueSoonWindowDays
+        let threshold = calendar.date(byAdding: .day, value: window, to: today) ?? today
+        return due <= threshold ? .dueSoon : .upcoming
     }
 }
 

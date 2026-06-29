@@ -147,6 +147,75 @@ final class BillListViewModelTests: XCTestCase {
     }
 }
 
+final class BillStatusTests: XCTestCase {
+    // A fixed "now" so day-based comparisons are deterministic regardless of
+    // when the suite runs. Use a UTC calendar to match the fixed reference.
+    private let now = Date(timeIntervalSince1970: 1_700_000_000) // 2023-11-14T22:13:20Z
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+
+    private func due(daysFromNow days: Int) -> Date {
+        calendar.date(byAdding: .day, value: days, to: now)!
+    }
+
+    private func resolve(
+        isPaid: Bool = false,
+        daysFromNow: Int,
+        reminderDaysBefore: Int = 3
+    ) -> BillStatus {
+        BillStatus.resolve(
+            isPaid: isPaid,
+            dueDate: due(daysFromNow: daysFromNow),
+            reminderDaysBefore: reminderDaysBefore,
+            now: now,
+            calendar: calendar
+        )
+    }
+
+    func testPaidAlwaysWinsEvenWhenOverdue() {
+        XCTAssertEqual(resolve(isPaid: true, daysFromNow: -10), .paid)
+    }
+
+    func testOverdueWhenUnpaidAndPastDue() {
+        XCTAssertEqual(resolve(daysFromNow: -1), .overdue)
+    }
+
+    func testDueTodayWhenUnpaidAndDueSameCalendarDay() {
+        // Due earlier in the same calendar day still reads as "Due today"
+        // because the status compares whole days, not instants.
+        let startOfToday = calendar.startOfDay(for: now)
+        XCTAssertEqual(
+            BillStatus.resolve(
+                isPaid: false,
+                dueDate: startOfToday,
+                reminderDaysBefore: 3,
+                now: now,
+                calendar: calendar
+            ),
+            .dueToday
+        )
+    }
+
+    func testDueSoonWithinReminderWindow() {
+        XCTAssertEqual(resolve(daysFromNow: 2, reminderDaysBefore: 3), .dueSoon)
+        // Boundary: exactly at the window edge still reads as due soon.
+        XCTAssertEqual(resolve(daysFromNow: 3, reminderDaysBefore: 3), .dueSoon)
+    }
+
+    func testUpcomingBeyondReminderWindow() {
+        XCTAssertEqual(resolve(daysFromNow: 4, reminderDaysBefore: 3), .upcoming)
+    }
+
+    func testFallsBackToFixedWindowWhenNoReminderLead() {
+        // reminderDaysBefore <= 0 falls back to the default 3-day window.
+        XCTAssertEqual(resolve(daysFromNow: 3, reminderDaysBefore: 0), .dueSoon)
+        XCTAssertEqual(resolve(daysFromNow: 4, reminderDaysBefore: 0), .upcoming)
+    }
+}
+
 @MainActor
 final class OrbitRefreshCenterTests: XCTestCase {
     func testHelperNamesMatchNotificationNameConstants() {
