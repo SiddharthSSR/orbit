@@ -28,6 +28,9 @@ final class OrbitMockLaunchSmokeTests: XCTestCase {
         XCTAssertTrue(billsTab.exists)
         billsTab.tap()
         XCTAssertTrue(app.staticTexts["Credit card bill"].waitForExistence(timeout: 3))
+        // The seeded credit-card bill is due in two days, so it deterministically
+        // lands in the "Due soon" urgency section (header sits at the top).
+        XCTAssertTrue(app.staticTexts["Due soon"].waitForExistence(timeout: 3))
     }
 
     @MainActor

@@ -217,6 +217,109 @@ final class BillStatusTests: XCTestCase {
 }
 
 @MainActor
+final class BillUrgencyGroupingTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_700_000_000)
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+
+    private func bill(
+        name: String,
+        daysFromNow: Int,
+        isPaid: Bool = false,
+        reminderDaysBefore: Int = 3
+    ) -> BillDTO {
+        let dueDate = calendar.date(byAdding: .day, value: daysFromNow, to: now)!
+        return BillDTO(
+            id: UUID(),
+            name: name,
+            amount: 100,
+            currency: "INR",
+            dueDate: dueDate,
+            recurrence: nil,
+            isPaid: isPaid,
+            reminderDaysBefore: reminderDaysBefore,
+            notes: nil,
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+
+    private func group(_ bills: [BillDTO]) -> [BillGroup] {
+        BillListViewModel.groupedByUrgency(bills, now: now, calendar: calendar)
+    }
+
+    func testGroupsAreOrderedMostActionableFirst() {
+        let bills = [
+            bill(name: "Upcoming", daysFromNow: 30),
+            bill(name: "Paid", daysFromNow: -1, isPaid: true),
+            bill(name: "Overdue", daysFromNow: -2),
+            bill(name: "Due soon", daysFromNow: 2),
+            bill(name: "Due today", daysFromNow: 0)
+        ]
+
+        let groups = group(bills)
+
+        XCTAssertEqual(
+            groups.map(\.status),
+            [.overdue, .dueToday, .dueSoon, .upcoming, .paid]
+        )
+    }
+
+    func testEmptyGroupsAreOmitted() {
+        let bills = [
+            bill(name: "Overdue", daysFromNow: -1),
+            bill(name: "Upcoming", daysFromNow: 30)
+        ]
+
+        let groups = group(bills)
+
+        // No due-today / due-soon / paid bills, so only two sections appear.
+        XCTAssertEqual(groups.map(\.status), [.overdue, .upcoming])
+    }
+
+    func testWithinGroupSortsByDueDateAscending() {
+        let bills = [
+            bill(name: "Later", daysFromNow: 20),
+            bill(name: "Sooner", daysFromNow: 10),
+            bill(name: "Soonest", daysFromNow: 5)
+        ]
+
+        let upcoming = group(bills).first { $0.status == .upcoming }
+
+        XCTAssertEqual(upcoming?.bills.map(\.name), ["Soonest", "Sooner", "Later"])
+    }
+
+    func testWithinGroupNameBreaksDueDateTies() {
+        let bills = [
+            bill(name: "Zebra", daysFromNow: 10),
+            bill(name: "apple", daysFromNow: 10),
+            bill(name: "Mango", daysFromNow: 10)
+        ]
+
+        let upcoming = group(bills).first { $0.status == .upcoming }
+
+        // Same due date → case-insensitive name order.
+        XCTAssertEqual(upcoming?.bills.map(\.name), ["apple", "Mango", "Zebra"])
+    }
+
+    func testPaidBillsAlwaysSortAfterUnpaid() {
+        let bills = [
+            bill(name: "Paid but overdue date", daysFromNow: -5, isPaid: true),
+            bill(name: "Unpaid upcoming", daysFromNow: 30)
+        ]
+
+        let groups = group(bills)
+
+        // Paid wins over the overdue date, so it lands in the last group.
+        XCTAssertEqual(groups.map(\.status), [.upcoming, .paid])
+        XCTAssertEqual(groups.last?.bills.map(\.name), ["Paid but overdue date"])
+    }
+}
+
+@MainActor
 final class OrbitRefreshCenterTests: XCTestCase {
     func testHelperNamesMatchNotificationNameConstants() {
         XCTAssertEqual(OrbitRefreshCenter.memoryDidChange, .orbitMemoryDidChange)

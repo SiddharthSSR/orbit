@@ -49,14 +49,16 @@ struct BillsScreen: View {
                 }
             }
 
-            Section {
-                if billViewModel.isLoading {
+            if billViewModel.isLoading {
+                Section {
                     HStack {
                         Spacer()
                         ProgressView()
                         Spacer()
                     }
-                } else if billViewModel.bills.isEmpty {
+                }
+            } else if billViewModel.bills.isEmpty {
+                Section {
                     EmptyStateView(
                         title: "No bills yet",
                         message: "Payment reminders and recurring bills will show up here.",
@@ -64,22 +66,27 @@ struct BillsScreen: View {
                     )
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
-                } else {
-                    ForEach(billViewModel.bills) { bill in
-                        BillRow(
-                            bill: bill,
-                            onOpen: { selectedBill = bill },
-                            onTogglePaid: {
-                                Task { await billViewModel.toggleBillPaid(bill: bill) }
-                            },
-                            onDelete: {
-                                Task { await billViewModel.deleteBill(bill: bill) }
-                            }
-                        )
+                }
+            } else {
+                // Grouped most-actionable-first; empty urgency groups are omitted.
+                ForEach(billGroups) { group in
+                    Section {
+                        ForEach(group.bills) { bill in
+                            BillRow(
+                                bill: bill,
+                                onOpen: { selectedBill = bill },
+                                onTogglePaid: {
+                                    Task { await billViewModel.toggleBillPaid(bill: bill) }
+                                },
+                                onDelete: {
+                                    Task { await billViewModel.deleteBill(bill: bill) }
+                                }
+                            )
+                        }
+                    } header: {
+                        groupHeader(group)
                     }
                 }
-            } header: {
-                upcomingHeader
             }
         }
         .scrollContentBackground(.hidden)
@@ -97,15 +104,16 @@ struct BillsScreen: View {
         }
     }
 
-    private var unpaidCount: Int {
-        billViewModel.bills.filter { !$0.isPaid }.count
+    /// Bills grouped into non-empty urgency sections for display.
+    private var billGroups: [BillGroup] {
+        BillListViewModel.groupedByUrgency(billViewModel.bills)
     }
 
-    private var upcomingHeader: some View {
-        OrbitSectionHeader("Upcoming payments") {
-            if unpaidCount > 0 {
-                OrbitBadge(text: unpaidCount == 1 ? "1 due" : "\(unpaidCount) due", tint: .orange)
-            }
+    /// Compact section header: the status label with a count badge tinted to
+    /// match the status.
+    private func groupHeader(_ group: BillGroup) -> some View {
+        OrbitSectionHeader(group.status.label) {
+            OrbitBadge(text: "\(group.bills.count)", tint: group.status.tint)
         }
         .textCase(nil)
     }
@@ -327,6 +335,15 @@ enum BillStatus: Equatable {
     /// Fallback "due soon" window (in days) when a bill has no usable
     /// `reminderDaysBefore` lead time.
     static let defaultDueSoonWindowDays = 3
+
+    /// Canonical most-actionable-first order, used for sorting and sectioning
+    /// the Bills list.
+    static let urgencyOrder: [BillStatus] = [.overdue, .dueToday, .dueSoon, .upcoming, .paid]
+
+    /// Position of this status in `urgencyOrder` (lower is more urgent).
+    var urgencyRank: Int {
+        BillStatus.urgencyOrder.firstIndex(of: self) ?? BillStatus.urgencyOrder.count
+    }
 
     var label: String {
         switch self {
