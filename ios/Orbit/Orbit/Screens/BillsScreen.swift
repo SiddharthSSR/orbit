@@ -109,13 +109,31 @@ struct BillsScreen: View {
         BillListViewModel.groupedByUrgency(billViewModel.bills)
     }
 
-    /// Compact section header: the status label with a count badge tinted to
-    /// match the status.
+    /// Compact section header: the status label with a trailing summary of the
+    /// bill count and, when safe, the group subtotal.
     private func groupHeader(_ group: BillGroup) -> some View {
         OrbitSectionHeader(group.status.label) {
-            OrbitBadge(text: "\(group.bills.count)", tint: group.status.tint)
+            Text(groupSummary(group))
+                .font(OrbitTypography.caption)
+                .foregroundStyle(.secondary)
         }
         .textCase(nil)
+    }
+
+    /// "2 bills · ₹4,500" when a single-currency total is available, falling
+    /// back to "3 bills · Mixed currencies" or just the count.
+    private func groupSummary(_ group: BillGroup) -> String {
+        let count = group.count
+        let countText = count == 1 ? "1 bill" : "\(count) bills"
+        switch group.total {
+        case let .amount(sum, currency):
+            let amountText = sum.formatted(.currency(code: currency))
+            return "\(countText) · \(amountText)"
+        case .mixedCurrencies:
+            return "\(countText) · Mixed currencies"
+        case .unavailable:
+            return countText
+        }
     }
 
     private func createBill() async {

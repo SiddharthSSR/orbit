@@ -320,6 +320,96 @@ final class BillUrgencyGroupingTests: XCTestCase {
 }
 
 @MainActor
+final class BillGroupTotalTests: XCTestCase {
+    private let now = Date(timeIntervalSince1970: 1_700_000_000)
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar
+    }
+
+    private func bill(
+        name: String,
+        daysFromNow: Int,
+        amount: Double?,
+        currency: String = "INR",
+        isPaid: Bool = false
+    ) -> BillDTO {
+        let dueDate = calendar.date(byAdding: .day, value: daysFromNow, to: now)!
+        return BillDTO(
+            id: UUID(),
+            name: name,
+            amount: amount,
+            currency: currency,
+            dueDate: dueDate,
+            recurrence: nil,
+            isPaid: isPaid,
+            reminderDaysBefore: 3,
+            notes: nil,
+            createdAt: now,
+            updatedAt: now
+        )
+    }
+
+    func testSubtotalForSingleCurrency() {
+        let group = BillGroup(
+            status: .dueSoon,
+            bills: [
+                bill(name: "A", daysFromNow: 1, amount: 1500),
+                bill(name: "B", daysFromNow: 2, amount: 3000)
+            ]
+        )
+
+        XCTAssertEqual(group.total, .amount(4500, currency: "INR"))
+        XCTAssertEqual(group.count, 2)
+    }
+
+    func testMixedCurrencyFallback() {
+        let group = BillGroup(
+            status: .upcoming,
+            bills: [
+                bill(name: "A", daysFromNow: 10, amount: 1500, currency: "INR"),
+                bill(name: "B", daysFromNow: 11, amount: 20, currency: "USD")
+            ]
+        )
+
+        XCTAssertEqual(group.total, .mixedCurrencies)
+        XCTAssertEqual(group.count, 2)
+    }
+
+    func testMissingAmountFallsBackToUnavailable() {
+        let group = BillGroup(
+            status: .upcoming,
+            bills: [
+                bill(name: "A", daysFromNow: 10, amount: 1500),
+                bill(name: "B", daysFromNow: 11, amount: nil)
+            ]
+        )
+
+        XCTAssertEqual(group.total, .unavailable)
+        XCTAssertEqual(group.count, 2)
+    }
+
+    func testTotalsDoNotChangeOrdering() {
+        // Mixing amounts/currencies must not affect urgency grouping or the
+        // within-group due-date ordering established in MVP-8.2.
+        let bills = [
+            bill(name: "Later", daysFromNow: 20, amount: nil),
+            bill(name: "Sooner", daysFromNow: 10, amount: 999, currency: "USD"),
+            bill(name: "Overdue", daysFromNow: -1, amount: 100)
+        ]
+
+        let groups = BillListViewModel.groupedByUrgency(bills, now: now, calendar: calendar)
+
+        XCTAssertEqual(groups.map(\.status), [.overdue, .upcoming])
+        let upcoming = groups.first { $0.status == .upcoming }
+        XCTAssertEqual(upcoming?.bills.map(\.name), ["Sooner", "Later"])
+        // The upcoming group mixes a usable amount with a missing one.
+        XCTAssertEqual(upcoming?.total, .unavailable)
+    }
+}
+
+@MainActor
 final class OrbitRefreshCenterTests: XCTestCase {
     func testHelperNamesMatchNotificationNameConstants() {
         XCTAssertEqual(OrbitRefreshCenter.memoryDidChange, .orbitMemoryDidChange)

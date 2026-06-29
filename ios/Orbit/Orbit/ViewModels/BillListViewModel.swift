@@ -1,5 +1,15 @@
 import Foundation
 
+/// Compact subtotal shown on a Bills group header.
+enum BillGroupTotal: Equatable {
+    /// Every bill in the group has an amount and they share one currency.
+    case amount(Double, currency: String)
+    /// Bills carry usable amounts but in more than one currency.
+    case mixedCurrencies
+    /// At least one bill has no amount, so a meaningful total isn't available.
+    case unavailable
+}
+
 /// A run of bills that share the same urgency status, for sectioned display in
 /// the Bills list. Built by `BillListViewModel.groupedByUrgency`.
 struct BillGroup: Identifiable {
@@ -7,6 +17,24 @@ struct BillGroup: Identifiable {
     let bills: [BillDTO]
 
     var id: Int { status.urgencyRank }
+
+    /// Number of bills in the group.
+    var count: Int { bills.count }
+
+    /// Group subtotal, summed only when it is safe to do so: every bill must
+    /// have an amount and all amounts must share a single currency. Otherwise a
+    /// calm fallback is returned (count-only or "Mixed currencies").
+    var total: BillGroupTotal {
+        guard !bills.isEmpty, bills.allSatisfy({ $0.amount != nil }) else {
+            return .unavailable
+        }
+        let currencies = Set(bills.map(\.currency))
+        guard currencies.count == 1, let currency = currencies.first else {
+            return .mixedCurrencies
+        }
+        let sum = bills.reduce(0.0) { $0 + ($1.amount ?? 0) }
+        return .amount(sum, currency: currency)
+    }
 }
 
 @MainActor
